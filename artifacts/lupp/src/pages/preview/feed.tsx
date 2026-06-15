@@ -5,7 +5,6 @@ import { Heart, MessageCircle, Share2, Bookmark, ArrowLeft, ShoppingBag, Star, T
 import { mockVideos } from '@/data/mock';
 import { Link, useRoute } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
-import { LuppLogo } from '@/components/shared/LuppLogo';
 import { videosService } from '@/services/videos.service';
 import { analyticsService } from '@/services/analytics.service';
 import { isSupabaseConfigured } from '@/lib/env';
@@ -38,6 +37,7 @@ export default function PreviewFeed() {
   const [, params] = useRoute('/s/:storeSlug/feed');
   const storeSlug = params?.storeSlug;
   const [likedMap, setLikedMap] = React.useState<Record<string, boolean>>({});
+  const isEmbedded = new URLSearchParams(window.location.search).get('embed') === '1';
 
   const feedQuery = useQuery({
     queryKey: ['public-feed', storeSlug],
@@ -89,9 +89,13 @@ export default function PreviewFeed() {
     <div className="h-[100dvh] w-full bg-black overflow-hidden flex justify-center text-white">
       <div className="relative flex h-full w-full max-w-[420px] flex-col bg-slate-950">
         <div className="absolute left-0 right-0 top-0 z-50 flex items-center justify-between bg-gradient-to-b from-black/60 to-transparent p-4">
-          <Button variant="ghost" size="icon" asChild className="text-white hover:bg-white/20">
-            <Link href="/app/feed"><ArrowLeft className="h-6 w-6" /></Link>
-          </Button>
+          {isEmbedded ? (
+            <div className="w-10" />
+          ) : (
+            <Button variant="ghost" size="icon" asChild className="text-white hover:bg-white/20">
+              <Link href="/app/feed"><ArrowLeft className="h-6 w-6" /></Link>
+            </Button>
+          )}
           <div className="max-w-[240px] truncate text-lg font-bold">
             {store?.name ?? 'Lupp Preview'}
           </div>
@@ -137,10 +141,6 @@ export default function PreviewFeed() {
                 ) : (
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-900 via-slate-900 to-black opacity-90" />
                 )}
-
-                <div className="absolute right-4 top-16 scale-75 opacity-30">
-                  <LuppLogo />
-                </div>
 
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/60 to-transparent p-4 pt-32">
                   <div className="mb-4 pr-16">

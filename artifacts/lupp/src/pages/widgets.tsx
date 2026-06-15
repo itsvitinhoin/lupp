@@ -2,6 +2,9 @@ import React from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { WidgetCard, type WidgetCardItem } from '@/components/shared/WidgetCard';
 import { CodeBlock } from '@/components/shared/CodeBlock';
 import { mockWidgets } from '@/data/mock';
@@ -41,8 +44,21 @@ export default function Widgets() {
   });
   const realWidgets = widgetsQuery.data?.map(toWidgetCard) ?? [];
   const widgets = realWidgets.length ? realWidgets : mockWidgets.map((widget) => ({ ...widget, type: widget.id }));
-  const [selectedWidget, setSelectedWidget] = React.useState<WidgetCardItem | null>(null);
-  const currentWidget = selectedWidget ?? widgets[0] ?? null;
+  const [, setSelectedWidget] = React.useState<WidgetCardItem | null>(null);
+  const launcherWidget: WidgetCardItem = {
+    id: 'floating-launcher',
+    name: 'Bolinha flutuante',
+    description: 'Abre o feed vertical em overlay dentro da loja',
+    status: 'ativo',
+    type: 'floating_launcher',
+  };
+  const [launcherLabel, setLauncherLabel] = React.useState('Compre pelo vídeo');
+  const [launcherPosition, setLauncherPosition] = React.useState('bottom-left');
+  const [launcherAccent, setLauncherAccent] = React.useState('#fe2c55');
+  const [launcherBackground, setLauncherBackground] = React.useState('#0b0b0f');
+  const [launcherTextColor, setLauncherTextColor] = React.useState('#ffffff');
+  const [launcherFont, setLauncherFont] = React.useState('Inter, system-ui, sans-serif');
+  const [launcherSize, setLauncherSize] = React.useState('74');
 
   const getWidgetType = (widget: WidgetCardItem) => widget.type || widget.id;
 
@@ -54,6 +70,13 @@ export default function Widgets() {
       `  src="${env.widgetCdnUrl}"`,
       `  data-store="${store.slug}"`,
       `  data-widget="${getWidgetType(widget)}"`,
+      `  data-position="${launcherPosition}"`,
+      `  data-accent-color="${launcherAccent}"`,
+      `  data-background-color="${launcherBackground}"`,
+      `  data-text-color="${launcherTextColor}"`,
+      `  data-label="${launcherLabel}"`,
+      `  data-font-family="${launcherFont}"`,
+      `  data-bubble-size="${launcherSize}"`,
       `  data-supabase-url="${env.supabaseUrl}"`,
       `  data-supabase-key="${env.supabaseAnonKey}"`,
       `  data-lupp-url="${env.appUrl}"`,
@@ -132,13 +155,57 @@ export default function Widgets() {
 
         <Card className="border-white/5 bg-card/50">
           <CardHeader>
-            <CardTitle>Código de instalação</CardTitle>
+            <CardTitle>Código da bolinha flutuante</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Cole antes do fechamento do `body` no e-commerce interno. Para página de produto, adicione também `data-product-url` com a URL do produto atual.
+              Cole antes do fechamento do `body` no e-commerce. A bolinha aparece na loja e abre o feed vertical em overlay.
             </p>
-            <CodeBlock code={currentWidget ? getEmbedCode(currentWidget) : '<!-- Nenhum widget disponível. -->'} />
+            <div className="grid gap-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Posição</Label>
+                  <Select value={launcherPosition} onValueChange={setLauncherPosition}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bottom-left">Inferior esquerda</SelectItem>
+                      <SelectItem value="bottom-right">Inferior direita</SelectItem>
+                      <SelectItem value="top-left">Superior esquerda</SelectItem>
+                      <SelectItem value="top-right">Superior direita</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Texto</Label>
+                  <Input value={launcherLabel} onChange={(event) => setLauncherLabel(event.target.value)} />
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Cor principal</Label>
+                  <Input type="color" value={launcherAccent} onChange={(event) => setLauncherAccent(event.target.value)} className="h-10 p-1" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Fundo</Label>
+                  <Input type="color" value={launcherBackground} onChange={(event) => setLauncherBackground(event.target.value)} className="h-10 p-1" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Texto</Label>
+                  <Input type="color" value={launcherTextColor} onChange={(event) => setLauncherTextColor(event.target.value)} className="h-10 p-1" />
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-[1fr_88px]">
+                <div className="space-y-2">
+                  <Label>Fonte</Label>
+                  <Input value={launcherFont} onChange={(event) => setLauncherFont(event.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tamanho</Label>
+                  <Input value={launcherSize} onChange={(event) => setLauncherSize(event.target.value)} inputMode="numeric" />
+                </div>
+              </div>
+            </div>
+            <CodeBlock code={getEmbedCode(launcherWidget)} />
             {store && (
               <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
                 Feed público: <a className="text-primary hover:underline" href={`/s/${store.slug}/feed`} target="_blank" rel="noreferrer">{window.location.origin}/s/{store.slug}/feed</a>

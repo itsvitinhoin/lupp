@@ -12,7 +12,7 @@ export default function TestStore() {
   const storeSlug = params?.storeSlug ?? '';
   const widgetHostRef = React.useRef<HTMLDivElement | null>(null);
   const searchParams = new URLSearchParams(window.location.search);
-  const widgetType = searchParams.get('widget') || 'home_showcase';
+  const widgetType = searchParams.get('widget') || 'floating_launcher';
 
   React.useEffect(() => {
     if (!widgetHostRef.current || !storeSlug || !isSupabaseConfigured) return;
@@ -23,6 +23,12 @@ export default function TestStore() {
     script.async = true;
     script.dataset.store = storeSlug;
     script.dataset.widget = widgetType;
+    script.dataset.position = 'bottom-left';
+    script.dataset.label = 'Compre pelo vídeo';
+    script.dataset.accentColor = '#fe2c55';
+    script.dataset.backgroundColor = '#0b0b0f';
+    script.dataset.textColor = '#ffffff';
+    script.dataset.bubbleSize = '74';
     script.dataset.supabaseUrl = env.supabaseUrl;
     script.dataset.supabaseKey = env.supabaseAnonKey;
     script.dataset.luppUrl = env.appUrl;
@@ -80,9 +86,9 @@ export default function TestStore() {
 
           <Card className="border-slate-200 bg-white">
             <CardContent className="p-5">
-              <div className="mb-3 flex items-center gap-2">
-                <LuppLogo />
-                <span className="text-sm font-medium text-slate-600">Widget instalado via script</span>
+              <div className="mb-3 flex items-center gap-2 rounded-md bg-slate-950 px-3 py-2">
+                <LuppLogo className="h-6" />
+                <span className="text-sm font-medium text-white/80">Widget instalado via script</span>
               </div>
               <div ref={widgetHostRef} />
               {!isSupabaseConfigured && (
