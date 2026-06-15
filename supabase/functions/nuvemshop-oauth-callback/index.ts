@@ -92,12 +92,13 @@ Deno.serve(async (req) => {
 
   const returnTo = payload.return_to || fallbackReturnTo;
   const tokenResponse = await fetch("https://www.tiendanube.com/apps/authorize/token", {
-    body: new URLSearchParams({
+    body: JSON.stringify({
       client_id: appId,
       client_secret: clientSecret,
       code,
+      grant_type: "authorization_code",
     }),
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers: { "Content-Type": "application/json" },
     method: "POST",
   });
 
