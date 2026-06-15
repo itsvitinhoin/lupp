@@ -83,6 +83,7 @@ export function AppRoutes() {
       <Route path="/preview/product" component={PreviewProduct} />
       <Route path="/s/:storeSlug/feed" component={PreviewFeed} />
       <Route path="/test-store/:storeSlug" component={TestStore} />
+      <Route path="/test-store/:storeSlug/produto-demo" component={TestStore} />
 
       <Route component={NotFound} />
     </Switch>
