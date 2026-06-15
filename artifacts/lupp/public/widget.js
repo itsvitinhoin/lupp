@@ -4,32 +4,44 @@
   var script = document.currentScript;
   if (!script) return;
 
-  var storeSlug = script.getAttribute("data-store");
-  var widgetType = (script.getAttribute("data-widget") || "floating_launcher").replace(/-/g, "_");
-  var productUrl = script.getAttribute("data-product-url") || window.location.href;
-  var supabaseUrl = script.getAttribute("data-supabase-url") || window.LUPP_SUPABASE_URL || "";
-  var supabaseKey = script.getAttribute("data-supabase-key") || window.LUPP_SUPABASE_ANON_KEY || "";
-  var luppBaseUrl = (script.getAttribute("data-lupp-url") || new URL(script.src).origin).replace(/\/$/, "");
-  var requireActiveWidget = script.getAttribute("data-require-active") === "true";
+  var scriptParams = new URL(script.src, window.location.href).searchParams;
+
+  function readScriptValue(attributeName, queryNames, fallback) {
+    var attributeValue = script.getAttribute(attributeName);
+    if (attributeValue !== null && attributeValue !== "") return attributeValue;
+    for (var index = 0; index < queryNames.length; index += 1) {
+      var queryValue = scriptParams.get(queryNames[index]);
+      if (queryValue !== null && queryValue !== "") return queryValue;
+    }
+    return fallback;
+  }
+
+  var storeSlug = readScriptValue("data-store", ["lupp_store", "lupp_store_slug", "store_slug"], "");
+  var widgetType = readScriptValue("data-widget", ["lupp_widget", "widget"], "floating_launcher").replace(/-/g, "_");
+  var productUrl = readScriptValue("data-product-url", ["lupp_product_url", "product_url"], window.location.href);
+  var supabaseUrl = readScriptValue("data-supabase-url", ["lupp_supabase_url", "supabase_url"], window.LUPP_SUPABASE_URL || "");
+  var supabaseKey = readScriptValue("data-supabase-key", ["lupp_supabase_key", "supabase_key"], window.LUPP_SUPABASE_ANON_KEY || "");
+  var luppBaseUrl = readScriptValue("data-lupp-url", ["lupp_url", "lupp_base_url"], new URL(script.src).origin).replace(/\/$/, "");
+  var requireActiveWidget = readScriptValue("data-require-active", ["lupp_require_active", "require_active"], "false") === "true";
 
   var launcherConfig = {
-    position: script.getAttribute("data-position") || "bottom-left",
-    accentColor: script.getAttribute("data-accent-color") || "#fe2c55",
-    backgroundColor: script.getAttribute("data-background-color") || "#0b0b0f",
-    textColor: script.getAttribute("data-text-color") || "#ffffff",
-    label: script.getAttribute("data-label") || "Compre pelo vídeo",
-    fontFamily: script.getAttribute("data-font-family") || "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-    bubbleSize: Number(script.getAttribute("data-bubble-size") || 74),
-    offsetX: Number(script.getAttribute("data-offset-x") || 18),
-    offsetY: Number(script.getAttribute("data-offset-y") || 18),
+    position: readScriptValue("data-position", ["lupp_position"], "bottom-left"),
+    accentColor: readScriptValue("data-accent-color", ["lupp_accent_color"], "#fe2c55"),
+    backgroundColor: readScriptValue("data-background-color", ["lupp_background_color"], "#0b0b0f"),
+    textColor: readScriptValue("data-text-color", ["lupp_text_color"], "#ffffff"),
+    label: readScriptValue("data-label", ["lupp_label"], "Compre pelo vídeo"),
+    fontFamily: readScriptValue("data-font-family", ["lupp_font_family"], "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"),
+    bubbleSize: Number(readScriptValue("data-bubble-size", ["lupp_bubble_size"], 74)),
+    offsetX: Number(readScriptValue("data-offset-x", ["lupp_offset_x"], 18)),
+    offsetY: Number(readScriptValue("data-offset-y", ["lupp_offset_y"], 18)),
   };
 
   var displayConfig = {
-    mode: script.getAttribute("data-display-mode") || "all",
-    includePaths: parsePathList(script.getAttribute("data-include-paths") || ""),
-    excludePaths: parsePathList(script.getAttribute("data-exclude-paths") || ""),
-    productMode: script.getAttribute("data-product-mode") || "linked_or_all",
-    hideWithoutVideos: script.getAttribute("data-hide-without-videos") === "true",
+    mode: readScriptValue("data-display-mode", ["lupp_display_mode"], "all"),
+    includePaths: parsePathList(readScriptValue("data-include-paths", ["lupp_include_paths"], "")),
+    excludePaths: parsePathList(readScriptValue("data-exclude-paths", ["lupp_exclude_paths"], "")),
+    productMode: readScriptValue("data-product-mode", ["lupp_product_mode"], "linked_or_all"),
+    hideWithoutVideos: readScriptValue("data-hide-without-videos", ["lupp_hide_without_videos"], "false") === "true",
   };
 
   if (!storeSlug || !supabaseUrl || !supabaseKey) {
@@ -200,6 +212,9 @@
   function productMatchesCurrentPage(product) {
     if (!product || !product.product_url) return false;
 
+    var externalProductId = currentExternalProductId();
+    if (externalProductId && product.external_id && String(product.external_id) === externalProductId) return true;
+
     var current = normalizeUrl(productUrl || window.location.href);
     var saved = normalizeUrl(product.product_url);
     if (current === saved) return true;
@@ -211,6 +226,15 @@
     var currentHandle = extractProductHandle(productUrl || window.location.href);
     var savedHandle = extractProductHandle(product.product_url);
     return Boolean(currentHandle && savedHandle && currentHandle === savedHandle);
+  }
+
+  function currentExternalProductId() {
+    try {
+      if (window.LS && window.LS.product && window.LS.product.id !== undefined && window.LS.product.id !== null) {
+        return String(window.LS.product.id);
+      }
+    } catch (_) {}
+    return "";
   }
 
   function videoMatchesCurrentProduct(video) {
@@ -579,7 +603,7 @@
         var videoQuery =
           "/videos?store_id=eq." +
           store.id +
-          "&status=eq.active&is_feed_enabled=eq.true&select=*,video_products(is_primary,products(id,product_url))&order=sort_order.asc,created_at.desc";
+          "&status=eq.active&is_feed_enabled=eq.true&select=*,video_products(is_primary,products(id,external_id,product_url))&order=sort_order.asc,created_at.desc";
 
         return fetchJson(videoQuery).then(function (videos) {
           var filteredVideos = filterVideosForCurrentUrl(videos);

@@ -15,6 +15,33 @@ export const widgetsService = {
     return data;
   },
 
+  async installNuvemshopScript(storeId: string) {
+    const client = requireSupabase();
+    const {
+      data: { session },
+      error: sessionError,
+    } = await client.auth.getSession();
+
+    if (sessionError) throw sessionError;
+    if (!session) throw new Error("Sua sessão expirou. Entre novamente para instalar o script.");
+
+    const { data, error } = await client.functions.invoke<{ installed: boolean; method: string; script_id: string }>("nuvemshop-install-script", {
+      body: { store_id: storeId },
+    });
+
+    if (error) {
+      if ("context" in error && error.context instanceof Response) {
+        const details = await error.context.json().catch(() => null);
+        if (details && typeof details.error === "string") {
+          throw new Error(details.error.replace(/_/g, " "));
+        }
+      }
+      throw error;
+    }
+
+    return data ?? { installed: true, method: "POST", script_id: "" };
+  },
+
   getEmbedCode(storeSlug: string, widgetType: string) {
     return `<script src="${env.widgetCdnUrl}" data-store="${storeSlug}" data-widget="${widgetType}"></script>`;
   },

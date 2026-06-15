@@ -15,7 +15,7 @@ import { useCurrentStore } from '@/hooks/useStore';
 import { widgetsService } from '@/services/widgets.service';
 import { env, isSupabaseConfigured } from '@/lib/env';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, Save } from 'lucide-react';
+import { CloudUpload, ExternalLink, Save } from 'lucide-react';
 
 const widgetDescriptions: Record<string, string> = {
   product_video: 'Mostre vídeos compráveis dentro da página de produto',
@@ -84,6 +84,7 @@ export default function Widgets() {
   const [productMode, setProductMode] = React.useState('linked_or_all');
   const [hideWithoutVideos, setHideWithoutVideos] = React.useState(false);
   const [isSavingSettings, setIsSavingSettings] = React.useState(false);
+  const [isInstallingNuvemshop, setIsInstallingNuvemshop] = React.useState(false);
 
   React.useEffect(() => {
     if (!floatingWidget) return;
@@ -136,41 +137,43 @@ export default function Widgets() {
     ].join('\n');
   };
 
-  const handleSaveLauncherSettings = async () => {
+  const buildLauncherSettings = (currentSettings: Record<string, any>) => ({
+    ...currentSettings,
+    appearance: {
+      accent_color: launcherAccent,
+      background_color: launcherBackground,
+      bubble_size: Number(launcherSize) || 74,
+      font_family: launcherFont,
+      label: launcherLabel,
+      position: launcherPosition,
+      text_color: launcherTextColor,
+    },
+    display: {
+      exclude_paths: pathsFromText(excludePaths),
+      hide_without_videos: hideWithoutVideos,
+      include_paths: pathsFromText(includePaths),
+      mode: displayMode,
+      product_mode: productMode,
+    },
+  });
+
+  const saveLauncherSettings = async () => {
     if (!store || !floatingWidget) {
-      toast({
-        title: 'Widget flutuante não encontrado',
-        description: 'Crie uma loja com os widgets padrão antes de salvar esta configuração.',
-      });
-      return;
+      throw new Error('Crie uma loja com os widgets padrão antes de salvar esta configuração.');
     }
 
+    const currentSettings = asSettings(floatingWidget.settings);
+    await widgetsService.updateWidget(floatingWidget.id, {
+      status: 'active',
+      settings: buildLauncherSettings(currentSettings),
+    });
+    await queryClient.invalidateQueries({ queryKey: ['widgets', store.id] });
+  };
+
+  const handleSaveLauncherSettings = async () => {
     try {
       setIsSavingSettings(true);
-      const currentSettings = asSettings(floatingWidget.settings);
-      await widgetsService.updateWidget(floatingWidget.id, {
-        status: 'active',
-        settings: {
-          ...currentSettings,
-          appearance: {
-            accent_color: launcherAccent,
-            background_color: launcherBackground,
-            bubble_size: Number(launcherSize) || 74,
-            font_family: launcherFont,
-            label: launcherLabel,
-            position: launcherPosition,
-            text_color: launcherTextColor,
-          },
-          display: {
-            exclude_paths: pathsFromText(excludePaths),
-            hide_without_videos: hideWithoutVideos,
-            include_paths: pathsFromText(includePaths),
-            mode: displayMode,
-            product_mode: productMode,
-          },
-        },
-      });
-      await queryClient.invalidateQueries({ queryKey: ['widgets', store.id] });
+      await saveLauncherSettings();
       toast({
         title: 'Bolinha configurada',
         description: 'As regras de exibição foram salvas e o widget flutuante foi ativado.',
@@ -182,6 +185,27 @@ export default function Widgets() {
       });
     } finally {
       setIsSavingSettings(false);
+    }
+  };
+
+  const handleInstallNuvemshopScript = async () => {
+    if (!store) return;
+
+    try {
+      setIsInstallingNuvemshop(true);
+      await saveLauncherSettings();
+      await widgetsService.installNuvemshopScript(store.id);
+      toast({
+        title: 'Script instalado na Nuvemshop',
+        description: 'A bolinha da Lupp foi associada à loja conectada.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Não foi possível instalar na Nuvemshop',
+        description: error instanceof Error ? error.message : 'Verifique o script_id e a permissão scripts no app.',
+      });
+    } finally {
+      setIsInstallingNuvemshop(false);
     }
   };
 
@@ -361,6 +385,15 @@ export default function Widgets() {
             <Button className="w-full" onClick={() => void handleSaveLauncherSettings()} disabled={isSavingSettings || !floatingWidget}>
               <Save className="mr-2 h-4 w-4" />
               {isSavingSettings ? 'Salvando...' : 'Salvar e ativar bolinha'}
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full border-white/10 bg-card/50"
+              onClick={() => void handleInstallNuvemshopScript()}
+              disabled={isInstallingNuvemshop || !floatingWidget || !store}
+            >
+              <CloudUpload className="mr-2 h-4 w-4" />
+              {isInstallingNuvemshop ? 'Instalando...' : 'Instalar automaticamente na Nuvemshop'}
             </Button>
             <CodeBlock code={getEmbedCode(launcherWidget)} />
             {store && (
