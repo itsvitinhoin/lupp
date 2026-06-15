@@ -53,6 +53,35 @@ export const integrationsService = {
     return data.authorize_url;
   },
 
+  async syncNuvemshopProducts(storeId: string) {
+    const client = requireSupabase();
+    const {
+      data: { session },
+      error: sessionError,
+    } = await client.auth.getSession();
+
+    if (sessionError) throw sessionError;
+    if (!session) {
+      throw new Error("Sua sessão expirou. Entre novamente para sincronizar produtos.");
+    }
+
+    const { data, error } = await client.functions.invoke<{ count: number; ok: boolean; pages: number }>("nuvemshop-sync-products", {
+      body: { store_id: storeId },
+    });
+
+    if (error) {
+      if ("context" in error && error.context instanceof Response) {
+        const details = await error.context.json().catch(() => null);
+        if (details && typeof details.error === "string") {
+          throw new Error(details.error.replace(/_/g, " "));
+        }
+      }
+      throw error;
+    }
+
+    return data ?? { count: 0, ok: true, pages: 0 };
+  },
+
   async upsertTrackingSettings(storeId: string, provider: (typeof TRACKING_PROVIDERS)[number], settings: Record<string, string>) {
     const { data, error } = await requireSupabase()
       .from("integrations")

@@ -33,12 +33,39 @@ export default function Products() {
   const [price, setPrice] = React.useState('189.90');
   const [productUrl, setProductUrl] = React.useState('');
   const [isSaving, setIsSaving] = React.useState(false);
+  const [isSyncing, setIsSyncing] = React.useState(false);
 
   const handleAction = (action: string) => {
-    toast({
-      title: action,
-      description: "Ação simulada com sucesso.",
-    });
+    toast({ title: action, description: "Ação simulada com sucesso." });
+  };
+
+  const handleSyncProducts = async () => {
+    if (!isSupabaseConfigured) {
+      toast({ title: 'Supabase não configurado', description: 'Configure Supabase para sincronizar produtos reais.' });
+      return;
+    }
+
+    if (!store) {
+      toast({ title: 'Crie uma loja primeiro', description: 'Conclua o onboarding antes de sincronizar produtos.' });
+      return;
+    }
+
+    try {
+      setIsSyncing(true);
+      const result = await productsService.syncNuvemshopProducts(store.id);
+      await queryClient.invalidateQueries({ queryKey: ['products', store.id] });
+      toast({
+        title: 'Produtos sincronizados',
+        description: `${result.count ?? 0} produtos importados ou atualizados da Nuvemshop.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Não foi possível sincronizar',
+        description: error instanceof Error ? error.message : 'Conecte a Nuvemshop antes de sincronizar.',
+      });
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleCreateProduct = async () => {
@@ -88,9 +115,9 @@ export default function Products() {
           <p className="text-muted-foreground mt-1">Gerencie os produtos que aparecem nos seus vídeos.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="border-white/10 bg-card/50" onClick={() => handleAction('Sincronizar')}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Sincronizar
+          <Button variant="outline" className="border-white/10 bg-card/50" onClick={() => void handleSyncProducts()} disabled={isSyncing}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
           </Button>
           <Button variant="outline" className="border-white/10 bg-card/50" onClick={() => handleAction('Importar')}>
             <DownloadCloud className="mr-2 h-4 w-4" />

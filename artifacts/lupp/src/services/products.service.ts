@@ -1,4 +1,5 @@
 import { requireSupabase } from "@/lib/supabase";
+import { integrationsService } from "./integrations.service";
 import type { CreateProductPayload, UpdateProductPayload } from "@/types/product";
 
 export const productsService = {
@@ -28,5 +29,9 @@ export const productsService = {
   async deleteProduct(productId: string) {
     const { error } = await requireSupabase().from("products").delete().eq("id", productId);
     if (error) throw error;
+  },
+
+  async syncNuvemshopProducts(storeId: string) {
+    return integrationsService.syncNuvemshopProducts(storeId);
   },
 };

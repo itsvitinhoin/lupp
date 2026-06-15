@@ -8,15 +8,17 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useCurrentStore } from '@/hooks/useStore';
 import { integrationsService } from '@/services/integrations.service';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 
 export default function Integrations() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   const { session, loading: authLoading } = useAuth();
   const { store } = useCurrentStore();
   const [connectingProvider, setConnectingProvider] = React.useState<string | null>(null);
+  const [syncingProvider, setSyncingProvider] = React.useState<string | null>(null);
   const integrationsQuery = useQuery({
     queryKey: ['integrations', store?.id],
     queryFn: () => integrationsService.listIntegrations(store!.id),
@@ -77,6 +79,28 @@ export default function Integrations() {
     }
   };
 
+  const handleSync = async (integration: Integration) => {
+    if (integration.name.toLowerCase() !== 'nuvemshop' || !store) return;
+
+    try {
+      setSyncingProvider('nuvemshop');
+      const result = await integrationsService.syncNuvemshopProducts(store.id);
+      await queryClient.invalidateQueries({ queryKey: ['products', store.id] });
+      await integrationsQuery.refetch();
+      toast({
+        title: 'Produtos sincronizados',
+        description: `${result.count ?? 0} produtos importados ou atualizados da Nuvemshop.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Não foi possível sincronizar',
+        description: error instanceof Error ? error.message : 'Tente novamente em instantes.',
+      });
+    } finally {
+      setSyncingProvider(null);
+    }
+  };
+
   return (
     <AppLayout title="Integrações">
       <div className="mb-8">
@@ -90,15 +114,19 @@ export default function Integrations() {
             {mockIntegrations.map((integration) => {
               const providerKey = integration.name.toLowerCase();
               const normalizedProvider = providerKey === 'nuvemshop' ? 'nuvemshop' : providerKey;
-              const displayIntegration = activeProviders.has(normalizedProvider)
-                ? { ...integration, status: 'disponível' as const, description: `${integration.description} Conectada.` }
+              const isConnected = activeProviders.has(normalizedProvider);
+              const displayIntegration = isConnected
+                ? { ...integration, description: `${integration.description} Conectada.` }
                 : integration;
               return (
                 <IntegrationCard
                   key={integration.id}
                   integration={displayIntegration}
+                  isConnected={isConnected}
                   isConfiguring={connectingProvider === normalizedProvider}
+                  isSyncing={syncingProvider === normalizedProvider}
                   onConfigure={handleConfigure}
+                  onSync={handleSync}
                 />
               );
             })}
