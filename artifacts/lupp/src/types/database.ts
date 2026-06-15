@@ -215,8 +215,11 @@ export interface Database {
           store_id: string;
           provider: string;
           status: string;
+          external_store_id: string | null;
           credentials: Json;
           settings: Json;
+          connected_at: string | null;
+          last_sync_at: string | null;
           created_at: string;
           updated_at: string;
         };

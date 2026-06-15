@@ -22,6 +22,18 @@ export const integrationsService = {
     return data ?? [];
   },
 
+  async createNuvemshopAuthorizeUrl(storeId: string) {
+    const { data, error } = await requireSupabase().functions.invoke<{ authorize_url: string }>("nuvemshop-oauth-start", {
+      body: {
+        return_to: `${window.location.origin}/app/integrations`,
+        store_id: storeId,
+      },
+    });
+    if (error) throw error;
+    if (!data?.authorize_url) throw new Error("Não foi possível iniciar a conexão com a Nuvemshop.");
+    return data.authorize_url;
+  },
+
   async upsertTrackingSettings(storeId: string, provider: (typeof TRACKING_PROVIDERS)[number], settings: Record<string, string>) {
     const { data, error } = await requireSupabase()
       .from("integrations")

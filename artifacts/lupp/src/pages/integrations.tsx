@@ -4,9 +4,61 @@ import { IntegrationCard } from '@/components/shared/IntegrationCard';
 import { mockIntegrations, Integration } from '@/data/mock';
 import { CodeBlock } from '@/components/shared/CodeBlock';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { useCurrentStore } from '@/hooks/useStore';
+import { integrationsService } from '@/services/integrations.service';
+import { useQuery } from '@tanstack/react-query';
 
 export default function Integrations() {
+  const { toast } = useToast();
+  const { store } = useCurrentStore();
+  const integrationsQuery = useQuery({
+    queryKey: ['integrations', store?.id],
+    queryFn: () => integrationsService.listIntegrations(store!.id),
+    enabled: Boolean(store?.id),
+  });
   const manualSnippet = `<script src="https://cdn.lupp.app/embed.js" data-store="bella-moda"></script>`;
+  const activeProviders = new Set((integrationsQuery.data ?? []).filter((integration) => integration.status === 'active').map((integration) => integration.provider));
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get('connected');
+    const error = params.get('error');
+
+    if (connected === 'nuvemshop') {
+      toast({ title: 'Nuvemshop conectada', description: 'Agora já podemos sincronizar o catálogo dessa loja.' });
+      window.history.replaceState({}, '', window.location.pathname);
+      void integrationsQuery.refetch();
+      return;
+    }
+
+    if (error) {
+      toast({ title: 'Falha ao conectar integração', description: error.replace(/_/g, ' ') });
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  const handleConfigure = async (integration: Integration) => {
+    if (integration.name.toLowerCase() !== 'nuvemshop') {
+      toast({ title: 'Em breve', description: 'Vamos conectar essa plataforma depois da Nuvemshop.' });
+      return;
+    }
+
+    if (!store) {
+      toast({ title: 'Crie uma loja primeiro', description: 'A integração precisa estar associada a uma loja Luup.' });
+      return;
+    }
+
+    try {
+      const authorizeUrl = await integrationsService.createNuvemshopAuthorizeUrl(store.id);
+      window.location.href = authorizeUrl;
+    } catch (error) {
+      toast({
+        title: 'Não foi possível conectar a Nuvemshop',
+        description: error instanceof Error ? error.message : 'Tente novamente em instantes.',
+      });
+    }
+  };
 
   return (
     <AppLayout title="Integrações">
@@ -18,9 +70,14 @@ export default function Integrations() {
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <div className="grid gap-4 sm:grid-cols-2">
-            {mockIntegrations.map(integration => (
-              <IntegrationCard key={integration.id} integration={integration} />
-            ))}
+            {mockIntegrations.map((integration) => {
+              const providerKey = integration.name.toLowerCase();
+              const normalizedProvider = providerKey === 'nuvemshop' ? 'nuvemshop' : providerKey;
+              const displayIntegration = activeProviders.has(normalizedProvider)
+                ? { ...integration, status: 'disponível' as const, description: `${integration.description} Conectada.` }
+                : integration;
+              return <IntegrationCard key={integration.id} integration={displayIntegration} onConfigure={handleConfigure} />;
+            })}
           </div>
         </div>
 
