@@ -28,7 +28,7 @@ function formatTusError(error: Error | tus.DetailedError) {
     const status = error.originalResponse.getStatus();
     const body = error.originalResponse.getBody();
     if (status === 413) {
-      return "O Supabase recusou o arquivo pelo limite global de Storage. Projetos Free aceitam no máximo 50MB; para vídeos maiores, suba para Pro e ajuste Storage > Settings > Global file size limit.";
+      return "O Supabase recusou o arquivo pelo limite global de Storage. Em projetos Pro, ajuste Storage > Settings > Global file size limit para pelo menos o tamanho do vídeo.";
     }
 
     return `Falha no upload resumível (${status}). ${body || error.message}`;
