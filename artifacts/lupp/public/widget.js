@@ -10,6 +10,7 @@
   var supabaseUrl = script.getAttribute("data-supabase-url") || window.LUPP_SUPABASE_URL || "";
   var supabaseKey = script.getAttribute("data-supabase-key") || window.LUPP_SUPABASE_ANON_KEY || "";
   var luppBaseUrl = (script.getAttribute("data-lupp-url") || new URL(script.src).origin).replace(/\/$/, "");
+  var requireActiveWidget = script.getAttribute("data-require-active") === "true";
 
   var launcherConfig = {
     position: script.getAttribute("data-position") || "bottom-left",
@@ -21,6 +22,14 @@
     bubbleSize: Number(script.getAttribute("data-bubble-size") || 74),
     offsetX: Number(script.getAttribute("data-offset-x") || 18),
     offsetY: Number(script.getAttribute("data-offset-y") || 18),
+  };
+
+  var displayConfig = {
+    mode: script.getAttribute("data-display-mode") || "all",
+    includePaths: parsePathList(script.getAttribute("data-include-paths") || ""),
+    excludePaths: parsePathList(script.getAttribute("data-exclude-paths") || ""),
+    productMode: script.getAttribute("data-product-mode") || "linked_or_all",
+    hideWithoutVideos: script.getAttribute("data-hide-without-videos") === "true",
   };
 
   if (!storeSlug || !supabaseUrl || !supabaseKey) {
@@ -63,6 +72,159 @@
       if (!response.ok) throw new Error("Luup API error: " + response.status);
       return response.json();
     });
+  }
+
+  function parsePathList(value) {
+    return String(value || "")
+      .split(/[\n,]+/)
+      .map(function (item) {
+        return item.trim();
+      })
+      .filter(Boolean);
+  }
+
+  function normalizePath(value) {
+    var path = String(value || "/").trim();
+    try {
+      path = new URL(path, window.location.origin).pathname;
+    } catch (_) {}
+    path = path.replace(/\/+/g, "/");
+    if (path.length > 1) path = path.replace(/\/$/, "");
+    return path || "/";
+  }
+
+  function normalizeUrl(value) {
+    try {
+      var url = new URL(value, window.location.origin);
+      return (url.origin + normalizePath(url.pathname)).toLowerCase();
+    } catch (_) {
+      return normalizePath(value).toLowerCase();
+    }
+  }
+
+  function currentPath() {
+    return normalizePath(window.location.pathname);
+  }
+
+  function isHomePath(path) {
+    return path === "/" || path === "";
+  }
+
+  function isLikelyProductPath(path) {
+    return /\/(produto|produtos|product|products)\//i.test(path);
+  }
+
+  function matchesPattern(path, pattern) {
+    var normalizedPath = normalizePath(path).toLowerCase();
+    var normalizedPattern = normalizePath(pattern).toLowerCase();
+    if (!normalizedPattern || normalizedPattern === "/") return normalizedPath === "/";
+    if (normalizedPattern.indexOf("*") === -1) return normalizedPath === normalizedPattern || normalizedPath.indexOf(normalizedPattern + "/") === 0;
+
+    var expression = normalizedPattern
+      .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/\*/g, ".*");
+    return new RegExp("^" + expression + "$").test(normalizedPath);
+  }
+
+  function matchesAnyPattern(path, patterns) {
+    return (patterns || []).some(function (pattern) {
+      return matchesPattern(path, pattern);
+    });
+  }
+
+  function shouldDisplayOnCurrentUrl(config) {
+    var path = currentPath();
+    var mode = config.mode || "all";
+
+    if (matchesAnyPattern(path, config.excludePaths)) return false;
+    if (mode === "home") return isHomePath(path);
+    if (mode === "product") return isLikelyProductPath(path);
+    if (mode === "custom") return !config.includePaths.length || matchesAnyPattern(path, config.includePaths);
+    return true;
+  }
+
+  function mappedWidgetType() {
+    if (widgetType === "floating_launcher") return "floating_video";
+    return widgetType;
+  }
+
+  function fetchWidgetConfig(storeId) {
+    var type = mappedWidgetType();
+    return fetchJson(
+      "/widgets?store_id=eq." +
+        encodeURIComponent(storeId) +
+        "&type=eq." +
+        encodeURIComponent(type) +
+        "&status=eq.active&select=*"
+    ).then(function (widgets) {
+      return widgets[0] || null;
+    });
+  }
+
+  function applyWidgetSettings(widget) {
+    var settings = widget && widget.settings && typeof widget.settings === "object" ? widget.settings : {};
+    var appearance = settings.appearance && typeof settings.appearance === "object" ? settings.appearance : {};
+    var display = settings.display && typeof settings.display === "object" ? settings.display : {};
+
+    launcherConfig.position = appearance.position || launcherConfig.position;
+    launcherConfig.accentColor = appearance.accent_color || launcherConfig.accentColor;
+    launcherConfig.backgroundColor = appearance.background_color || launcherConfig.backgroundColor;
+    launcherConfig.textColor = appearance.text_color || launcherConfig.textColor;
+    launcherConfig.label = typeof appearance.label === "string" ? appearance.label : launcherConfig.label;
+    launcherConfig.fontFamily = appearance.font_family || launcherConfig.fontFamily;
+    launcherConfig.bubbleSize = Number(appearance.bubble_size || launcherConfig.bubbleSize);
+    launcherConfig.offsetX = Number(appearance.offset_x || launcherConfig.offsetX);
+    launcherConfig.offsetY = Number(appearance.offset_y || launcherConfig.offsetY);
+
+    displayConfig.mode = display.mode || displayConfig.mode;
+    displayConfig.includePaths = Array.isArray(display.include_paths) ? display.include_paths : displayConfig.includePaths;
+    displayConfig.excludePaths = Array.isArray(display.exclude_paths) ? display.exclude_paths : displayConfig.excludePaths;
+    displayConfig.productMode = display.product_mode || displayConfig.productMode;
+    displayConfig.hideWithoutVideos = Boolean(display.hide_without_videos || displayConfig.hideWithoutVideos);
+  }
+
+  function linkedProducts(video) {
+    return (video.video_products || [])
+      .map(function (link) {
+        return link.products || null;
+      })
+      .filter(Boolean);
+  }
+
+  function extractProductHandle(value) {
+    var path = normalizePath(value);
+    var match = path.match(/\/(?:produto|produtos|product|products)\/([^/]+)/i);
+    return match ? decodeURIComponent(match[1]).toLowerCase() : "";
+  }
+
+  function productMatchesCurrentPage(product) {
+    if (!product || !product.product_url) return false;
+
+    var current = normalizeUrl(productUrl || window.location.href);
+    var saved = normalizeUrl(product.product_url);
+    if (current === saved) return true;
+
+    var currentProductPath = normalizePath(productUrl || window.location.href).toLowerCase();
+    var savedProductPath = normalizePath(product.product_url).toLowerCase();
+    if (currentProductPath === savedProductPath) return true;
+
+    var currentHandle = extractProductHandle(productUrl || window.location.href);
+    var savedHandle = extractProductHandle(product.product_url);
+    return Boolean(currentHandle && savedHandle && currentHandle === savedHandle);
+  }
+
+  function videoMatchesCurrentProduct(video) {
+    return linkedProducts(video).some(productMatchesCurrentPage);
+  }
+
+  function filterVideosForCurrentUrl(videos) {
+    var path = currentPath();
+    var matchingProductVideos = videos.filter(videoMatchesCurrentProduct);
+    var isProduct = displayConfig.mode === "product" || isLikelyProductPath(path);
+
+    if (isProduct && matchingProductVideos.length) return matchingProductVideos;
+    if (isProduct && displayConfig.productMode === "linked_only") return [];
+    return videos;
   }
 
   function track(storeId, eventType, videoId, productId, metadata) {
@@ -395,15 +557,38 @@
         slug: storeSlug,
         button_color: launcherConfig.accentColor,
       };
-      track(store.id, "widget_view");
 
-      var videoQuery =
-        "/videos?store_id=eq." +
-        store.id +
-        "&status=eq.active&is_feed_enabled=eq.true&select=*&order=sort_order.asc,created_at.desc";
+      var widgetConfigPromise = fetchWidgetConfig(store.id).catch(function () {
+        return null;
+      });
 
-      return fetchJson(videoQuery).then(function (videos) {
-        render(root, store, videos);
+      return widgetConfigPromise.then(function (widgetConfig) {
+        if (!widgetConfig && requireActiveWidget) {
+          root.remove();
+          return null;
+        }
+
+        applyWidgetSettings(widgetConfig);
+        if (!shouldDisplayOnCurrentUrl(displayConfig)) {
+          root.remove();
+          return null;
+        }
+
+        track(store.id, "widget_view");
+
+        var videoQuery =
+          "/videos?store_id=eq." +
+          store.id +
+          "&status=eq.active&is_feed_enabled=eq.true&select=*,video_products(is_primary,products(id,product_url))&order=sort_order.asc,created_at.desc";
+
+        return fetchJson(videoQuery).then(function (videos) {
+          var filteredVideos = filterVideosForCurrentUrl(videos);
+          if (!filteredVideos.length && displayConfig.hideWithoutVideos) {
+            root.remove();
+            return;
+          }
+          render(root, store, filteredVideos);
+        });
       });
     })
     .catch(function (error) {

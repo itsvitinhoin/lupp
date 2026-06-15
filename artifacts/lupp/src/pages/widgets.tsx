@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { WidgetCard, type WidgetCardItem } from '@/components/shared/WidgetCard';
 import { CodeBlock } from '@/components/shared/CodeBlock';
 import { mockWidgets } from '@/data/mock';
@@ -13,7 +15,7 @@ import { useCurrentStore } from '@/hooks/useStore';
 import { widgetsService } from '@/services/widgets.service';
 import { env, isSupabaseConfigured } from '@/lib/env';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Save } from 'lucide-react';
 
 const widgetDescriptions: Record<string, string> = {
   product_video: 'Mostre vídeos compráveis dentro da página de produto',
@@ -33,6 +35,22 @@ function toWidgetCard(widget: any): WidgetCardItem {
   };
 }
 
+function asSettings(value: unknown): Record<string, any> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value as Record<string, any>;
+}
+
+function pathsFromText(value: string) {
+  return value
+    .split(/[\n,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function pathsToText(value: unknown) {
+  return Array.isArray(value) ? value.filter(Boolean).join('\n') : '';
+}
+
 export default function Widgets() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -44,6 +62,7 @@ export default function Widgets() {
   });
   const realWidgets = widgetsQuery.data?.map(toWidgetCard) ?? [];
   const widgets = realWidgets.length ? realWidgets : mockWidgets.map((widget) => ({ ...widget, type: widget.id }));
+  const floatingWidget = widgetsQuery.data?.find((widget) => widget.type === 'floating_video') ?? null;
   const [, setSelectedWidget] = React.useState<WidgetCardItem | null>(null);
   const launcherWidget: WidgetCardItem = {
     id: 'floating-launcher',
@@ -59,6 +78,32 @@ export default function Widgets() {
   const [launcherTextColor, setLauncherTextColor] = React.useState('#ffffff');
   const [launcherFont, setLauncherFont] = React.useState('Inter, system-ui, sans-serif');
   const [launcherSize, setLauncherSize] = React.useState('74');
+  const [displayMode, setDisplayMode] = React.useState('all');
+  const [includePaths, setIncludePaths] = React.useState('');
+  const [excludePaths, setExcludePaths] = React.useState('/checkout\n/carrinho\n/cart');
+  const [productMode, setProductMode] = React.useState('linked_or_all');
+  const [hideWithoutVideos, setHideWithoutVideos] = React.useState(false);
+  const [isSavingSettings, setIsSavingSettings] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!floatingWidget) return;
+    const settings = asSettings(floatingWidget.settings);
+    const appearance = asSettings(settings.appearance);
+    const display = asSettings(settings.display);
+
+    setLauncherPosition(String(appearance.position || 'bottom-left'));
+    setLauncherAccent(String(appearance.accent_color || '#fe2c55'));
+    setLauncherBackground(String(appearance.background_color || '#0b0b0f'));
+    setLauncherTextColor(String(appearance.text_color || '#ffffff'));
+    setLauncherLabel(String(appearance.label ?? 'Compre pelo vídeo'));
+    setLauncherFont(String(appearance.font_family || 'Inter, system-ui, sans-serif'));
+    setLauncherSize(String(appearance.bubble_size || '74'));
+    setDisplayMode(String(display.mode || 'all'));
+    setIncludePaths(pathsToText(display.include_paths));
+    setExcludePaths(pathsToText(display.exclude_paths) || '/checkout\n/carrinho\n/cart');
+    setProductMode(String(display.product_mode || 'linked_or_all'));
+    setHideWithoutVideos(Boolean(display.hide_without_videos));
+  }, [floatingWidget?.id, floatingWidget?.updated_at]);
 
   const getWidgetType = (widget: WidgetCardItem) => widget.type || widget.id;
 
@@ -77,12 +122,67 @@ export default function Widgets() {
       `  data-label="${launcherLabel}"`,
       `  data-font-family="${launcherFont}"`,
       `  data-bubble-size="${launcherSize}"`,
+      `  data-display-mode="${displayMode}"`,
+      `  data-include-paths="${pathsFromText(includePaths).join(',')}"`,
+      `  data-exclude-paths="${pathsFromText(excludePaths).join(',')}"`,
+      `  data-product-mode="${productMode}"`,
+      `  data-hide-without-videos="${hideWithoutVideos}"`,
+      `  data-require-active="true"`,
       `  data-supabase-url="${env.supabaseUrl}"`,
       `  data-supabase-key="${env.supabaseAnonKey}"`,
       `  data-lupp-url="${env.appUrl}"`,
       `  async`,
       `></script>`,
     ].join('\n');
+  };
+
+  const handleSaveLauncherSettings = async () => {
+    if (!store || !floatingWidget) {
+      toast({
+        title: 'Widget flutuante não encontrado',
+        description: 'Crie uma loja com os widgets padrão antes de salvar esta configuração.',
+      });
+      return;
+    }
+
+    try {
+      setIsSavingSettings(true);
+      const currentSettings = asSettings(floatingWidget.settings);
+      await widgetsService.updateWidget(floatingWidget.id, {
+        status: 'active',
+        settings: {
+          ...currentSettings,
+          appearance: {
+            accent_color: launcherAccent,
+            background_color: launcherBackground,
+            bubble_size: Number(launcherSize) || 74,
+            font_family: launcherFont,
+            label: launcherLabel,
+            position: launcherPosition,
+            text_color: launcherTextColor,
+          },
+          display: {
+            exclude_paths: pathsFromText(excludePaths),
+            hide_without_videos: hideWithoutVideos,
+            include_paths: pathsFromText(includePaths),
+            mode: displayMode,
+            product_mode: productMode,
+          },
+        },
+      });
+      await queryClient.invalidateQueries({ queryKey: ['widgets', store.id] });
+      toast({
+        title: 'Bolinha configurada',
+        description: 'As regras de exibição foram salvas e o widget flutuante foi ativado.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Não foi possível salvar',
+        description: error instanceof Error ? error.message : 'Tente novamente em instantes.',
+      });
+    } finally {
+      setIsSavingSettings(false);
+    }
   };
 
   const handleToggle = async (widget: WidgetCardItem, active: boolean) => {
@@ -204,7 +304,64 @@ export default function Widgets() {
                   <Input value={launcherSize} onChange={(event) => setLauncherSize(event.target.value)} inputMode="numeric" />
                 </div>
               </div>
+              <div className="grid gap-3 border-t border-white/10 pt-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Mostrar em</Label>
+                    <Select value={displayMode} onValueChange={setDisplayMode}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas as páginas</SelectItem>
+                        <SelectItem value="home">Somente home</SelectItem>
+                        <SelectItem value="product">Somente páginas de produto</SelectItem>
+                        <SelectItem value="custom">URLs específicas</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Produto atual</Label>
+                    <Select value={productMode} onValueChange={setProductMode}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="linked_or_all">Vinculado primeiro, fallback geral</SelectItem>
+                        <SelectItem value="linked_only">Somente vídeos vinculados</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {displayMode === 'custom' && (
+                  <div className="space-y-2">
+                    <Label>URLs incluídas</Label>
+                    <Textarea
+                      value={includePaths}
+                      onChange={(event) => setIncludePaths(event.target.value)}
+                      placeholder={'/\n/produtos/*\n/colecao/verao'}
+                      rows={3}
+                    />
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label>URLs excluídas</Label>
+                  <Textarea
+                    value={excludePaths}
+                    onChange={(event) => setExcludePaths(event.target.value)}
+                    placeholder={'/checkout\n/carrinho\n/cart'}
+                    rows={3}
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-md border border-white/10 p-3">
+                  <div>
+                    <Label>Ocultar quando não houver vídeo</Label>
+                    <p className="mt-1 text-xs text-muted-foreground">Útil para páginas de produto sem vídeo vinculado.</p>
+                  </div>
+                  <Switch checked={hideWithoutVideos} onCheckedChange={setHideWithoutVideos} />
+                </div>
+              </div>
             </div>
+            <Button className="w-full" onClick={() => void handleSaveLauncherSettings()} disabled={isSavingSettings || !floatingWidget}>
+              <Save className="mr-2 h-4 w-4" />
+              {isSavingSettings ? 'Salvando...' : 'Salvar e ativar bolinha'}
+            </Button>
             <CodeBlock code={getEmbedCode(launcherWidget)} />
             {store && (
               <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
