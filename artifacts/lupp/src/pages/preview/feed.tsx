@@ -21,11 +21,13 @@ function formatPrice(value?: number | null) {
 
 function getProductView(video: any, fallbackUrl: string) {
   const product = getPrimaryProduct(video);
+  const price = product?.price ? Number(product.price) : null;
   return {
     id: product?.id ?? video.productId ?? null,
     name: product?.name ?? video.productName ?? 'Produto do vídeo',
     description: product?.description ?? 'Produto conectado ao vídeo para compra dentro da experiência Lupp.',
     price: formatPrice(product?.price) ?? 'R$ 189,90',
+    paymentTerms: price ? `ou 6x de ${formatPrice(price / 6)} sem juros` : 'Parcele na plataforma conectada',
     imageUrl: product?.image_url ?? null,
     productUrl: product?.product_url || fallbackUrl,
     platform: product?.platform ?? null,
@@ -53,6 +55,7 @@ export default function PreviewFeed() {
   const [pausedMap, setPausedMap] = React.useState<Record<string, boolean>>({});
   const [isMuted, setIsMuted] = React.useState(false);
   const [soundUnlocked, setSoundUnlocked] = React.useState(true);
+  const [controlsVisible, setControlsVisible] = React.useState(true);
   const [speedVideoId, setSpeedVideoId] = React.useState<string | null>(null);
   const videoRefs = React.useRef(new Map<string, HTMLVideoElement>());
   const sectionRefs = React.useRef(new Map<string, HTMLElement>());
@@ -60,6 +63,7 @@ export default function PreviewFeed() {
   const tapCountRef = React.useRef(0);
   const longPressTimerRef = React.useRef<number | null>(null);
   const longPressActiveRef = React.useRef(false);
+  const controlsTimerRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     if (!store?.id || !isSupabaseConfigured) return;
@@ -114,16 +118,33 @@ export default function PreviewFeed() {
     else sectionRefs.current.delete(id);
   };
 
+  const showControls = (keepVisible = false) => {
+    setControlsVisible(true);
+    if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
+    controlsTimerRef.current = null;
+
+    if (!keepVisible) {
+      controlsTimerRef.current = window.setTimeout(() => {
+        setControlsVisible(false);
+      }, 2200);
+    }
+  };
+
   const toggleMute = (event?: React.MouseEvent) => {
     event?.stopPropagation();
     setSoundUnlocked(true);
     setIsMuted((current) => !current);
+    showControls();
   };
 
   const togglePlay = (video: any, event?: React.MouseEvent) => {
     event?.stopPropagation();
     setSoundUnlocked(true);
-    setPausedMap((current) => ({ ...current, [video.id]: !current[video.id] }));
+    setPausedMap((current) => {
+      const nextPaused = !current[video.id];
+      showControls(nextPaused);
+      return { ...current, [video.id]: nextPaused };
+    });
   };
 
   const clearGestureTimers = () => {
@@ -142,6 +163,7 @@ export default function PreviewFeed() {
 
   const handleMediaPointerDown = (video: any) => {
     setSoundUnlocked(true);
+    showControls(pausedMap[video.id]);
     longPressActiveRef.current = false;
     if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
     longPressTimerRef.current = window.setTimeout(() => {
@@ -223,6 +245,13 @@ export default function PreviewFeed() {
     return () => clearGestureTimers();
   }, []);
 
+  React.useEffect(() => {
+    showControls(Boolean(activeVideoId && pausedMap[activeVideoId]));
+    return () => {
+      if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
+    };
+  }, [activeVideoId]);
+
   return (
     <div className="h-[100dvh] w-full bg-black overflow-hidden flex justify-center text-white">
       <div className="relative flex h-full w-full max-w-[420px] flex-col bg-slate-950">
@@ -261,12 +290,15 @@ export default function PreviewFeed() {
             const product = getProductView(video, fallbackProductUrl);
             const likes = likedMap[video.id] ? (video.likes ?? 0) + 1 : (video.likes ?? 0);
             const hasRealVideo = Boolean(video.video_url);
+            const isActiveVideo = activeVideoId === video.id || (!activeVideoId && index === 0);
+            const showVideoControls = isActiveVideo && (controlsVisible || pausedMap[video.id]);
 
             return (
               <section
                 key={video.id}
                 ref={setSectionRef(video.id)}
                 data-video-id={video.id}
+                data-active={isActiveVideo ? 'true' : 'false'}
                 className="relative h-full w-full snap-start bg-black"
               >
                 {hasRealVideo ? (
@@ -297,24 +329,26 @@ export default function PreviewFeed() {
                 />
 
                 <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-                  {(pausedMap[video.id] || activeVideoId !== video.id) && (
+                  {showVideoControls && pausedMap[video.id] && (
                     <button
                       type="button"
-                      className="pointer-events-auto flex h-20 w-20 items-center justify-center rounded-full bg-black/35 text-white shadow-2xl backdrop-blur-md"
+                      className="pointer-events-auto flex h-20 w-20 items-center justify-center rounded-full bg-black/35 text-white opacity-100 shadow-2xl backdrop-blur-md transition-opacity"
                       onClick={(event) => togglePlay(video, event)}
                       aria-label="Reproduzir vídeo"
                     >
                       <Play className="ml-1 h-10 w-10 fill-white" />
                     </button>
                   )}
-                  <button
-                    type="button"
-                    className="pointer-events-auto absolute top-[38%] flex h-11 w-11 -translate-y-20 items-center justify-center rounded-full bg-black/35 text-white shadow-xl backdrop-blur-md"
-                    onClick={toggleMute}
-                    aria-label={isMuted ? 'Ligar som' : 'Mutar vídeo'}
-                  >
-                    {isMuted || !soundUnlocked ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-                  </button>
+                  {showVideoControls && (
+                    <button
+                      type="button"
+                      className="pointer-events-auto absolute top-[38%] flex h-11 w-11 -translate-y-20 items-center justify-center rounded-full bg-black/35 text-white shadow-xl backdrop-blur-md transition-opacity"
+                      onClick={toggleMute}
+                      aria-label={isMuted ? 'Ligar som' : 'Mutar vídeo'}
+                    >
+                      {isMuted || !soundUnlocked ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+                    </button>
+                  )}
                   {speedVideoId === video.id && (
                     <div className="absolute top-24 rounded-full bg-white px-4 py-2 text-sm font-black text-black shadow-xl">
                       2x
@@ -331,7 +365,7 @@ export default function PreviewFeed() {
                   </div>
 
                   {product.name && (
-                    <div className="mb-2 rounded-md border border-white/15 bg-white text-slate-950 shadow-2xl">
+                    <div className="mb-2 overflow-hidden rounded-md border border-white/18 bg-white/26 text-white shadow-2xl shadow-black/25 backdrop-blur-xl">
                       <button
                         className="flex w-full items-center gap-2 p-2 text-left"
                         onClick={() => {
@@ -340,28 +374,25 @@ export default function PreviewFeed() {
                         }}
                       >
                         <div
-                          className="h-14 w-14 shrink-0 rounded-sm bg-slate-100 bg-cover bg-center"
+                          className="h-[70px] w-[70px] shrink-0 rounded-sm bg-white/20 bg-cover bg-center ring-1 ring-white/25"
                           style={{ backgroundImage: product.imageUrl ? `url(${product.imageUrl})` : undefined }}
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="line-clamp-1 text-[13px] font-semibold">{product.name}</p>
-                          <div className="mt-1 flex items-end gap-1">
-                            <span className="text-[17px] font-black text-[#fe2c55]">{product.price}</span>
-                            <span className="pb-0.5 text-[11px] text-slate-500">Oferta do vídeo</span>
-                          </div>
+                          <p className="line-clamp-1 text-[13px] font-medium uppercase leading-tight text-white">{product.name}</p>
+                          <p className="mt-1 text-[15px] font-semibold text-white">{product.price}</p>
+                          <p className="mt-0.5 line-clamp-1 text-[11px] font-medium text-white/75">{product.paymentTerms}</p>
+                          <p className="mt-1 line-clamp-1 text-[10px] font-medium text-white/55">
+                            {product.platform ?? store?.platform ?? 'e-commerce'} · compra segura
+                          </p>
                         </div>
-                        <span className="rounded-sm bg-[#fe2c55] px-3 py-2 text-xs font-bold text-white">
-                          Ver
+                        <span className="rounded-full border border-white/25 bg-white/16 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur-md">
+                          Detalhes
                         </span>
                       </button>
-                      <div className="flex items-center justify-between border-t border-slate-100 px-2 py-1.5 text-[11px] text-slate-500">
-                        <span>Frete e compra pela plataforma</span>
-                        <span>{product.platform ?? store?.platform ?? 'e-commerce'}</span>
-                      </div>
-                      <div className="grid grid-cols-[1fr_1.05fr] gap-2 p-2 pt-0">
+                      <div className="grid grid-cols-[1fr_1.05fr] gap-2 border-t border-white/10 p-2 pt-2">
                         <Button
                           variant="outline"
-                          className="h-10 border-slate-200 bg-white text-xs font-bold text-slate-950 hover:bg-slate-50"
+                          className="h-9 border-white/18 bg-white/14 text-xs font-semibold text-white backdrop-blur-md hover:bg-white/22 hover:text-white"
                           onClick={() => {
                             track('product_click', video, product.id);
                             setSelectedProduct({ video, product });
@@ -370,7 +401,7 @@ export default function PreviewFeed() {
                           Ver detalhes
                         </Button>
                         <Button
-                          className="h-10 bg-[#fe2c55] text-xs font-black text-white hover:bg-[#e6294e]"
+                          className="h-9 bg-white/92 text-xs font-bold text-slate-950 hover:bg-white"
                           onClick={() => openProductPage(video, product)}
                         >
                           Comprar agora
