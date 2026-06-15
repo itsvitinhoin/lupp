@@ -6,18 +6,135 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Stepper } from '@/components/shared/Stepper';
 import { LuppLogo } from '@/components/shared/LuppLogo';
+import { EnvNotice } from '@/components/shared/EnvNotice';
+import { storesService } from '@/services/stores.service';
+import { isSupabaseConfigured } from '@/lib/env';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation } from 'wouter';
 import { Check, CheckCircle2, MonitorPlay, Presentation, Smartphone, TrendingUp } from 'lucide-react';
 
 export default function Onboarding() {
   const [step, setStep] = React.useState(0);
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [storeName, setStoreName] = React.useState('Bella Moda');
+  const [storeUrl, setStoreUrl] = React.useState('bellamoda.com.br');
+  const [platform, setPlatform] = React.useState('');
+  const [segment, setSegment] = React.useState('moda');
+  const [goal, setGoal] = React.useState('conversion');
+  const [firstWidget, setFirstWidget] = React.useState('feed');
+
+  React.useEffect(() => {
+    const raw = sessionStorage.getItem('lupp_onboarding_prefill');
+    if (!raw) return;
+
+    try {
+      const prefill = JSON.parse(raw) as { storeName?: string; platform?: string };
+      if (prefill.storeName) setStoreName(prefill.storeName);
+      if (prefill.platform) setPlatform(prefill.platform);
+    } catch {
+      sessionStorage.removeItem('lupp_onboarding_prefill');
+    }
+  }, []);
+
+  const normalizeUrl = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  };
+
+  const validateStoreStep = () => {
+    if (!storeName.trim()) {
+      toast({ title: 'Informe o nome da loja.' });
+      return false;
+    }
+
+    if (!platform) {
+      toast({ title: 'Selecione a plataforma da loja.' });
+      return false;
+    }
+
+    if (!segment) {
+      toast({ title: 'Selecione o segmento da loja.' });
+      return false;
+    }
+
+    const url = normalizeUrl(storeUrl);
+    if (url) {
+      try {
+        new URL(url);
+      } catch {
+        toast({ title: 'URL inválida', description: 'Use algo como sualoja.com.br ou https://sualoja.com.br.' });
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const completeOnboarding = async () => {
+    if (!validateStoreStep()) {
+      setStep(1);
+      return;
+    }
+
+    if (!isSupabaseConfigured) {
+      localStorage.setItem(
+        'lupp_demo_store',
+        JSON.stringify({
+          name: storeName,
+          url: normalizeUrl(storeUrl),
+          platform,
+          segment,
+          goal,
+          firstWidget,
+        }),
+      );
+      toast({ title: 'Loja de teste configurada', description: 'Conecte Supabase para persistir no banco real.' });
+      setLocation('/app');
+      return;
+    }
+
+    if (!user) {
+      toast({ title: 'Sessão expirada', description: 'Entre novamente para concluir o onboarding.' });
+      setLocation('/login');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await storesService.createStoreWithDefaults({
+        ownerId: user.id,
+        name: storeName.trim(),
+        url: normalizeUrl(storeUrl) || undefined,
+        platform,
+        segment,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['stores', user.id] });
+      toast({ title: 'Loja criada com sucesso', description: 'Seu dashboard já está pronto para receber produtos e vídeos.' });
+      setLocation('/app');
+    } catch (error) {
+      toast({
+        title: 'Não foi possível criar a loja',
+        description: error instanceof Error ? error.message : 'Tente novamente em instantes.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleNext = () => {
+    if (step === 1 && !validateStoreStep()) return;
+
     if (step < 4) {
       setStep(step + 1);
     } else {
-      setLocation('/app');
+      void completeOnboarding();
     }
   };
 
@@ -28,6 +145,10 @@ export default function Onboarding() {
       <div className="w-full max-w-3xl mx-auto px-6 pt-12 flex-1 flex flex-col">
         <div className="mb-12 flex justify-center">
           <LuppLogo />
+        </div>
+
+        <div className="mb-6">
+          <EnvNotice />
         </div>
 
         <Stepper steps={steps} currentStep={step} />
@@ -63,15 +184,31 @@ export default function Onboarding() {
                   <div className="space-y-4 max-w-md mx-auto">
                     <div className="space-y-2">
                       <Label>Nome da loja</Label>
-                      <Input defaultValue="Bella Moda" />
+                      <Input value={storeName} onChange={(event) => setStoreName(event.target.value)} />
                     </div>
                     <div className="space-y-2">
                       <Label>URL da loja</Label>
-                      <Input defaultValue="bellamoda.com.br" />
+                      <Input value={storeUrl} onChange={(event) => setStoreUrl(event.target.value)} placeholder="sualoja.com.br" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Plataforma</Label>
+                      <Select value={platform} onValueChange={setPlatform}>
+                        <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="nuvemshop">Nuvemshop</SelectItem>
+                          <SelectItem value="shopify">Shopify</SelectItem>
+                          <SelectItem value="woocommerce">WooCommerce</SelectItem>
+                          <SelectItem value="tray">Tray</SelectItem>
+                          <SelectItem value="yampi">Yampi</SelectItem>
+                          <SelectItem value="loja_integrada">Loja Integrada</SelectItem>
+                          <SelectItem value="vtex">VTEX</SelectItem>
+                          <SelectItem value="outra">Outra</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label>Segmento</Label>
-                      <Select defaultValue="moda">
+                      <Select value={segment} onValueChange={setSegment}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="moda">Moda feminina</SelectItem>
@@ -97,12 +234,16 @@ export default function Onboarding() {
                   
                   <div className="grid gap-4 sm:grid-cols-2 max-w-2xl mx-auto">
                     {[
-                      { icon: TrendingUp, title: "Aumentar conversão", desc: "Vender mais na mesma página" },
-                      { icon: Presentation, title: "Melhorar página de produto", desc: "Substituir fotos estáticas" },
-                      { icon: Smartphone, title: "Feed estilo TikTok", desc: "Criar vitrine interativa" },
-                      { icon: MonitorPlay, title: "Medir performance", desc: "Entender views e cliques" }
+                      { id: "conversion", icon: TrendingUp, title: "Aumentar conversão", desc: "Vender mais na mesma página" },
+                      { id: "product-page", icon: Presentation, title: "Melhorar página de produto", desc: "Substituir fotos estáticas" },
+                      { id: "feed", icon: Smartphone, title: "Feed estilo TikTok", desc: "Criar vitrine interativa" },
+                      { id: "analytics", icon: MonitorPlay, title: "Medir performance", desc: "Entender views e cliques" }
                     ].map((item, i) => (
-                      <button key={i} className="text-left flex items-start gap-4 p-4 rounded-xl border border-white/10 bg-card/50 hover:border-primary/50 hover:bg-primary/5 transition-all focus:ring-2 focus:ring-primary outline-none">
+                      <button
+                        key={item.id}
+                        onClick={() => setGoal(item.id)}
+                        className={`text-left flex items-start gap-4 p-4 rounded-xl border transition-all focus:ring-2 focus:ring-primary outline-none ${goal === item.id ? 'border-primary bg-primary/10' : 'border-white/10 bg-card/50 hover:border-primary/50 hover:bg-primary/5'}`}
+                      >
                         <div className="mt-1 p-2 rounded-lg bg-primary/10 text-primary">
                           <item.icon className="h-5 w-5" />
                         </div>
@@ -129,11 +270,15 @@ export default function Onboarding() {
                   
                   <div className="grid gap-4 max-w-xl mx-auto">
                     {[
-                      { title: "Feed vertical", desc: "Uma página inteira com scroll infinito estilo TikTok", rec: true },
-                      { title: "Vídeo na página de produto", desc: "Player embutido junto às fotos do produto" },
-                      { title: "Carrossel na Home", desc: "Vitrine horizontal de vídeos na capa do site" }
+                      { id: "feed", title: "Feed vertical", desc: "Uma página inteira com scroll infinito estilo TikTok", rec: true },
+                      { id: "product-video", title: "Vídeo na página de produto", desc: "Player embutido junto às fotos do produto" },
+                      { id: "home-showcase", title: "Carrossel na Home", desc: "Vitrine horizontal de vídeos na capa do site" }
                     ].map((item, i) => (
-                      <button key={i} className={`relative text-left p-4 rounded-xl border ${item.rec ? 'border-primary bg-primary/5' : 'border-white/10 bg-card/50 hover:border-primary/50'} transition-all`}>
+                      <button
+                        key={item.id}
+                        onClick={() => setFirstWidget(item.id)}
+                        className={`relative text-left p-4 rounded-xl border ${firstWidget === item.id ? 'border-primary bg-primary/10' : 'border-white/10 bg-card/50 hover:border-primary/50'} transition-all`}
+                      >
                         {item.rec && (
                           <span className="absolute top-4 right-4 text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">Recomendado</span>
                         )}
@@ -158,8 +303,8 @@ export default function Onboarding() {
                   <p className="text-lg text-muted-foreground max-w-md mx-auto">
                     Sua loja está configurada e pronta para receber vídeos compráveis.
                   </p>
-                  <Button size="lg" className="mt-8 px-12" onClick={handleNext}>
-                    Ir para o Dashboard
+                  <Button size="lg" className="mt-8 px-12" onClick={handleNext} disabled={isSubmitting}>
+                    {isSubmitting ? 'Criando loja...' : 'Ir para o Dashboard'}
                   </Button>
                 </div>
               )}

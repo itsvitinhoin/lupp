@@ -14,6 +14,7 @@ import {
   Blocks,
   Link as LinkIcon
 } from 'lucide-react';
+import { useCurrentStore } from '@/hooks/useStore';
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/app' },
@@ -31,6 +32,24 @@ const navItems = [
 
 export function Sidebar() {
   const [location] = useLocation();
+  const { store } = useCurrentStore();
+  const demoStore = React.useMemo(() => {
+    const raw = localStorage.getItem('lupp_demo_store');
+    if (!raw) return null;
+
+    try {
+      return JSON.parse(raw) as { name?: string };
+    } catch {
+      return null;
+    }
+  }, []);
+  const storeName = store?.name ?? demoStore?.name ?? 'Lupp Demo';
+  const initials = storeName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('') || 'LP';
 
   return (
     <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 flex-col border-r border-white/10 bg-card/50 backdrop-blur-xl lg:flex">
@@ -62,10 +81,10 @@ export function Sidebar() {
       <div className="border-t border-white/5 p-4">
         <div className="flex items-center gap-3 rounded-md bg-white/5 p-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20 text-primary font-bold">
-            BM
+            {initials}
           </div>
           <div className="flex-1 overflow-hidden">
-            <p className="truncate text-sm font-medium">Bella Moda</p>
+            <p className="truncate text-sm font-medium">{storeName}</p>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
               <span className="text-xs text-muted-foreground">Feed ativo</span>

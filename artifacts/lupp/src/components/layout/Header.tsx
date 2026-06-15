@@ -1,11 +1,30 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Link } from 'wouter';
-import { ExternalLink, Plus, Menu } from 'lucide-react';
+import { Link, useLocation } from 'wouter';
+import { ExternalLink, Plus, Menu, LogOut } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Sidebar as MobileSidebar } from './Sidebar';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 
 export function Header({ title }: { title: string }) {
+  const [, setLocation] = useLocation();
+  const { signOut } = useAuth();
+  const { toast } = useToast();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      localStorage.removeItem('lupp_demo_auth');
+      toast({ title: 'Você saiu da Lupp.' });
+      setLocation('/login');
+    } catch (error) {
+      toast({
+        title: 'Não foi possível sair',
+        description: error instanceof Error ? error.message : 'Tente novamente.',
+      });
+    }
+  };
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/5 bg-background/80 px-4 backdrop-blur-md sm:px-6">
       <div className="flex items-center gap-4">
@@ -38,6 +57,9 @@ export function Header({ title }: { title: string }) {
             <Plus className="mr-2 h-4 w-4" />
             Adicionar vídeo
           </Link>
+        </Button>
+        <Button variant="ghost" size="icon" onClick={handleSignOut} title="Sair">
+          <LogOut className="h-4 w-4" />
         </Button>
       </div>
     </header>
