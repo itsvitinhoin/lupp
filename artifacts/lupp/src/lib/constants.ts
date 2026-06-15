@@ -57,3 +57,28 @@ export const ANALYTICS_EVENT_TYPES = [
 
 export const MAX_VIDEO_UPLOAD_BYTES = 200 * 1024 * 1024;
 export const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
+export const ACCEPTED_VIDEO_EXTENSIONS = ["mp4", "m4v", "mov", "webm"];
+export const ACCEPTED_VIDEO_INPUT_TYPES = [
+  ...ACCEPTED_VIDEO_TYPES,
+  ...ACCEPTED_VIDEO_EXTENSIONS.map((extension) => `.${extension}`),
+];
+
+const VIDEO_TYPE_BY_EXTENSION: Record<string, string> = {
+  mp4: "video/mp4",
+  m4v: "video/mp4",
+  mov: "video/quicktime",
+  webm: "video/webm",
+};
+
+export function extensionFromName(name: string) {
+  return name.split(".").pop()?.toLowerCase() || "";
+}
+
+export function getVideoContentType(file: Pick<File, "name" | "type">) {
+  return file.type || VIDEO_TYPE_BY_EXTENSION[extensionFromName(file.name)] || "";
+}
+
+export function isAcceptedVideoFile(file: Pick<File, "name" | "type">) {
+  const contentType = getVideoContentType(file);
+  return ACCEPTED_VIDEO_TYPES.includes(contentType) || ACCEPTED_VIDEO_EXTENSIONS.includes(extensionFromName(file.name));
+}

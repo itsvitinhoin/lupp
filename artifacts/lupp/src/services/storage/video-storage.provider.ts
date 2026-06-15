@@ -1,14 +1,41 @@
-import { ACCEPTED_VIDEO_TYPES, MAX_VIDEO_UPLOAD_BYTES } from "@/lib/constants";
+import * as tus from "tus-js-client";
+import { extensionFromName, getVideoContentType, isAcceptedVideoFile, MAX_VIDEO_UPLOAD_BYTES } from "@/lib/constants";
+import { env } from "@/lib/env";
 import { requireSupabase } from "@/lib/supabase";
 import type { UploadedVideo, VideoStorageProvider } from "@/types/video";
 
 function extensionFromFile(file: File) {
-  return file.name.split(".").pop()?.toLowerCase() || "mp4";
+  return extensionFromName(file.name) || "mp4";
+}
+
+function getResumableUploadEndpoint() {
+  try {
+    const url = new URL(env.supabaseUrl);
+    const projectRef = url.hostname.endsWith(".supabase.co") ? url.hostname.split(".")[0] : "";
+
+    if (projectRef) {
+      return `${url.protocol}//${projectRef}.storage.supabase.co/storage/v1/upload/resumable`;
+    }
+
+    return `${url.origin}/storage/v1/upload/resumable`;
+  } catch {
+    return `${env.supabaseUrl.replace(/\/$/, "")}/storage/v1/upload/resumable`;
+  }
+}
+
+function formatTusError(error: Error | tus.DetailedError) {
+  if (error instanceof tus.DetailedError && error.originalResponse) {
+    const status = error.originalResponse.getStatus();
+    const body = error.originalResponse.getBody();
+    return `Falha no upload resumível (${status}). ${body || error.message}`;
+  }
+
+  return error.message;
 }
 
 export class SupabaseVideoProvider implements VideoStorageProvider {
   async uploadVideo(file: File, storeId: string, onProgress?: (progress: number) => void): Promise<UploadedVideo> {
-    if (!ACCEPTED_VIDEO_TYPES.includes(file.type)) {
+    if (!isAcceptedVideoFile(file)) {
       throw new Error("Formato inválido. Envie um vídeo MP4, MOV ou WebM.");
     }
 
@@ -18,18 +45,57 @@ export class SupabaseVideoProvider implements VideoStorageProvider {
 
     const supabase = requireSupabase();
     const path = `${storeId}/${crypto.randomUUID()}.${extensionFromFile(file)}`;
-    onProgress?.(10);
+    const contentType = getVideoContentType(file);
+    const { data } = await supabase.auth.getSession();
 
-    const { error } = await supabase.storage.from("videos").upload(path, file, {
-      cacheControl: "31536000",
-      upsert: false,
-      contentType: file.type,
+    if (!data.session?.access_token) {
+      throw new Error("Sessão expirada. Faça login novamente para enviar vídeos.");
+    }
+
+    onProgress?.(1);
+
+    await new Promise<void>((resolve, reject) => {
+      const upload = new tus.Upload(file, {
+        endpoint: getResumableUploadEndpoint(),
+        retryDelays: [0, 3000, 5000, 10000, 20000],
+        headers: {
+          authorization: `Bearer ${data.session.access_token}`,
+          apikey: env.supabaseAnonKey,
+        },
+        metadata: {
+          bucketName: "videos",
+          objectName: path,
+          contentType,
+          cacheControl: "31536000",
+        },
+        chunkSize: 6 * 1024 * 1024,
+        uploadDataDuringCreation: true,
+        removeFingerprintOnSuccess: true,
+        onProgress: (bytesUploaded, bytesTotal) => {
+          const nextProgress = bytesTotal > 0 ? Math.min(99, Math.round((bytesUploaded / bytesTotal) * 100)) : 1;
+          onProgress?.(nextProgress);
+        },
+        onError: (error) => {
+          reject(new Error(formatTusError(error)));
+        },
+        onSuccess: () => resolve(),
+      });
+
+      upload
+        .findPreviousUploads()
+        .then((previousUploads) => {
+          if (previousUploads.length > 0) {
+            upload.resumeFromPreviousUpload(previousUploads[0]);
+          }
+
+          upload.start();
+        })
+        .catch((error: Error) => reject(error));
     });
-    if (error) throw error;
 
     onProgress?.(100);
-    const { data } = supabase.storage.from("videos").getPublicUrl(path);
-    return { url: data.publicUrl, path, provider: "supabase" };
+    const { data: publicUrlData } = supabase.storage.from("videos").getPublicUrl(path);
+    return { url: publicUrlData.publicUrl, path, provider: "supabase" };
   }
 
   async uploadThumbnail(file: File, storeId: string): Promise<UploadedVideo> {
@@ -38,7 +104,7 @@ export class SupabaseVideoProvider implements VideoStorageProvider {
     const { error } = await supabase.storage.from("thumbnails").upload(path, file, {
       cacheControl: "31536000",
       upsert: false,
-      contentType: file.type,
+      contentType: file.type || "image/jpeg",
     });
     if (error) throw error;
 

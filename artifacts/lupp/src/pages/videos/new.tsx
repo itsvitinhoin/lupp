@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useProducts } from '@/hooks/useProducts';
 import { useCurrentStore } from '@/hooks/useStore';
 import { isSupabaseConfigured } from '@/lib/env';
-import { ACCEPTED_VIDEO_TYPES } from '@/lib/constants';
+import { ACCEPTED_VIDEO_INPUT_TYPES, isAcceptedVideoFile } from '@/lib/constants';
 import { videoStorageProvider } from '@/services/storage/video-storage.provider';
 import { videosService } from '@/services/videos.service';
 import { useQueryClient } from '@tanstack/react-query';
@@ -64,7 +64,7 @@ export default function VideosNew() {
   const handleFile = (nextFile?: File | null) => {
     if (!nextFile) return;
 
-    if (!ACCEPTED_VIDEO_TYPES.includes(nextFile.type)) {
+    if (!isAcceptedVideoFile(nextFile)) {
       toast({ title: 'Formato inválido', description: 'Envie um vídeo MP4, MOV ou WebM.' });
       return;
     }
@@ -159,7 +159,7 @@ export default function VideosNew() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept={ACCEPTED_VIDEO_TYPES.join(',')}
+                accept={ACCEPTED_VIDEO_INPUT_TYPES.join(',')}
                 className="sr-only"
                 onChange={(event) => handleFile(event.target.files?.item(0))}
               />
@@ -188,7 +188,7 @@ export default function VideosNew() {
                   </div>
                   <Progress value={progress} />
                   <p className="text-center text-xs text-muted-foreground">
-                    {isSubmitting ? 'Enviando para o Supabase Storage...' : 'Pronto para publicar'}
+                    {isSubmitting ? 'Enviando em partes para o Supabase Storage...' : 'Pronto para publicar'}
                   </p>
                 </div>
               )}
