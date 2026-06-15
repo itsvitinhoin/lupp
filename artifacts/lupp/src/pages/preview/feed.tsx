@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Drawer, DrawerContent, DrawerFooter, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
-import { Heart, MessageCircle, Share2, Bookmark, ArrowLeft, ShoppingBag, Star, Truck, ShieldCheck, X } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Bookmark, ArrowLeft, ShoppingBag, Star, Truck, ShieldCheck, X, Play, Volume2, VolumeX } from 'lucide-react';
 import { mockVideos } from '@/data/mock';
 import { Link, useRoute } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
@@ -49,6 +49,17 @@ export default function PreviewFeed() {
   const realVideos = feedQuery.data?.videos ?? [];
   const videos = storeSlug && realVideos.length ? realVideos : mockVideos.filter((video) => video.productName);
   const [selectedProduct, setSelectedProduct] = React.useState<{ video: any; product: ReturnType<typeof getProductView> } | null>(null);
+  const [activeVideoId, setActiveVideoId] = React.useState<string | null>(null);
+  const [pausedMap, setPausedMap] = React.useState<Record<string, boolean>>({});
+  const [isMuted, setIsMuted] = React.useState(false);
+  const [soundUnlocked, setSoundUnlocked] = React.useState(true);
+  const [speedVideoId, setSpeedVideoId] = React.useState<string | null>(null);
+  const videoRefs = React.useRef(new Map<string, HTMLVideoElement>());
+  const sectionRefs = React.useRef(new Map<string, HTMLElement>());
+  const tapTimerRef = React.useRef<number | null>(null);
+  const tapCountRef = React.useRef(0);
+  const longPressTimerRef = React.useRef<number | null>(null);
+  const longPressActiveRef = React.useRef(false);
 
   React.useEffect(() => {
     if (!store?.id || !isSupabaseConfigured) return;
@@ -73,6 +84,14 @@ export default function PreviewFeed() {
     track('like_click', video, getPrimaryProduct(video)?.id ?? video.productId ?? null);
   };
 
+  const likeVideo = (video: any) => {
+    setLikedMap((current) => {
+      if (current[video.id]) return current;
+      track('like_click', video, getPrimaryProduct(video)?.id ?? video.productId ?? null);
+      return { ...current, [video.id]: true };
+    });
+  };
+
   const handleShare = async (video: any) => {
     const url = `${window.location.origin}${window.location.pathname}?v=${video.id}`;
     await navigator.clipboard.writeText(url);
@@ -84,6 +103,125 @@ export default function PreviewFeed() {
     track('add_to_cart_click', video, product.id);
     window.open(product.productUrl, '_blank', 'noopener,noreferrer');
   };
+
+  const setVideoRef = (id: string) => (element: HTMLVideoElement | null) => {
+    if (element) videoRefs.current.set(id, element);
+    else videoRefs.current.delete(id);
+  };
+
+  const setSectionRef = (id: string) => (element: HTMLElement | null) => {
+    if (element) sectionRefs.current.set(id, element);
+    else sectionRefs.current.delete(id);
+  };
+
+  const toggleMute = (event?: React.MouseEvent) => {
+    event?.stopPropagation();
+    setSoundUnlocked(true);
+    setIsMuted((current) => !current);
+  };
+
+  const togglePlay = (video: any, event?: React.MouseEvent) => {
+    event?.stopPropagation();
+    setSoundUnlocked(true);
+    setPausedMap((current) => ({ ...current, [video.id]: !current[video.id] }));
+  };
+
+  const clearGestureTimers = () => {
+    if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
+    if (tapTimerRef.current) window.clearTimeout(tapTimerRef.current);
+    longPressTimerRef.current = null;
+    tapTimerRef.current = null;
+  };
+
+  const resetSpeed = (video: any) => {
+    const element = videoRefs.current.get(video.id);
+    if (element) element.playbackRate = 1;
+    setSpeedVideoId(null);
+    longPressActiveRef.current = false;
+  };
+
+  const handleMediaPointerDown = (video: any) => {
+    setSoundUnlocked(true);
+    longPressActiveRef.current = false;
+    if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = window.setTimeout(() => {
+      const element = videoRefs.current.get(video.id);
+      if (element) element.playbackRate = 2;
+      longPressActiveRef.current = true;
+      setSpeedVideoId(video.id);
+    }, 420);
+  };
+
+  const handleMediaPointerUp = (video: any) => {
+    if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = null;
+
+    if (longPressActiveRef.current) {
+      resetSpeed(video);
+      return;
+    }
+
+    tapCountRef.current += 1;
+    if (tapCountRef.current === 1) {
+      tapTimerRef.current = window.setTimeout(() => {
+        tapCountRef.current = 0;
+        togglePlay(video);
+      }, 230);
+      return;
+    }
+
+    if (tapTimerRef.current) window.clearTimeout(tapTimerRef.current);
+    tapTimerRef.current = null;
+    tapCountRef.current = 0;
+    likeVideo(video);
+  };
+
+  React.useEffect(() => {
+    if (!videos.length) return;
+    if (!activeVideoId || !videos.some((video: any) => video.id === activeVideoId)) {
+      setActiveVideoId(videos[0].id);
+    }
+  }, [activeVideoId, videos]);
+
+  React.useEffect(() => {
+    if (!videos.length) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0];
+        const id = visible?.target.getAttribute('data-video-id');
+        if (id) setActiveVideoId(id);
+      },
+      { threshold: [0.65, 0.8, 0.95] },
+    );
+
+    sectionRefs.current.forEach((section) => observer.observe(section));
+    return () => observer.disconnect();
+  }, [videos]);
+
+  React.useEffect(() => {
+    videoRefs.current.forEach((element, id) => {
+      const isActive = id === activeVideoId && !selectedProduct;
+      element.muted = isMuted || !soundUnlocked;
+      element.playbackRate = speedVideoId === id ? 2 : 1;
+
+      if (!isActive || pausedMap[id]) {
+        element.pause();
+        return;
+      }
+
+      void element.play().catch(() => {
+        element.muted = true;
+        setIsMuted(true);
+        void element.play().catch(() => {});
+      });
+    });
+  }, [activeVideoId, isMuted, pausedMap, selectedProduct, soundUnlocked, speedVideoId]);
+
+  React.useEffect(() => {
+    return () => clearGestureTimers();
+  }, []);
 
   return (
     <div className="h-[100dvh] w-full bg-black overflow-hidden flex justify-center text-white">
@@ -125,16 +263,22 @@ export default function PreviewFeed() {
             const hasRealVideo = Boolean(video.video_url);
 
             return (
-              <section key={video.id} className="relative h-full w-full snap-start bg-black">
+              <section
+                key={video.id}
+                ref={setSectionRef(video.id)}
+                data-video-id={video.id}
+                className="relative h-full w-full snap-start bg-black"
+              >
                 {hasRealVideo ? (
                   <video
+                    ref={setVideoRef(video.id)}
                     src={video.video_url}
                     poster={video.thumbnail_url ?? undefined}
                     className="absolute inset-0 h-full w-full object-cover"
-                    muted
+                    muted={isMuted || !soundUnlocked}
                     playsInline
                     loop
-                    autoPlay={index === 0}
+                    autoPlay
                     preload="metadata"
                     onPlay={() => track('video_view', video, product?.id ?? null)}
                   />
@@ -142,7 +286,43 @@ export default function PreviewFeed() {
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-900 via-slate-900 to-black opacity-90" />
                 )}
 
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/60 to-transparent p-4 pt-32">
+                <div
+                  className="absolute inset-0 z-10"
+                  onPointerDown={() => handleMediaPointerDown(video)}
+                  onPointerUp={() => handleMediaPointerUp(video)}
+                  onPointerCancel={() => resetSpeed(video)}
+                  onPointerLeave={() => {
+                    if (longPressActiveRef.current) resetSpeed(video);
+                  }}
+                />
+
+                <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+                  {(pausedMap[video.id] || activeVideoId !== video.id) && (
+                    <button
+                      type="button"
+                      className="pointer-events-auto flex h-20 w-20 items-center justify-center rounded-full bg-black/35 text-white shadow-2xl backdrop-blur-md"
+                      onClick={(event) => togglePlay(video, event)}
+                      aria-label="Reproduzir vídeo"
+                    >
+                      <Play className="ml-1 h-10 w-10 fill-white" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="pointer-events-auto absolute top-[38%] flex h-11 w-11 -translate-y-20 items-center justify-center rounded-full bg-black/35 text-white shadow-xl backdrop-blur-md"
+                    onClick={toggleMute}
+                    aria-label={isMuted ? 'Ligar som' : 'Mutar vídeo'}
+                  >
+                    {isMuted || !soundUnlocked ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+                  </button>
+                  {speedVideoId === video.id && (
+                    <div className="absolute top-24 rounded-full bg-white px-4 py-2 text-sm font-black text-black shadow-xl">
+                      2x
+                    </div>
+                  )}
+                </div>
+
+                <div className="absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black via-black/60 to-transparent p-4 pt-32">
                   <div className="mb-4 pr-16">
                     <h3 className="mb-1 text-lg font-medium text-white">{video.title}</h3>
                     <p className="line-clamp-2 text-sm text-white/80">
@@ -200,7 +380,7 @@ export default function PreviewFeed() {
                   )}
                 </div>
 
-                <div className="absolute bottom-32 right-2 flex flex-col items-center gap-6">
+                <div className="absolute bottom-32 right-2 z-40 flex flex-col items-center gap-6">
                   <button className="flex flex-col items-center gap-1" onClick={() => handleLike(video)}>
                     <div className="rounded-full bg-black/20 p-3 backdrop-blur-md">
                       <Heart className="h-7 w-7 transition-all" fill={likedMap[video.id] ? '#FF4D6D' : 'transparent'} stroke={likedMap[video.id] ? '#FF4D6D' : 'white'} />

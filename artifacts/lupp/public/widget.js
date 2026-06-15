@@ -137,19 +137,103 @@
       "width:min(100vw,430px);height:100dvh;max-height:100dvh;border:0;background:#000;box-shadow:0 24px 80px rgba(0,0,0,.42);";
     frame.src = luppBaseUrl + "/s/" + encodeURIComponent(store.slug) + "/feed?embed=1" + (videoId ? "&v=" + encodeURIComponent(videoId) : "");
 
-    function closeOverlay() {
+    var feedbackShown = false;
+
+    function destroyOverlay() {
       overlay.remove();
       document.body.style.overflow = previousOverflow;
     }
 
-    close.addEventListener("click", closeOverlay);
+    function showFeedbackForm() {
+      if (feedbackShown) {
+        destroyOverlay();
+        return;
+      }
+
+      feedbackShown = true;
+      frame.style.filter = "blur(12px) brightness(.58)";
+      overlay.style.background = "rgba(0,0,0,.62)";
+      close.style.display = "none";
+
+      var selected = "";
+      var feedback = document.createElement("div");
+      feedback.setAttribute("data-lupp-feedback", "true");
+      feedback.style.cssText =
+        "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:12px;color:#fff;";
+
+      feedback.innerHTML =
+        '<div style="width:min(100%,430px);height:min(100dvh,805px);border-radius:18px;background:radial-gradient(circle at 50% 0%,rgba(255,255,255,.28),rgba(255,255,255,.08) 42%,rgba(0,0,0,.34));box-shadow:0 28px 90px rgba(0,0,0,.55);backdrop-filter:blur(18px);padding:26px 28px;display:flex;flex-direction:column;justify-content:center;gap:14px;">' +
+        '<div style="display:flex;justify-content:center;margin-bottom:4px;"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"></path><path d="M8 9h8"></path><path d="M8 13h5"></path></svg></div>' +
+        '<div style="text-align:center;margin-bottom:18px;"><h2 style="margin:0 0 8px;font-size:20px;line-height:1.1;font-weight:800;">Queremos saber sua opinião!</h2><p style="margin:0 auto;max-width:360px;font-size:12px;line-height:1.15;font-weight:700;color:rgba(255,255,255,.92);">Sua experiência é muito importante para nós. Responda rapidamente e ajude-nos a melhorar cada vez mais.</p></div>' +
+        '<div data-lupp-feedback-options style="display:grid;gap:10px;"></div>' +
+        '<textarea data-lupp-feedback-text placeholder="Deixe aqui sua sugestão do que achou ou de como podemos melhorar." style="margin-top:24px;width:100%;min-height:66px;resize:none;border:1px solid rgba(255,255,255,.32);border-radius:9px;background:rgba(255,255,255,.13);color:#fff;outline:none;padding:14px;font-family:inherit;font-size:13px;font-weight:600;line-height:1.4;box-sizing:border-box;"></textarea>' +
+        '<button data-lupp-feedback-submit type="button" style="height:40px;border:0;border-radius:5px;background:#fff;color:#050505;font-family:inherit;font-size:15px;font-weight:800;line-height:1;cursor:pointer;">Enviar Feedback</button>' +
+        '<button data-lupp-feedback-skip type="button" style="height:40px;border:0;background:transparent;color:#fff;font-family:inherit;font-size:16px;font-weight:800;line-height:1;cursor:pointer;">Agora não</button>' +
+        "</div>";
+
+      var options = [
+        "A experiência foi incrível",
+        "Atendeu às expectativas",
+        "Poderia ser melhor",
+        "Prefiro ver somente fotos",
+      ];
+      var optionList = feedback.querySelector("[data-lupp-feedback-options]");
+
+      function renderOptions() {
+        optionList.innerHTML = options
+          .map(function (option) {
+            var active = selected === option;
+            return (
+              '<button data-lupp-feedback-option="' +
+              escapeHtml(option) +
+              '" type="button" style="height:42px;display:flex;align-items:center;gap:14px;border:1px solid rgba(255,255,255,.34);border-radius:9px;background:' +
+              (active ? "rgba(255,255,255,.28)" : "rgba(255,255,255,.15)") +
+              ';color:#fff;text-align:left;padding:0 12px;font-family:inherit;font-size:14px;font-weight:800;line-height:1;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.16);"><span style="width:20px;height:20px;border-radius:999px;background:rgba(255,255,255,.86);color:#9ca3af;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;">✓</span><span>' +
+              escapeHtml(option) +
+              "</span></button>"
+            );
+          })
+          .join("");
+      }
+
+      renderOptions();
+      feedback.addEventListener("click", function (event) {
+        event.stopPropagation();
+        var optionButton = event.target.closest("[data-lupp-feedback-option]");
+        if (optionButton) {
+          selected = optionButton.getAttribute("data-lupp-feedback-option") || "";
+          renderOptions();
+          return;
+        }
+
+        if (event.target.closest("[data-lupp-feedback-submit]")) {
+          var text = feedback.querySelector("[data-lupp-feedback-text]").value || "";
+          track(store.id, "widget_view", videoId || null, null, {
+            action: "feedback_submit",
+            feedback_option: selected,
+            feedback_text: text,
+          });
+          destroyOverlay();
+          return;
+        }
+
+        if (event.target.closest("[data-lupp-feedback-skip]")) {
+          track(store.id, "widget_view", videoId || null, null, { action: "feedback_skip" });
+          destroyOverlay();
+        }
+      });
+
+      overlay.appendChild(feedback);
+    }
+
+    close.addEventListener("click", showFeedbackForm);
     overlay.addEventListener("click", function (event) {
-      if (event.target === overlay) closeOverlay();
+      if (event.target === overlay) showFeedbackForm();
     });
     document.addEventListener("keydown", function onKeydown(event) {
       if (event.key !== "Escape") return;
       document.removeEventListener("keydown", onKeydown);
-      closeOverlay();
+      showFeedbackForm();
     });
 
     overlay.appendChild(frame);
