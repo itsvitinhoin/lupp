@@ -19,6 +19,7 @@ import Billing from "@/pages/billing";
 import Settings from "@/pages/settings";
 import PreviewFeed from "@/pages/preview/feed";
 import PreviewProduct from "@/pages/preview/product";
+import TestStore from "@/pages/test-store";
 import { AuthRoute, ProtectedRoute } from "./ProtectedRoute";
 
 export function AppRoutes() {
@@ -80,6 +81,8 @@ export function AppRoutes() {
 
       <Route path="/preview/feed" component={PreviewFeed} />
       <Route path="/preview/product" component={PreviewProduct} />
+      <Route path="/s/:storeSlug/feed" component={PreviewFeed} />
+      <Route path="/test-store/:storeSlug" component={TestStore} />
 
       <Route component={NotFound} />
     </Switch>

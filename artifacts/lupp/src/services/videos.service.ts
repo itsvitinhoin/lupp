@@ -4,7 +4,12 @@ import type { CreateVideoPayload, UpdateVideoPayload } from "@/types/video";
 
 export const videosService = {
   async listVideos(storeId: string, search = "", status = "all") {
-    let query = requireSupabase().from("videos").select("*").eq("store_id", storeId).order("sort_order").order("created_at", { ascending: false });
+    let query = requireSupabase()
+      .from("videos")
+      .select("*, video_products(*, products(*))")
+      .eq("store_id", storeId)
+      .order("sort_order")
+      .order("created_at", { ascending: false });
 
     if (search) query = query.ilike("title", `%${search}%`);
     if (status !== "all") query = query.eq("status", status as VideoStatus);
@@ -12,6 +17,20 @@ export const videosService = {
     const { data, error } = await query;
     if (error) throw error;
     return data ?? [];
+  },
+
+  async listPublicFeedVideosByStoreSlug(storeSlug: string) {
+    const supabase = requireSupabase();
+    const { data: store, error: storeError } = await supabase
+      .from("stores")
+      .select("*")
+      .eq("slug", storeSlug)
+      .eq("status", "active")
+      .single();
+    if (storeError) throw storeError;
+
+    const videos = await this.listPublicFeedVideos(store.id);
+    return { store, videos };
   },
 
   async listPublicFeedVideos(storeId: string) {

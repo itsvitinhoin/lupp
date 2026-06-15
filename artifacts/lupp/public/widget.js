@@ -5,10 +5,11 @@
   if (!script) return;
 
   var storeSlug = script.getAttribute("data-store");
-  var widgetType = script.getAttribute("data-widget") || "home-showcase";
+  var widgetType = (script.getAttribute("data-widget") || "home_showcase").replace(/-/g, "_");
   var productUrl = script.getAttribute("data-product-url") || window.location.href;
   var supabaseUrl = script.getAttribute("data-supabase-url") || window.LUPP_SUPABASE_URL || "";
   var supabaseKey = script.getAttribute("data-supabase-key") || window.LUPP_SUPABASE_ANON_KEY || "";
+  var luppBaseUrl = script.getAttribute("data-lupp-url") || new URL(script.src).origin;
 
   if (!storeSlug || !supabaseUrl || !supabaseKey) {
     console.warn("[Lupp] Configure data-store, data-supabase-url e data-supabase-key para carregar o widget.");
@@ -68,7 +69,7 @@
   function createRoot() {
     var root = document.createElement("div");
     root.setAttribute("data-lupp-widget-root", widgetType);
-    if (widgetType === "floating-video") {
+    if (widgetType === "floating_video") {
       root.style.position = "fixed";
       root.style.right = "18px";
       root.style.bottom = "18px";
@@ -80,7 +81,7 @@
 
   function render(root, store, videos) {
     var accent = store.button_color || "#006BFF";
-    var items = videos.slice(0, widgetType === "stories-bar" ? 8 : 6);
+    var items = videos.slice(0, widgetType === "stories_bar" ? 8 : 6);
 
     if (!items.length) {
       root.innerHTML = "";
@@ -92,7 +93,7 @@
       "--lupp-accent:" +
       accent;
 
-    if (widgetType === "stories-bar") {
+    if (widgetType === "stories_bar") {
       root.innerHTML =
         '<div style="' +
         style +
@@ -116,7 +117,7 @@
       return;
     }
 
-    if (widgetType === "floating-video") {
+    if (widgetType === "floating_video") {
       var video = items[0];
       root.innerHTML =
         '<button data-video="' +
@@ -185,7 +186,7 @@
           });
           if (!video) return;
           track(store.id, "video_view", video.id);
-          window.open("/s/" + store.slug + "/feed?v=" + video.id, "_blank", "noopener");
+          window.open(luppBaseUrl.replace(/\/$/, "") + "/s/" + store.slug + "/feed?v=" + video.id, "_blank", "noopener");
         });
       });
     })

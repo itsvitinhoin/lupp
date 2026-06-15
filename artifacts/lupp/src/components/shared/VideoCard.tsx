@@ -1,24 +1,50 @@
 import React from 'react';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Video } from '@/data/mock';
 import { StatusBadge } from './StatusBadge';
 import { BarChart3, Copy, Edit2, Eye, Heart, MessageCircle, MoreVertical, MousePointerClick, Pause, Play, Trash2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { VideoPlayerMock } from './VideoPlayerMock';
 
+export interface VideoCardItem {
+  id: string;
+  title: string;
+  status: 'ativo' | 'pausado' | 'rascunho';
+  views: number;
+  likes: number;
+  comments: number;
+  clicks: number;
+  revenue: number;
+  productId: string | null;
+  productName: string | null;
+  thumbnail: string;
+  videoUrl?: string | null;
+}
+
 interface VideoCardProps {
-  video: Video;
-  onEdit?: (video: Video) => void;
-  onToggleStatus?: (video: Video) => void;
-  onDelete?: (video: Video) => void;
+  video: VideoCardItem;
+  onEdit?: (video: VideoCardItem) => void;
+  onToggleStatus?: (video: VideoCardItem) => void;
+  onDelete?: (video: VideoCardItem) => void;
 }
 
 export function VideoCard({ video, onEdit, onToggleStatus, onDelete }: VideoCardProps) {
   return (
     <Card className="overflow-hidden border-white/5 bg-card/50 backdrop-blur-sm transition-all hover:border-white/10 hover:shadow-md hover:shadow-primary/5">
       <div className="relative aspect-[9/16] w-full overflow-hidden">
-        <VideoPlayerMock />
+        {video.videoUrl ? (
+          <video
+            src={video.videoUrl}
+            poster={video.thumbnail || undefined}
+            className="h-full w-full object-cover bg-black"
+            muted
+            playsInline
+            loop
+            preload="metadata"
+          />
+        ) : (
+          <VideoPlayerMock />
+        )}
         <div className="absolute left-2 top-2">
           <StatusBadge status={video.status} />
         </div>

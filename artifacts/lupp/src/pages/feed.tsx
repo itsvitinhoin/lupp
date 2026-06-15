@@ -10,10 +10,16 @@ import { VideoPlayerMock } from '@/components/shared/VideoPlayerMock';
 import { Copy, ExternalLink, GripVertical } from 'lucide-react';
 import { mockVideos } from '@/data/mock';
 import { useToast } from '@/hooks/use-toast';
-import { Link } from 'wouter';
+import { useCurrentStore } from '@/hooks/useStore';
+import { useVideos } from '@/hooks/useVideos';
 
 export default function FeedConfig() {
   const { toast } = useToast();
+  const { store } = useCurrentStore();
+  const videosQuery = useVideos(store?.id, '', 'active');
+  const publicFeedPath = store ? `/s/${store.slug}/feed` : '/preview/feed';
+  const publicFeedUrl = `${window.location.origin}${publicFeedPath}`;
+  const videos = videosQuery.data?.length ? videosQuery.data : mockVideos.slice(0, 4);
   
   const handleSave = () => {
     toast({
@@ -23,7 +29,7 @@ export default function FeedConfig() {
   };
 
   const copyUrl = () => {
-    navigator.clipboard.writeText('https://bellamoda.com.br/videos');
+    navigator.clipboard.writeText(publicFeedUrl);
     toast({
       title: "URL copiada",
       description: "Link do feed copiado para a área de transferência.",
@@ -47,7 +53,7 @@ export default function FeedConfig() {
                 <Label>URL pública do feed</Label>
                 <div className="flex gap-2">
                   <div className="flex-1 rounded-md border border-white/10 bg-background/50 px-3 py-2 text-sm text-muted-foreground flex items-center">
-                    /videos
+                    {publicFeedPath}
                   </div>
                   <Button variant="outline" size="icon" onClick={copyUrl}>
                     <Copy className="h-4 w-4" />
@@ -126,10 +132,10 @@ export default function FeedConfig() {
 
               <div className="space-y-2 pt-4 border-t border-white/5">
                 <Label className="text-muted-foreground">Arraste para ordenar (modo manual)</Label>
-                {mockVideos.slice(0, 4).map((video) => (
+                {videos.slice(0, 4).map((video: any) => (
                   <div key={video.id} className="flex items-center gap-3 rounded-md border border-white/5 bg-card/30 p-2">
                     <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
-                    <div className="h-10 w-8 rounded bg-primary/20 shrink-0"></div>
+                    <div className="h-10 w-8 rounded bg-primary/20 bg-cover bg-center shrink-0" style={{ backgroundImage: video.thumbnail_url ? `url(${video.thumbnail_url})` : undefined }}></div>
                     <div className="flex-1 overflow-hidden">
                       <p className="truncate text-sm font-medium">{video.title}</p>
                     </div>
@@ -154,7 +160,7 @@ export default function FeedConfig() {
               Salvar alterações
             </Button>
             <Button variant="outline" className="flex-1" asChild>
-              <a href="/preview/feed" target="_blank" rel="noopener noreferrer">
+              <a href={publicFeedPath} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="mr-2 h-4 w-4" />
                 Ver preview
               </a>

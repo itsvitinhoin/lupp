@@ -2,19 +2,26 @@ import React from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Widget } from '@/data/mock';
 import { Code, Settings, Eye } from 'lucide-react';
 
+export interface WidgetCardItem {
+  id: string;
+  name: string;
+  description: string;
+  status: 'ativo' | 'inativo' | 'active' | 'inactive';
+  type?: string;
+}
+
 interface WidgetCardProps {
-  widget: Widget;
-  onToggle?: (widget: Widget, active: boolean) => void;
-  onConfigure?: (widget: Widget) => void;
-  onCopyCode?: (widget: Widget) => void;
-  onPreview?: (widget: Widget) => void;
+  widget: WidgetCardItem;
+  onToggle?: (widget: WidgetCardItem, active: boolean) => void;
+  onConfigure?: (widget: WidgetCardItem) => void;
+  onCopyCode?: (widget: WidgetCardItem) => void;
+  onPreview?: (widget: WidgetCardItem) => void;
 }
 
 export function WidgetCard({ widget, onToggle, onConfigure, onCopyCode, onPreview }: WidgetCardProps) {
-  const isActive = widget.status === 'ativo';
+  const isActive = widget.status === 'ativo' || widget.status === 'active';
 
   return (
     <Card className={`border-white/5 transition-all ${isActive ? 'bg-card/80 border-primary/20 shadow-md shadow-primary/5' : 'bg-card/30'}`}>
