@@ -20,6 +20,8 @@ export default function Signup() {
   const [storeName, setStoreName] = React.useState('');
   const [platform, setPlatform] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [pendingConfirmationEmail, setPendingConfirmationEmail] = React.useState('');
+  const [isResending, setIsResending] = React.useState(false);
 
   const persistOnboardingPrefill = () => {
     sessionStorage.setItem(
@@ -50,6 +52,7 @@ export default function Signup() {
       const data = await authService.signUp({ name, email, password });
 
       if (!data.session) {
+        setPendingConfirmationEmail(email.trim());
         toast({
           title: 'Cadastro criado',
           description: 'Confirme seu e-mail para entrar e concluir o onboarding.',
@@ -67,6 +70,32 @@ export default function Signup() {
       });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    const targetEmail = pendingConfirmationEmail || email.trim();
+    if (!targetEmail) {
+      toast({ title: 'Informe o e-mail cadastrado.' });
+      return;
+    }
+
+    if (!isSupabaseConfigured) {
+      toast({ title: 'Modo teste local', description: 'Configure Supabase para reenviar confirmação real.' });
+      return;
+    }
+
+    try {
+      setIsResending(true);
+      await authService.resendConfirmation(targetEmail);
+      toast({ title: 'Confirmação reenviada', description: 'Confira sua caixa de entrada e spam.' });
+    } catch (error) {
+      toast({
+        title: 'Não foi possível reenviar',
+        description: error instanceof Error ? error.message : 'Tente novamente em instantes.',
+      });
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -159,6 +188,21 @@ export default function Signup() {
             {isSubmitting ? 'Criando conta...' : 'Criar conta grátis'}
           </Button>
           </form>
+
+          {pendingConfirmationEmail && (
+            <div className="rounded-md border border-primary/20 bg-primary/10 p-3 text-sm text-muted-foreground">
+              <p>Cadastro criado para {pendingConfirmationEmail}. Confirme seu e-mail para liberar o login.</p>
+              <Button
+                type="button"
+                variant="link"
+                className="mt-1 h-auto p-0 text-primary"
+                onClick={handleResendConfirmation}
+                disabled={isResending}
+              >
+                {isResending ? 'Reenviando...' : 'Reenviar e-mail de confirmação'}
+              </Button>
+            </div>
+          )}
           
           <p className="text-center text-sm text-muted-foreground mt-6">
             Já tem uma conta?{' '}

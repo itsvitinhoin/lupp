@@ -17,6 +17,7 @@ export default function Login() {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isResetting, setIsResetting] = React.useState(false);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -46,6 +47,34 @@ export default function Login() {
       });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    if (!email.trim()) {
+      toast({ title: 'Informe seu e-mail para recuperar a senha.' });
+      return;
+    }
+
+    if (!isSupabaseConfigured) {
+      toast({ title: 'Modo teste local', description: 'Configure Supabase para enviar recuperação de senha real.' });
+      return;
+    }
+
+    try {
+      setIsResetting(true);
+      await authService.resetPassword(email.trim());
+      toast({
+        title: 'E-mail enviado',
+        description: 'Se esse e-mail existir na Lupp, você receberá as instruções de recuperação.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Não foi possível enviar',
+        description: error instanceof Error ? error.message : 'Tente novamente em instantes.',
+      });
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -84,9 +113,14 @@ export default function Login() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="password">Senha</Label>
-              <a href="#" className="text-xs font-medium text-primary hover:underline">
-                Esqueci minha senha
-              </a>
+              <button
+                type="button"
+                className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+                onClick={handlePasswordReset}
+                disabled={isResetting}
+              >
+                {isResetting ? 'Enviando...' : 'Esqueci minha senha'}
+              </button>
             </div>
             <Input
               id="password"

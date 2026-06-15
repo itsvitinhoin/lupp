@@ -309,6 +309,36 @@ grant usage on schema private to authenticated;
 revoke all on function private.is_store_member(uuid) from public;
 grant execute on function private.is_store_member(uuid) to authenticated;
 
+create or replace function private.handle_new_user_profile()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.profiles (id, name, email, avatar_url)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'name', new.raw_user_meta_data->>'full_name'),
+    new.email,
+    new.raw_user_meta_data->>'avatar_url'
+  )
+  on conflict (id) do update set
+    name = coalesce(excluded.name, public.profiles.name),
+    email = coalesce(excluded.email, public.profiles.email),
+    avatar_url = coalesce(excluded.avatar_url, public.profiles.avatar_url),
+    updated_at = now();
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created_create_profile on auth.users;
+
+create trigger on_auth_user_created_create_profile
+after insert on auth.users
+for each row execute function private.handle_new_user_profile();
+
 create policy "profiles are visible to owner" on public.profiles for select to authenticated using (id = auth.uid());
 create policy "profiles are insertable by owner" on public.profiles for insert to authenticated with check (id = auth.uid());
 create policy "profiles are editable by owner" on public.profiles for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
