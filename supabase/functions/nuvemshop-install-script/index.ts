@@ -157,6 +157,37 @@ Deno.serve(async (req) => {
   const listData = await readJson(listResponse);
   const scripts = Array.isArray(listData.result) ? listData.result : [];
   const existing = scripts.find((script) => String(script.id) === String(scriptId));
+  if (existing && existing.is_auto_install) {
+    const integrationSettings =
+      integration.settings && typeof integration.settings === "object" && !Array.isArray(integration.settings)
+        ? integration.settings
+        : {};
+
+    await supabase
+      .from("integrations")
+      .update({
+        settings: {
+          ...integrationSettings,
+          script_install: {
+            auto_installed: true,
+            installed_at: new Date().toISOString(),
+            script_id: scriptId,
+            source: "nuvemshop_auto_install",
+            status: existing.status || null,
+          },
+        },
+      })
+      .eq("id", integration.id);
+
+    return jsonResponse({
+      auto_installed: true,
+      installed: true,
+      ok: true,
+      script: existing,
+      script_id: scriptId,
+    });
+  }
+
   const method = existing ? "PUT" : "POST";
   const endpoint = existing ? `${scriptApiBase}/${scriptId}` : scriptApiBase;
   let installResponse = await fetch(endpoint, {

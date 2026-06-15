@@ -23,6 +23,19 @@
   var supabaseKey = readScriptValue("data-supabase-key", ["lupp_supabase_key", "supabase_key"], window.LUPP_SUPABASE_ANON_KEY || "");
   var luppBaseUrl = readScriptValue("data-lupp-url", ["lupp_url", "lupp_base_url"], new URL(script.src).origin).replace(/\/$/, "");
   var requireActiveWidget = readScriptValue("data-require-active", ["lupp_require_active", "require_active"], "false") === "true";
+  var externalStoreId = readScriptValue("data-external-store-id", ["external_store_id", "store"], "");
+
+  if (!supabaseUrl && /apps-scripts\.tiendanube\.com/i.test(new URL(script.src, window.location.href).hostname)) {
+    supabaseUrl = "https://duktrvqfbvpfajuajhci.supabase.co";
+  }
+
+  if (!storeSlug && externalStoreId) {
+    requireActiveWidget = true;
+  }
+
+  if (/apps-scripts\.tiendanube\.com/i.test(new URL(script.src, window.location.href).hostname) && !/^https?:\/\/lupp-lupp\.vercel\.app/i.test(luppBaseUrl)) {
+    luppBaseUrl = "https://lupp-lupp.vercel.app";
+  }
 
   var launcherConfig = {
     position: readScriptValue("data-position", ["lupp_position"], "bottom-left"),
@@ -44,12 +57,13 @@
     hideWithoutVideos: readScriptValue("data-hide-without-videos", ["lupp_hide_without_videos"], "false") === "true",
   };
 
-  if (!storeSlug || !supabaseUrl || !supabaseKey) {
+  if ((!storeSlug && !externalStoreId) || !supabaseUrl || (!supabaseKey && !externalStoreId)) {
     console.warn("[Luup] Configure data-store, data-supabase-url e data-supabase-key para carregar o widget.");
     return;
   }
 
   var apiBase = supabaseUrl.replace(/\/$/, "") + "/rest/v1";
+  var bootstrapBase = supabaseUrl.replace(/\/$/, "") + "/functions/v1/lupp-widget-bootstrap";
   var headers = {
     apikey: supabaseKey,
     Authorization: "Bearer " + supabaseKey,
@@ -82,6 +96,21 @@
   function fetchJson(path) {
     return fetch(apiBase + path, { headers: headers }).then(function (response) {
       if (!response.ok) throw new Error("Luup API error: " + response.status);
+      return response.json();
+    });
+  }
+
+  function fetchBootstrap() {
+    var params = new URLSearchParams();
+    params.set("widget", mappedWidgetType());
+    if (storeSlug) params.set("store_slug", storeSlug);
+    if (externalStoreId) {
+      params.set("provider", "nuvemshop");
+      params.set("external_store_id", externalStoreId);
+    }
+
+    return fetch(bootstrapBase + "?" + params.toString()).then(function (response) {
+      if (!response.ok) throw new Error("Luup bootstrap error: " + response.status);
       return response.json();
     });
   }
@@ -253,21 +282,32 @@
 
   function track(storeId, eventType, videoId, productId, metadata) {
     if (!storeId) return;
+    var payload = {
+      store_id: storeId,
+      video_id: videoId || null,
+      product_id: productId || null,
+      event_type: eventType,
+      visitor_id: ensureVisitorId(),
+      session_id: ensureSessionId(),
+      url: window.location.href,
+      referrer: document.referrer || null,
+      user_agent: navigator.userAgent,
+      metadata: Object.assign({ widget_type: widgetType, product_url: productUrl }, metadata || {}),
+    };
+
+    if (!supabaseKey) {
+      fetch(bootstrapBase, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }).catch(function () {});
+      return;
+    }
+
     fetch(apiBase + "/analytics_events", {
       method: "POST",
       headers: Object.assign({ "Content-Type": "application/json", Prefer: "return=minimal" }, headers),
-      body: JSON.stringify({
-        store_id: storeId,
-        video_id: videoId || null,
-        product_id: productId || null,
-        event_type: eventType,
-        visitor_id: ensureVisitorId(),
-        session_id: ensureSessionId(),
-        url: window.location.href,
-        referrer: document.referrer || null,
-        user_agent: navigator.userAgent,
-        metadata: Object.assign({ widget_type: widgetType, product_url: productUrl }, metadata || {}),
-      }),
+      body: JSON.stringify(payload),
     }).catch(function () {});
   }
 
@@ -573,6 +613,41 @@
   }
 
   var root = createRoot();
+
+  if (!supabaseKey) {
+    fetchBootstrap()
+      .then(function (payload) {
+        var store = payload.store || {
+          id: null,
+          slug: storeSlug || externalStoreId,
+          button_color: launcherConfig.accentColor,
+        };
+        var widgetConfig = payload.widget || null;
+        if (!payload.active && requireActiveWidget) {
+          root.remove();
+          return;
+        }
+
+        applyWidgetSettings(widgetConfig);
+        if (!shouldDisplayOnCurrentUrl(displayConfig)) {
+          root.remove();
+          return;
+        }
+
+        track(store.id, "widget_view");
+        var filteredVideos = filterVideosForCurrentUrl(payload.videos || []);
+        if (!filteredVideos.length && displayConfig.hideWithoutVideos) {
+          root.remove();
+          return;
+        }
+        render(root, store, filteredVideos);
+      })
+      .catch(function (error) {
+        console.warn("[Luup]", error.message);
+        root.remove();
+      });
+    return;
+  }
 
   fetchJson("/stores?slug=eq." + encodeURIComponent(storeSlug) + "&status=eq.active&select=*")
     .then(function (stores) {
