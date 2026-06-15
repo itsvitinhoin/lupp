@@ -7,10 +7,11 @@ import { Globe, ShoppingBag, ShoppingCart } from 'lucide-react';
 
 interface IntegrationCardProps {
   integration: Integration;
+  isConfiguring?: boolean;
   onConfigure?: (integration: Integration) => void;
 }
 
-export function IntegrationCard({ integration, onConfigure }: IntegrationCardProps) {
+export function IntegrationCard({ integration, isConfiguring = false, onConfigure }: IntegrationCardProps) {
   // Mock icons based on name
   const getIcon = () => {
     const name = integration.name.toLowerCase();
@@ -19,6 +20,13 @@ export function IntegrationCard({ integration, onConfigure }: IntegrationCardPro
   };
 
   const isDisabled = integration.status === 'em breve';
+  const buttonLabel = isConfiguring
+    ? 'Conectando...'
+    : integration.status === 'disponível'
+      ? 'Conectar'
+      : integration.status === 'enterprise'
+        ? 'Falar com vendas'
+        : 'Aguarde';
 
   return (
     <Card className={`border-white/5 bg-card/50 backdrop-blur-sm transition-all hover:border-white/10 ${isDisabled ? 'opacity-60' : ''}`}>
@@ -34,10 +42,10 @@ export function IntegrationCard({ integration, onConfigure }: IntegrationCardPro
         <Button 
           variant={integration.status === 'disponível' ? 'default' : 'outline'} 
           className="w-full"
-          disabled={isDisabled}
+          disabled={isDisabled || isConfiguring}
           onClick={() => onConfigure?.(integration)}
         >
-          {integration.status === 'disponível' ? 'Conectar' : integration.status === 'enterprise' ? 'Falar com vendas' : 'Aguarde'}
+          {buttonLabel}
         </Button>
       </CardContent>
     </Card>

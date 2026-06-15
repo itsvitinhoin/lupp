@@ -23,13 +23,32 @@ export const integrationsService = {
   },
 
   async createNuvemshopAuthorizeUrl(storeId: string) {
-    const { data, error } = await requireSupabase().functions.invoke<{ authorize_url: string }>("nuvemshop-oauth-start", {
+    const client = requireSupabase();
+    const {
+      data: { session },
+      error: sessionError,
+    } = await client.auth.getSession();
+
+    if (sessionError) throw sessionError;
+    if (!session) {
+      throw new Error("Sua sessão expirou. Entre novamente para conectar a Nuvemshop.");
+    }
+
+    const { data, error } = await client.functions.invoke<{ authorize_url: string }>("nuvemshop-oauth-start", {
       body: {
         return_to: `${window.location.origin}/app/integrations`,
         store_id: storeId,
       },
     });
-    if (error) throw error;
+    if (error) {
+      if ("context" in error && error.context instanceof Response) {
+        const details = await error.context.json().catch(() => null);
+        if (details && typeof details.error === "string") {
+          throw new Error(details.error.replace(/_/g, " "));
+        }
+      }
+      throw error;
+    }
     if (!data?.authorize_url) throw new Error("Não foi possível iniciar a conexão com a Nuvemshop.");
     return data.authorize_url;
   },

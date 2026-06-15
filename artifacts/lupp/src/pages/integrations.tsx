@@ -5,13 +5,18 @@ import { mockIntegrations, Integration } from '@/data/mock';
 import { CodeBlock } from '@/components/shared/CodeBlock';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { useCurrentStore } from '@/hooks/useStore';
 import { integrationsService } from '@/services/integrations.service';
 import { useQuery } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
 
 export default function Integrations() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const { session, loading: authLoading } = useAuth();
   const { store } = useCurrentStore();
+  const [connectingProvider, setConnectingProvider] = React.useState<string | null>(null);
   const integrationsQuery = useQuery({
     queryKey: ['integrations', store?.id],
     queryFn: () => integrationsService.listIntegrations(store!.id),
@@ -49,14 +54,26 @@ export default function Integrations() {
       return;
     }
 
+    if (!authLoading && !session) {
+      toast({
+        title: 'Faça login novamente',
+        description: 'A conexão com a Nuvemshop precisa de uma sessão real do Supabase.',
+      });
+      setLocation('/login');
+      return;
+    }
+
     try {
+      setConnectingProvider('nuvemshop');
       const authorizeUrl = await integrationsService.createNuvemshopAuthorizeUrl(store.id);
-      window.location.href = authorizeUrl;
+      window.location.assign(authorizeUrl);
     } catch (error) {
       toast({
         title: 'Não foi possível conectar a Nuvemshop',
         description: error instanceof Error ? error.message : 'Tente novamente em instantes.',
       });
+    } finally {
+      setConnectingProvider(null);
     }
   };
 
@@ -76,7 +93,14 @@ export default function Integrations() {
               const displayIntegration = activeProviders.has(normalizedProvider)
                 ? { ...integration, status: 'disponível' as const, description: `${integration.description} Conectada.` }
                 : integration;
-              return <IntegrationCard key={integration.id} integration={displayIntegration} onConfigure={handleConfigure} />;
+              return (
+                <IntegrationCard
+                  key={integration.id}
+                  integration={displayIntegration}
+                  isConfiguring={connectingProvider === normalizedProvider}
+                  onConfigure={handleConfigure}
+                />
+              );
             })}
           </div>
         </div>
