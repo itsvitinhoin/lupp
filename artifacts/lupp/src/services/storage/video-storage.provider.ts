@@ -69,7 +69,7 @@ export class SupabaseVideoProvider implements VideoStorageProvider {
           cacheControl: "31536000",
         },
         chunkSize: 6 * 1024 * 1024,
-        uploadDataDuringCreation: true,
+        uploadDataDuringCreation: false,
         removeFingerprintOnSuccess: true,
         onProgress: (bytesUploaded, bytesTotal) => {
           const nextProgress = bytesTotal > 0 ? Math.min(99, Math.round((bytesUploaded / bytesTotal) * 100)) : 1;
