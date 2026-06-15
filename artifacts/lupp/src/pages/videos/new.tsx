@@ -14,9 +14,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useProducts } from '@/hooks/useProducts';
 import { useCurrentStore } from '@/hooks/useStore';
 import { isSupabaseConfigured } from '@/lib/env';
-import { ACCEPTED_VIDEO_INPUT_TYPES, isAcceptedVideoFile } from '@/lib/constants';
+import { ACCEPTED_VIDEO_INPUT_TYPES, MAX_VIDEO_UPLOAD_BYTES, MAX_VIDEO_UPLOAD_MB, isAcceptedVideoFile } from '@/lib/constants';
 import { videoStorageProvider } from '@/services/storage/video-storage.provider';
 import { videosService } from '@/services/videos.service';
+import type { VideoUploadProgress } from '@/types/video';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 
@@ -26,6 +27,18 @@ const ctaLabels: Record<string, string> = {
   carrinho: 'Adicionar ao carrinho',
   conhecer: 'Conhecer peça',
 };
+
+const uploadPhaseLabels: Record<VideoUploadProgress['phase'], string> = {
+  preparing: 'Preparando upload...',
+  uploading: 'Enviando vídeo...',
+  processing: 'Finalizando...',
+  complete: 'Upload concluído',
+};
+
+function formatBytes(bytes?: number) {
+  if (!bytes) return '0 MB';
+  return `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} MB`;
+}
 
 export default function VideosNew() {
   const { toast } = useToast();
@@ -39,6 +52,7 @@ export default function VideosNew() {
   const [file, setFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState('');
   const [progress, setProgress] = React.useState(0);
+  const [uploadProgress, setUploadProgress] = React.useState<VideoUploadProgress | null>(null);
   const [title, setTitle] = React.useState('');
   const [description, setDescription] = React.useState('');
   const [selectedProductId, setSelectedProductId] = React.useState('');
@@ -69,10 +83,16 @@ export default function VideosNew() {
       return;
     }
 
+    if (nextFile.size > MAX_VIDEO_UPLOAD_BYTES) {
+      toast({ title: 'Vídeo muito grande', description: `O limite atual é ${MAX_VIDEO_UPLOAD_MB}MB por vídeo.` });
+      return;
+    }
+
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(nextFile);
     setPreviewUrl(URL.createObjectURL(nextFile));
-    setProgress(5);
+    setProgress(0);
+    setUploadProgress(null);
     if (!title.trim()) {
       setTitle(nextFile.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '));
     }
@@ -106,7 +126,10 @@ export default function VideosNew() {
 
     try {
       setIsSubmitting(true);
-      const uploaded = await videoStorageProvider.uploadVideo(file, store.id, setProgress);
+      const uploaded = await videoStorageProvider.uploadVideo(file, store.id, (nextProgress) => {
+        setProgress(nextProgress.progress);
+        setUploadProgress(nextProgress);
+      });
       const video = await videosService.createVideo(
         {
           store_id: store.id,
@@ -175,7 +198,7 @@ export default function VideosNew() {
                   </div>
                   <div className="text-center">
                     <p className="text-lg font-medium">Arraste seu vídeo aqui</p>
-                    <p className="mt-1 text-sm text-muted-foreground">MP4, MOV ou WebM até 200MB</p>
+                    <p className="mt-1 text-sm text-muted-foreground">MP4, MOV ou WebM até {MAX_VIDEO_UPLOAD_MB}MB</p>
                   </div>
                 </button>
               ) : (
@@ -186,10 +209,20 @@ export default function VideosNew() {
                       Trocar
                     </Button>
                   </div>
-                  <Progress value={progress} />
-                  <p className="text-center text-xs text-muted-foreground">
-                    {isSubmitting ? 'Enviando em partes para o Supabase Storage...' : 'Pronto para publicar'}
-                  </p>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{isSubmitting && uploadProgress ? uploadPhaseLabels[uploadProgress.phase] : 'Pronto para publicar'}</span>
+                      <span>{Math.round(progress)}%</span>
+                    </div>
+                    <Progress value={progress} />
+                    {isSubmitting && uploadProgress ? (
+                      <p className="text-center text-xs text-muted-foreground">
+                        {formatBytes(uploadProgress.bytesUploaded)} de {formatBytes(uploadProgress.bytesTotal)}
+                      </p>
+                    ) : (
+                      <p className="text-center text-xs text-muted-foreground">O progresso aparece assim que você publicar.</p>
+                    )}
+                  </div>
                 </div>
               )}
             </CardContent>

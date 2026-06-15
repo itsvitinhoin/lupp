@@ -55,7 +55,9 @@ export const ANALYTICS_EVENT_TYPES = [
   "feed_open",
 ] as const;
 
-export const MAX_VIDEO_UPLOAD_BYTES = 200 * 1024 * 1024;
+const configuredVideoUploadMb = Number(import.meta.env.VITE_MAX_VIDEO_UPLOAD_MB || 50);
+export const MAX_VIDEO_UPLOAD_MB = Number.isFinite(configuredVideoUploadMb) && configuredVideoUploadMb > 0 ? configuredVideoUploadMb : 50;
+export const MAX_VIDEO_UPLOAD_BYTES = MAX_VIDEO_UPLOAD_MB * 1024 * 1024;
 export const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
 export const ACCEPTED_VIDEO_EXTENSIONS = ["mp4", "m4v", "mov", "webm"];
 export const ACCEPTED_VIDEO_INPUT_TYPES = [

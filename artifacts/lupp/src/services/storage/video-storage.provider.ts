@@ -1,8 +1,8 @@
 import * as tus from "tus-js-client";
-import { extensionFromName, getVideoContentType, isAcceptedVideoFile, MAX_VIDEO_UPLOAD_BYTES } from "@/lib/constants";
+import { extensionFromName, getVideoContentType, isAcceptedVideoFile, MAX_VIDEO_UPLOAD_BYTES, MAX_VIDEO_UPLOAD_MB } from "@/lib/constants";
 import { env } from "@/lib/env";
 import { requireSupabase } from "@/lib/supabase";
-import type { UploadedVideo, VideoStorageProvider } from "@/types/video";
+import type { UploadedVideo, VideoStorageProvider, VideoUploadProgress } from "@/types/video";
 
 function extensionFromFile(file: File) {
   return extensionFromName(file.name) || "mp4";
@@ -27,6 +27,10 @@ function formatTusError(error: Error | tus.DetailedError) {
   if (error instanceof tus.DetailedError && error.originalResponse) {
     const status = error.originalResponse.getStatus();
     const body = error.originalResponse.getBody();
+    if (status === 413) {
+      return "O Supabase recusou o arquivo pelo limite global de Storage. Projetos Free aceitam no máximo 50MB; para vídeos maiores, suba para Pro e ajuste Storage > Settings > Global file size limit.";
+    }
+
     return `Falha no upload resumível (${status}). ${body || error.message}`;
   }
 
@@ -34,13 +38,13 @@ function formatTusError(error: Error | tus.DetailedError) {
 }
 
 export class SupabaseVideoProvider implements VideoStorageProvider {
-  async uploadVideo(file: File, storeId: string, onProgress?: (progress: number) => void): Promise<UploadedVideo> {
+  async uploadVideo(file: File, storeId: string, onProgress?: (progress: VideoUploadProgress) => void): Promise<UploadedVideo> {
     if (!isAcceptedVideoFile(file)) {
       throw new Error("Formato inválido. Envie um vídeo MP4, MOV ou WebM.");
     }
 
     if (file.size > MAX_VIDEO_UPLOAD_BYTES) {
-      throw new Error("O vídeo excede o limite inicial de 200MB.");
+      throw new Error(`O vídeo excede o limite configurado de ${MAX_VIDEO_UPLOAD_MB}MB.`);
     }
 
     const supabase = requireSupabase();
@@ -52,7 +56,7 @@ export class SupabaseVideoProvider implements VideoStorageProvider {
       throw new Error("Sessão expirada. Faça login novamente para enviar vídeos.");
     }
 
-    onProgress?.(1);
+    onProgress?.({ bytesTotal: file.size, bytesUploaded: 0, phase: "preparing", progress: 1 });
 
     await new Promise<void>((resolve, reject) => {
       const upload = new tus.Upload(file, {
@@ -73,7 +77,7 @@ export class SupabaseVideoProvider implements VideoStorageProvider {
         removeFingerprintOnSuccess: true,
         onProgress: (bytesUploaded, bytesTotal) => {
           const nextProgress = bytesTotal > 0 ? Math.min(99, Math.round((bytesUploaded / bytesTotal) * 100)) : 1;
-          onProgress?.(nextProgress);
+          onProgress?.({ bytesTotal, bytesUploaded, phase: "uploading", progress: nextProgress });
         },
         onError: (error) => {
           reject(new Error(formatTusError(error)));
@@ -93,7 +97,7 @@ export class SupabaseVideoProvider implements VideoStorageProvider {
         .catch((error: Error) => reject(error));
     });
 
-    onProgress?.(100);
+    onProgress?.({ bytesTotal: file.size, bytesUploaded: file.size, phase: "complete", progress: 100 });
     const { data: publicUrlData } = supabase.storage.from("videos").getPublicUrl(path);
     return { url: publicUrlData.publicUrl, path, provider: "supabase" };
   }
