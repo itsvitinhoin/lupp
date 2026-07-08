@@ -245,6 +245,51 @@ function getSupabaseClient() {
   });
 }
 
+const STORE_COLUMNS = "id, slug, button_color, status, platform, url, plan_id";
+
+function domainsMatch(left: string, right: string) {
+  if (!left || !right) return false;
+  return (
+    left === right || left.endsWith(`.${right}`) || right.endsWith(`.${left}`)
+  );
+}
+
+function integrationSettingsDomains(settings: unknown) {
+  if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
+    return [] as string[];
+  }
+  const record = settings as Record<string, unknown>;
+  const candidates: unknown[] = [
+    record.storefront_domain,
+    record.nuvemshop_original_domain,
+    record.store_domain,
+    record.storefront_url,
+  ];
+  if (Array.isArray(record.nuvemshop_domains)) {
+    candidates.push(...record.nuvemshop_domains);
+  }
+  if (Array.isArray(record.storefront_domains)) {
+    candidates.push(...record.storefront_domains);
+  }
+  return candidates.map(normalizedDomain).filter(Boolean);
+}
+
+async function activeStoreById(
+  supabase: ReturnType<typeof createClient>,
+  storeId: string,
+) {
+  const { data } = await supabase
+    .from("stores")
+    .select(STORE_COLUMNS)
+    .eq("id", storeId)
+    .eq("status", "active")
+    .maybeSingle();
+  return data;
+}
+
+// Resolution is a fallback chain: a stronger identifier that misses must not
+// prevent a weaker one from matching (e.g. an inferred external_store_id that
+// is stale should still fall through to domain matching).
 async function findStore(
   supabase: ReturnType<typeof createClient>,
   reqUrl: URL,
@@ -270,62 +315,76 @@ async function findStore(
       "",
   );
 
+  const tried: string[] = [];
+
   if (storeId) {
-    const { data } = await supabase
-      .from("stores")
-      .select("id, slug, button_color, status, platform, url, plan_id")
-      .eq("id", storeId)
+    tried.push("store_id");
+    const store = await activeStoreById(supabase, storeId);
+    if (store) return { resolvedBy: "store_id", store, tried };
+  }
+
+  if (externalStoreId) {
+    tried.push("external_store_id");
+    const { data: integration } = await supabase
+      .from("integrations")
+      .select("store_id")
+      .eq("provider", provider)
+      .eq("external_store_id", externalStoreId)
       .eq("status", "active")
       .maybeSingle();
-    if (data) return data;
+    if (integration?.store_id) {
+      const store = await activeStoreById(supabase, integration.store_id);
+      if (store) return { resolvedBy: "external_store_id", store, tried };
+    }
   }
 
   if (storeSlug) {
-    const { data } = await supabase
+    tried.push("store_slug");
+    const { data: store } = await supabase
       .from("stores")
-      .select("id, slug, button_color, status, platform, url, plan_id")
+      .select(STORE_COLUMNS)
       .eq("slug", storeSlug)
       .eq("status", "active")
       .maybeSingle();
-    return data;
+    if (store) return { resolvedBy: "store_slug", store, tried };
   }
 
-  if (!externalStoreId && storeDomain) {
+  if (storeDomain) {
+    tried.push("store_domain");
     const { data: stores } = await supabase
       .from("stores")
-      .select("id, slug, button_color, status, platform, url, plan_id")
+      .select(STORE_COLUMNS)
       .eq("status", "active")
       .limit(250);
 
-    const matched = (stores ?? []).find((store) => {
-      const host = normalizedDomain(store.url);
-      if (!host) return false;
-      return host === storeDomain || host.endsWith(`.${storeDomain}`) || storeDomain.endsWith(`.${host}`);
-    });
+    const matched = (stores ?? []).find((store) =>
+      domainsMatch(normalizedDomain(store.url), storeDomain),
+    );
+    if (matched) return { resolvedBy: "store_domain", store: matched, tried };
 
-    if (matched) return matched;
+    // Stores are often visited on a domain that differs from stores.url
+    // (e.g. *.lojavirtualnuvem.com.br vs the custom domain). The OAuth
+    // callback and product sync persist every known storefront domain in
+    // integrations.settings, so match against those too.
+    tried.push("integration_domain");
+    const { data: integrations } = await supabase
+      .from("integrations")
+      .select("store_id, settings")
+      .eq("status", "active")
+      .limit(500);
+
+    const matchedIntegration = (integrations ?? []).find((integration) =>
+      integrationSettingsDomains(integration.settings).some((domain) =>
+        domainsMatch(domain, storeDomain),
+      ),
+    );
+    if (matchedIntegration?.store_id) {
+      const store = await activeStoreById(supabase, matchedIntegration.store_id);
+      if (store) return { resolvedBy: "integration_domain", store, tried };
+    }
   }
 
-  if (!externalStoreId) return null;
-
-  const { data: integration } = await supabase
-    .from("integrations")
-    .select("store_id")
-    .eq("provider", provider)
-    .eq("external_store_id", externalStoreId)
-    .eq("status", "active")
-    .maybeSingle();
-
-  if (!integration?.store_id) return null;
-
-  const { data } = await supabase
-    .from("stores")
-    .select("id, slug, button_color, status, platform, url, plan_id")
-    .eq("id", integration.store_id)
-    .eq("status", "active")
-    .maybeSingle();
-
-  return data;
+  return { resolvedBy: null, store: null, tried };
 }
 
 function mappedWidgetType(type: string) {
@@ -471,9 +530,17 @@ Deno.serve(async (req) => {
   const widgetType = mappedWidgetType(
     reqUrl.searchParams.get("widget") || "floating_video",
   );
-  const store = await findStore(supabase, reqUrl);
+  const storeResolution = await findStore(supabase, reqUrl);
+  const store = storeResolution.store;
   if (!store?.id) {
-    return jsonResponse({ active: false, error: "store_not_found" }, 404);
+    return jsonResponse(
+      {
+        active: false,
+        error: "store_not_found",
+        tried: storeResolution.tried,
+      },
+      404,
+    );
   }
 
   const canShowWidget = await hasBillingAccess(supabase, store.id);
@@ -481,6 +548,7 @@ Deno.serve(async (req) => {
     return jsonResponse({
       active: false,
       error: "trial_expired",
+      resolved_by: storeResolution.resolvedBy,
       store,
       videos: [],
       widget: null,
@@ -595,7 +663,9 @@ Deno.serve(async (req) => {
 
   return jsonResponse({
     active: Boolean(effectiveWidget),
+    error: effectiveWidget ? undefined : "no_active_widget",
     mode,
+    resolved_by: storeResolution.resolvedBy,
     store,
     upzero_config: upzeroConfig,
     upzero_storefront_key: upzeroStorefrontKey,
