@@ -4,20 +4,69 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { LuppLogo } from '@/components/shared/LuppLogo';
-import { EnvNotice } from '@/components/shared/EnvNotice';
+import { ShopifyEmbeddedRecovery } from '@/components/shared/ShopifyEmbeddedRecovery';
 import { authService } from '@/services/auth.service';
 import { storesService } from '@/services/stores.service';
-import { isSupabaseConfigured } from '@/lib/env';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { useCurrentStore } from '@/hooks/useStore';
+import { isShopifyEmbeddedSession } from '@/lib/shopify-embedded';
 import { Link, useLocation } from 'wouter';
+
+function isEmailNotConfirmedError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  return /email.*not.*confirmed|not.*confirmed|email_not_confirmed/i.test(error.message);
+}
 
 export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { error: authError, loading: authLoading, user } = useAuth();
+  const storesQuery = useCurrentStore();
+  const isEmbeddedShopify = isShopifyEmbeddedSession();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isResetting, setIsResetting] = React.useState(false);
+  const [unconfirmedEmail, setUnconfirmedEmail] = React.useState('');
+  const [isResendingConfirmation, setIsResendingConfirmation] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isEmbeddedShopify || authLoading || !user || storesQuery.isLoading) return;
+    setLocation(storesQuery.store ? '/app' : '/onboarding');
+  }, [authLoading, isEmbeddedShopify, setLocation, storesQuery.isLoading, storesQuery.store, user]);
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const confirmationEmail = params.get('confirm_email')?.trim();
+
+    if (confirmationEmail) {
+      setEmail(confirmationEmail);
+      setUnconfirmedEmail(confirmationEmail);
+      toast({
+        title: 'Confirme seu e-mail',
+        description: 'Enviamos um link de confirmação. Depois de confirmar, volte para fazer login.',
+      });
+    }
+
+    if (params.get('confirmed') === '1') {
+      toast({
+        title: 'E-mail confirmado',
+        description: 'Agora você já pode entrar na Luup.',
+      });
+    }
+
+    if (params.get('reset') === '1') {
+      toast({
+        title: 'Recuperação aberta',
+        description: 'Defina sua nova senha para continuar.',
+      });
+    }
+  }, [toast]);
+
+  if (isEmbeddedShopify) {
+    return <ShopifyEmbeddedRecovery connecting={!authError} error={authError} />;
+  }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -27,20 +76,25 @@ export default function Login() {
       return;
     }
 
-    if (!isSupabaseConfigured) {
-      localStorage.setItem('lupp_demo_auth', JSON.stringify({ email, name: email.split('@')[0] }));
-      toast({ title: 'Modo teste local ativo', description: 'Configure o Supabase para validar login real.' });
-      setLocation(localStorage.getItem('lupp_demo_store') ? '/app' : '/onboarding');
-      return;
-    }
-
     try {
       setIsSubmitting(true);
       await authService.signIn({ email, password });
       const stores = await storesService.listUserStores();
+      localStorage.removeItem('lupp_demo_auth');
+      localStorage.removeItem('lupp_demo_store');
       toast({ title: 'Login realizado com sucesso.' });
       setLocation(stores.length ? '/app' : '/onboarding');
     } catch (error) {
+      if (isEmailNotConfirmedError(error)) {
+        const targetEmail = email.trim();
+        setUnconfirmedEmail(targetEmail);
+        toast({
+          title: 'Confirme seu e-mail para entrar',
+          description: 'Sua conta já foi criada, mas ainda falta clicar no link de confirmação enviado pela Supabase.',
+        });
+        return;
+      }
+
       toast({
         title: 'Não foi possível entrar',
         description: error instanceof Error ? error.message : 'Confira suas credenciais e tente novamente.',
@@ -50,14 +104,34 @@ export default function Login() {
     }
   };
 
-  const handlePasswordReset = async () => {
-    if (!email.trim()) {
-      toast({ title: 'Informe seu e-mail para recuperar a senha.' });
+  const handleResendConfirmation = async () => {
+    const targetEmail = (unconfirmedEmail || email).trim();
+    if (!targetEmail) {
+      toast({ title: 'Informe o e-mail cadastrado.' });
       return;
     }
 
-    if (!isSupabaseConfigured) {
-      toast({ title: 'Modo teste local', description: 'Configure Supabase para enviar recuperação de senha real.' });
+    try {
+      setIsResendingConfirmation(true);
+      await authService.resendConfirmation(targetEmail);
+      setUnconfirmedEmail(targetEmail);
+      toast({
+        title: 'Confirmação reenviada',
+        description: 'Confira sua caixa de entrada e a pasta de spam.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Não foi possível reenviar',
+        description: error instanceof Error ? error.message : 'Tente novamente em instantes.',
+      });
+    } finally {
+      setIsResendingConfirmation(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    if (!email.trim()) {
+      toast({ title: 'Informe seu e-mail para recuperar a senha.' });
       return;
     }
 
@@ -96,7 +170,6 @@ export default function Login() {
           </p>
         </CardHeader>
         <CardContent className="space-y-4 pb-8">
-          <EnvNotice />
           <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-2">
             <Label htmlFor="email">E-mail</Label>
@@ -106,7 +179,12 @@ export default function Login() {
               placeholder="nome@sualoja.com.br"
               className="bg-background/50 border-white/10"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                if (unconfirmedEmail && event.target.value.trim() !== unconfirmedEmail) {
+                  setUnconfirmedEmail('');
+                }
+              }}
               autoComplete="email"
             />
           </div>
@@ -136,6 +214,24 @@ export default function Login() {
             {isSubmitting ? 'Entrando...' : 'Entrar'}
           </Button>
           </form>
+
+          {unconfirmedEmail && (
+            <div className="rounded-md border border-primary/20 bg-primary/10 p-3 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">E-mail ainda não confirmado</p>
+              <p className="mt-1">
+                Confirme o link enviado para {unconfirmedEmail}. Se não recebeu, reenvie a confirmação.
+              </p>
+              <Button
+                type="button"
+                variant="link"
+                className="mt-2 h-auto p-0 text-primary"
+                onClick={handleResendConfirmation}
+                disabled={isResendingConfirmation}
+              >
+                {isResendingConfirmation ? 'Reenviando...' : 'Reenviar e-mail de confirmação'}
+              </Button>
+            </div>
+          )}
           
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">

@@ -48,7 +48,10 @@ Deno.serve(async (req) => {
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const appId = Deno.env.get("NUVEMSHOP_CLIENT_ID") || Deno.env.get("NUVEMSHOP_APP_ID") || "34355";
   const stateSecret = Deno.env.get("NUVEMSHOP_STATE_SECRET") || serviceRoleKey;
-  const appUrl = Deno.env.get("LUPP_APP_URL") || "https://lupp-lupp.vercel.app";
+  const appUrl = Deno.env.get("LUPP_APP_URL") || "https://www.playluup.com.br";
+  const authorizeBaseUrl =
+    Deno.env.get("NUVEMSHOP_AUTHORIZE_BASE_URL") ||
+    "https://www.nuvemshop.com.br";
 
   if (!supabaseUrl || !serviceRoleKey || !stateSecret) {
     return jsonResponse({ error: "missing_server_config" }, 500);
@@ -102,7 +105,7 @@ Deno.serve(async (req) => {
     stateSecret,
   );
 
-  const authorizeUrl = new URL(`https://www.tiendanube.com/apps/${appId}/authorize`);
+  const authorizeUrl = new URL(`/apps/${appId}/authorize`, authorizeBaseUrl);
   authorizeUrl.searchParams.set("state", state);
 
   return jsonResponse({ authorize_url: authorizeUrl.toString() });

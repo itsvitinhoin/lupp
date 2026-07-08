@@ -2,6 +2,8 @@ import { requireSupabase } from "@/lib/supabase";
 import { env } from "@/lib/env";
 import type { LoginPayload, SignupPayload } from "@/types/auth";
 
+const authRedirectUrl = (path: string) => `${env.appUrl}${path}`;
+
 export const authService = {
   async getSession() {
     const { data, error } = await requireSupabase().auth.getSession();
@@ -27,7 +29,7 @@ export const authService = {
       password,
       options: {
         data: { name },
-        emailRedirectTo: `${env.appUrl}/login`,
+        emailRedirectTo: authRedirectUrl("/login?confirmed=1"),
       },
     });
     if (error) throw error;
@@ -47,7 +49,7 @@ export const authService = {
       type: "signup",
       email,
       options: {
-        emailRedirectTo: `${env.appUrl}/login`,
+        emailRedirectTo: authRedirectUrl("/login?confirmed=1"),
       },
     });
     if (error) throw error;
@@ -56,7 +58,7 @@ export const authService = {
 
   async resetPassword(email: string) {
     const { data, error } = await requireSupabase().auth.resetPasswordForEmail(email, {
-      redirectTo: `${env.appUrl}/login`,
+      redirectTo: authRedirectUrl("/login?reset=1"),
     });
     if (error) throw error;
     return data;

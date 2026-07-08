@@ -1,75 +1,87 @@
-import React from 'react';
-import { Link, useLocation } from 'wouter';
-import { LuppLogo } from '../shared/LuppLogo';
-import { 
-  BarChart3, 
-  CreditCard, 
-  Film, 
-  LayoutDashboard, 
-  LayoutTemplate, 
-  MessageSquare, 
-  Package, 
-  Settings, 
+import React from "react";
+import { Link, useLocation } from "wouter";
+import {
+  CreditCard,
+  Film,
+  LayoutDashboard,
+  MessageSquare,
+  Package,
+  Settings,
   Smartphone,
   Blocks,
-  Link as LinkIcon
-} from 'lucide-react';
-import { useCurrentStore } from '@/hooks/useStore';
+  Link as LinkIcon,
+  ListOrdered,
+  Star,
+} from "lucide-react";
+import { useCurrentStore } from "@/hooks/useStore";
 
 const navItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', href: '/app' },
-  { icon: Film, label: 'Vídeos', href: '/app/videos' },
-  { icon: Smartphone, label: 'Feed Vertical', href: '/app/feed' },
-  { icon: Blocks, label: 'Widgets', href: '/app/widgets' },
-  { icon: LayoutTemplate, label: 'Páginas', href: '/app/pages' },
-  { icon: Package, label: 'Produtos', href: '/app/products' },
-  { icon: MessageSquare, label: 'Comentários', href: '/app/comments' },
-  { icon: BarChart3, label: 'Analytics', href: '/app/analytics' },
-  { icon: LinkIcon, label: 'Integrações', href: '/app/integrations' },
-  { icon: CreditCard, label: 'Planos', href: '/app/billing' },
-  { icon: Settings, label: 'Configurações', href: '/app/settings' },
+  { icon: LayoutDashboard, label: "Dashboard", href: "/app" },
+  { icon: Film, label: "Vídeos", href: "/app/videos" },
+  { icon: Smartphone, label: "Feed Vertical", href: "/app/feed" },
+  { icon: Blocks, label: "Widgets", href: "/app/widgets" },
+  { icon: Package, label: "Produtos", href: "/app/products" },
+  { icon: MessageSquare, label: "Comentários", href: "/app/comments" },
+  { icon: Star, label: "Feedbacks", href: "/app/feedbacks" },
+  { icon: ListOrdered, label: "Ordenação", href: "/app/ordering" },
+  { icon: LinkIcon, label: "Integrações", href: "/app/integrations" },
+  { icon: CreditCard, label: "Planos", href: "/app/billing" },
+  { icon: Settings, label: "Configurações", href: "/app/settings" },
 ];
 
 export function Sidebar() {
   const [location] = useLocation();
   const { store } = useCurrentStore();
-  const demoStore = React.useMemo(() => {
-    const raw = localStorage.getItem('lupp_demo_store');
-    if (!raw) return null;
-
-    try {
-      return JSON.parse(raw) as { name?: string };
-    } catch {
-      return null;
-    }
-  }, []);
-  const storeName = store?.name ?? demoStore?.name ?? 'Lupp Demo';
-  const initials = storeName
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('') || 'LP';
+  const storeName = store?.name ?? "Sua loja";
+  const logoUrl = store?.logo_url;
+  const initials =
+    storeName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("") || "LP";
 
   return (
-    <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 flex-col border-r border-white/10 bg-card/50 backdrop-blur-xl lg:flex">
-      <div className="flex h-16 items-center px-6 border-b border-white/5">
-        <Link href="/app" className="flex items-center">
-          <LuppLogo />
+    <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 flex-col border-r border-slate-200 bg-white lg:flex">
+      <div className="flex h-20 items-center px-6">
+        <Link href="/app" className="flex min-w-0 items-center gap-2">
+          {logoUrl ? (
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <img
+                src={logoUrl}
+                alt={storeName}
+                className="h-full w-full object-contain"
+              />
+            </span>
+          ) : (
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-sm font-black text-white shadow-sm shadow-primary/20">
+              {initials}
+            </span>
+          )}
+          <span className="truncate text-xl font-black tracking-tight text-slate-950">
+            {storeName}
+          </span>
         </Link>
       </div>
-      
+
       <div className="flex-1 overflow-y-auto py-4">
-        <nav className="space-y-1 px-3">
+        <nav className="space-y-1.5 px-4">
           {navItems.map((item) => {
-            const isActive = location === item.href || (item.href !== '/app' && location.startsWith(item.href));
-            
+            const isActive =
+              location === item.href ||
+              (item.href !== "/app" && location.startsWith(item.href));
+
             return (
-              <Link key={item.href} href={item.href} className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                isActive 
-                  ? 'bg-primary/10 text-primary' 
-                  : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
-              }`}>
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all ${
+                  isActive
+                    ? "bg-primary text-white shadow-sm shadow-primary/20"
+                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-950"
+                }`}
+              >
                 <item.icon className="h-4 w-4" />
                 {item.label}
               </Link>
@@ -78,16 +90,32 @@ export function Sidebar() {
         </nav>
       </div>
 
-      <div className="border-t border-white/5 p-4">
-        <div className="flex items-center gap-3 rounded-md bg-white/5 p-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20 text-primary font-bold">
-            {initials}
-          </div>
+      <div className="border-t border-slate-100 p-4">
+        <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
+          {logoUrl ? (
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white">
+              <img
+                src={logoUrl}
+                alt={storeName}
+                className="h-full w-full object-contain"
+              />
+            </div>
+          ) : (
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
+              {initials}
+            </div>
+          )}
           <div className="flex-1 overflow-hidden">
-            <p className="truncate text-sm font-medium">{storeName}</p>
+            <p className="truncate text-sm font-semibold text-slate-950">
+              {storeName}
+            </p>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
-              <span className="text-xs text-muted-foreground">Feed ativo</span>
+              <span
+                className={`h-2 w-2 rounded-full ${store ? "bg-emerald-500" : "bg-slate-300"}`}
+              ></span>
+              <span className="text-xs font-medium text-slate-500">
+                {store ? "Conta ativa" : "Conclua o onboarding"}
+              </span>
             </div>
           </div>
         </div>

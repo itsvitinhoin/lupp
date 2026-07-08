@@ -2,15 +2,119 @@ import { env } from "@/lib/env";
 import { requireSupabase } from "@/lib/supabase";
 import type { TableUpdate } from "@/types/database";
 
+function asRecord(value: unknown): Record<string, any> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, any>)
+    : {};
+}
+
+function uniqueValues(values: unknown[]) {
+  return Array.from(
+    new Set(values.map((value) => String(value || "").trim()).filter(Boolean)),
+  );
+}
+
+function errorText(value: unknown): string | null {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value.map(errorText).filter(Boolean).join(" | ") || null;
+  }
+  if (typeof value !== "object") return null;
+
+  const record = value as Record<string, unknown>;
+  const direct =
+    record.message ||
+    record.error_description ||
+    record.error ||
+    record.reason ||
+    record.description;
+  if (typeof direct === "string") return direct;
+
+  return errorText(record.details) || errorText(record.errors);
+}
+
 export const widgetsService = {
   async listWidgets(storeId: string) {
-    const { data, error } = await requireSupabase().from("widgets").select("*").eq("store_id", storeId).order("created_at");
+    const { data, error } = await requireSupabase()
+      .from("widgets")
+      .select("*")
+      .eq("store_id", storeId)
+      .order("created_at");
     if (error) throw error;
     return data ?? [];
   },
 
   async updateWidget(widgetId: string, updates: TableUpdate<"widgets">) {
-    const { data, error } = await requireSupabase().from("widgets").update(updates).eq("id", widgetId).select("*").single();
+    const { data, error } = await requireSupabase()
+      .from("widgets")
+      .update(updates)
+      .eq("id", widgetId)
+      .select("*")
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async ensureFloatingWidgetForProductPage(storeId: string) {
+    const supabase = requireSupabase();
+    const { data: widgets, error: listError } = await supabase
+      .from("widgets")
+      .select("*")
+      .eq("store_id", storeId)
+      .eq("type", "floating_video")
+      .order("created_at");
+    if (listError) throw listError;
+
+    const widget = widgets?.[0] ?? null;
+    const settings = asRecord(widget?.settings);
+    const appearance = asRecord(settings.appearance);
+    const display = asRecord(settings.display);
+    const nextSettings = {
+      ...settings,
+      appearance,
+      display: {
+        ...display,
+        mode: "all",
+        include_paths: [],
+        exclude_paths: uniqueValues(
+          Array.isArray(display.exclude_paths)
+            ? display.exclude_paths
+            : ["/checkout", "/carrinho", "/cart"],
+        ),
+        product_mode: "linked_or_all",
+        hide_without_videos: false,
+        home_experience_enabled: display.home_experience_enabled ?? true,
+        home_ordering: display.home_ordering || "manual",
+      },
+    };
+
+    if (!widget) {
+      const { data, error } = await supabase
+        .from("widgets")
+        .insert({
+          name: "Floating Video",
+          settings: nextSettings,
+          status: "active",
+          store_id: storeId,
+          target: "site",
+          type: "floating_video",
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data;
+    }
+
+    const { data, error } = await supabase
+      .from("widgets")
+      .update({
+        settings: nextSettings,
+        status: "active",
+      })
+      .eq("id", widget.id)
+      .select("*")
+      .single();
     if (error) throw error;
     return data;
   },
@@ -23,17 +127,28 @@ export const widgetsService = {
     } = await client.auth.getSession();
 
     if (sessionError) throw sessionError;
-    if (!session) throw new Error("Sua sessão expirou. Entre novamente para instalar o script.");
+    if (!session)
+      throw new Error(
+        "Sua sessão expirou. Entre novamente para instalar o script.",
+      );
 
-    const { data, error } = await client.functions.invoke<{ installed: boolean; method: string; script_id: string }>("nuvemshop-install-script", {
+    const { data, error } = await client.functions.invoke<{
+      installed: boolean;
+      method: string;
+      script_id: string;
+    }>("nuvemshop-install-script", {
       body: { store_id: storeId },
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
     });
 
     if (error) {
       if ("context" in error && error.context instanceof Response) {
         const details = await error.context.json().catch(() => null);
-        if (details && typeof details.error === "string") {
-          throw new Error(details.error.replace(/_/g, " "));
+        const message = errorText(details);
+        if (message) {
+          throw new Error(message.replace(/_/g, " "));
         }
       }
       throw error;
@@ -43,6 +158,30 @@ export const widgetsService = {
   },
 
   getEmbedCode(storeSlug: string, widgetType: string) {
-    return `<script src="${env.widgetCdnUrl}" data-store="${storeSlug}" data-widget="${widgetType}"></script>`;
+    const scriptUrl = JSON.stringify(env.widgetCdnUrl).replace(
+      /<\/script/gi,
+      "<\\/script",
+    );
+    const slug = JSON.stringify(storeSlug).replace(/<\/script/gi, "<\\/script");
+    const type = JSON.stringify(widgetType).replace(
+      /<\/script/gi,
+      "<\\/script",
+    );
+
+    return `<script>
+(function () {
+  var s = document.createElement('script');
+  s.async = true;
+  s.src = ${scriptUrl};
+  s.setAttribute('data-store', ${slug});
+  s.setAttribute('data-widget', ${type});
+  s.setAttribute('data-supabase-url', ${JSON.stringify(env.supabaseUrl).replace(/<\/script/gi, "<\\/script")});
+  s.setAttribute('data-supabase-key', ${JSON.stringify(env.supabaseAnonKey).replace(/<\/script/gi, "<\\/script")});
+  s.setAttribute('data-lupp-url', ${JSON.stringify(env.appUrl).replace(/<\/script/gi, "<\\/script")});
+
+  var firstScript = document.getElementsByTagName('script')[0];
+  firstScript.parentNode.insertBefore(s, firstScript);
+})();
+</script>`;
   },
 };

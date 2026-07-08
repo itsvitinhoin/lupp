@@ -56,3 +56,4 @@ Thumbs.db
 .cache/
 .local/
 supabase/.temp/
+.vercel

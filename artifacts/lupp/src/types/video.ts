@@ -5,9 +5,15 @@ export type CreateVideoPayload = TableInsert<"videos">;
 export type UpdateVideoPayload = TableUpdate<"videos">;
 
 export interface UploadedVideo {
-  url: string;
+  duration_seconds?: number | null;
+  file_size?: number | null;
   path: string;
+  playback_url?: string | null;
+  processing_status?: "uploading" | "processing" | "ready" | "failed" | "archived";
   provider: "supabase" | "bunny" | "cloudflare";
+  provider_video_id?: string | null;
+  thumbnail_url?: string | null;
+  url: string;
 }
 
 export interface VideoUploadProgress {

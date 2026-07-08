@@ -56,6 +56,109 @@ function redirectTo(url: string, params: Record<string, string>) {
   return Response.redirect(nextUrl.toString(), 302);
 }
 
+function integrationPayload({
+  appId,
+  externalStoreId,
+  now,
+  scope,
+  storeId,
+  tokenType,
+}: {
+  appId: string;
+  externalStoreId: string;
+  now: string;
+  scope?: string | null;
+  storeId: string;
+  tokenType?: string | null;
+}) {
+  return {
+    connected_at: now,
+    credentials: {
+      scope: scope || null,
+      token_type: tokenType || "bearer",
+    },
+    external_store_id: externalStoreId,
+    provider: "nuvemshop",
+    settings: {
+      app_id: appId,
+      connected_via: "oauth",
+      nuvemshop_store_id: externalStoreId,
+    },
+    status: "active",
+    store_id: storeId,
+  };
+}
+
+async function upsertNuvemshopIntegration({
+  appId,
+  externalStoreId,
+  now,
+  scope,
+  storeId,
+  supabase,
+  tokenType,
+}: {
+  appId: string;
+  externalStoreId: string;
+  now: string;
+  scope?: string | null;
+  storeId: string;
+  supabase: ReturnType<typeof createClient>;
+  tokenType?: string | null;
+}) {
+  const payload = integrationPayload({
+    appId,
+    externalStoreId,
+    now,
+    scope,
+    storeId,
+    tokenType,
+  });
+
+  const upsertResult = await supabase
+    .from("integrations")
+    .upsert(payload, { onConflict: "store_id,provider" })
+    .select("id")
+    .single();
+
+  if (!upsertResult.error && upsertResult.data) {
+    return { data: upsertResult.data, error: null };
+  }
+
+  const { data: existingExternal, error: lookupError } = await supabase
+    .from("integrations")
+    .select("id, store_id")
+    .eq("provider", "nuvemshop")
+    .eq("external_store_id", externalStoreId)
+    .maybeSingle();
+
+  if (lookupError || !existingExternal?.id) {
+    return { data: null, error: upsertResult.error || lookupError };
+  }
+
+  if (String(existingExternal.store_id) !== storeId) {
+    return {
+      data: null,
+      error: {
+        message:
+          "nuvemshop_store_already_connected_to_another_luup_store",
+      },
+    };
+  }
+
+  const updateResult = await supabase
+    .from("integrations")
+    .update(payload)
+    .eq("id", existingExternal.id)
+    .select("id")
+    .single();
+
+  return {
+    data: updateResult.data,
+    error: updateResult.error,
+  };
+}
+
 Deno.serve(async (req) => {
   const reqUrl = new URL(req.url);
   const code = reqUrl.searchParams.get("code");
@@ -65,8 +168,9 @@ Deno.serve(async (req) => {
   const appId = Deno.env.get("NUVEMSHOP_CLIENT_ID") || Deno.env.get("NUVEMSHOP_APP_ID") || "34355";
   const clientSecret = Deno.env.get("NUVEMSHOP_CLIENT_SECRET");
   const stateSecret = Deno.env.get("NUVEMSHOP_STATE_SECRET") || serviceRoleKey;
-  const appUrl = Deno.env.get("LUPP_APP_URL") || "https://lupp-lupp.vercel.app";
+  const appUrl = Deno.env.get("LUPP_APP_URL") || "https://www.playluup.com.br";
   const fallbackReturnTo = `${appUrl}/app/integrations`;
+  const restartInstallUrl = `${fallbackReturnTo}?connect=nuvemshop&install_retry=1`;
 
   if (!supabaseUrl || !serviceRoleKey || !clientSecret || !stateSecret) {
     return redirectTo(fallbackReturnTo, {
@@ -76,10 +180,7 @@ Deno.serve(async (req) => {
   }
 
   if (!code || !state) {
-    return redirectTo(fallbackReturnTo, {
-      error: "missing_oauth_code_or_state",
-      provider: "nuvemshop",
-    });
+    return Response.redirect(restartInstallUrl, 302);
   }
 
   const payload = await verifyState(state, stateSecret).catch(() => null);
@@ -116,33 +217,21 @@ Deno.serve(async (req) => {
 
   const externalStoreId = String(tokenData.user_id);
   const now = new Date().toISOString();
-  const { data: integration, error: integrationError } = await supabase
-    .from("integrations")
-    .upsert(
-      {
-        connected_at: now,
-        credentials: {
-          scope: tokenData.scope || null,
-          token_type: tokenData.token_type || "bearer",
-        },
-        external_store_id: externalStoreId,
-        provider: "nuvemshop",
-        settings: {
-          app_id: appId,
-          connected_via: "oauth",
-          nuvemshop_store_id: externalStoreId,
-        },
-        status: "active",
-        store_id: payload.store_id,
-      },
-      { onConflict: "store_id,provider" },
-    )
-    .select("id")
-    .single();
+  const { data: integration, error: integrationError } = await upsertNuvemshopIntegration({
+    appId,
+    externalStoreId,
+    now,
+    scope: tokenData.scope || null,
+    storeId: payload.store_id,
+    supabase,
+    tokenType: tokenData.token_type || "bearer",
+  });
 
   if (integrationError || !integration) {
     return redirectTo(returnTo, {
-      error: "luup_integration_save_failed",
+      error: integrationError?.message
+        ? `luup_integration_save_failed:${integrationError.message}`
+        : "luup_integration_save_failed",
       provider: "nuvemshop",
     });
   }

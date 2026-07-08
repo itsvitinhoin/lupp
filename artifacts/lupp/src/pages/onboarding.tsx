@@ -6,9 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Stepper } from '@/components/shared/Stepper';
 import { LuppLogo } from '@/components/shared/LuppLogo';
-import { EnvNotice } from '@/components/shared/EnvNotice';
 import { storesService } from '@/services/stores.service';
-import { isSupabaseConfigured } from '@/lib/env';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -83,23 +81,6 @@ export default function Onboarding() {
       return;
     }
 
-    if (!isSupabaseConfigured) {
-      localStorage.setItem(
-        'lupp_demo_store',
-        JSON.stringify({
-          name: storeName,
-          url: normalizeUrl(storeUrl),
-          platform,
-          segment,
-          goal,
-          firstWidget,
-        }),
-      );
-      toast({ title: 'Loja de teste configurada', description: 'Conecte Supabase para persistir no banco real.' });
-      setLocation('/app');
-      return;
-    }
-
     if (!user) {
       toast({ title: 'Sessão expirada', description: 'Entre novamente para concluir o onboarding.' });
       setLocation('/login');
@@ -116,8 +97,11 @@ export default function Onboarding() {
         segment,
       });
       await queryClient.invalidateQueries({ queryKey: ['stores', user.id] });
-      toast({ title: 'Loja criada com sucesso', description: 'Seu dashboard já está pronto para receber produtos e vídeos.' });
-      setLocation('/app');
+      localStorage.removeItem('lupp_demo_auth');
+      localStorage.removeItem('lupp_demo_store');
+      sessionStorage.removeItem('lupp_onboarding_prefill');
+      toast({ title: 'Loja criada com sucesso', description: 'Agora conecte a plataforma para sincronizar produtos automaticamente.' });
+      setLocation(platform && platform !== 'outra' ? `/app/integrations?connect=${platform}` : '/app/integrations');
     } catch (error) {
       toast({
         title: 'Não foi possível criar a loja',
@@ -145,10 +129,6 @@ export default function Onboarding() {
       <div className="w-full max-w-3xl mx-auto px-6 pt-12 flex-1 flex flex-col">
         <div className="mb-12 flex justify-center">
           <LuppLogo />
-        </div>
-
-        <div className="mb-6">
-          <EnvNotice />
         </div>
 
         <Stepper steps={steps} currentStep={step} />
@@ -196,6 +176,7 @@ export default function Onboarding() {
                         <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="nuvemshop">Nuvemshop</SelectItem>
+                          <SelectItem value="upzero">UP Zero</SelectItem>
                           <SelectItem value="shopify">Shopify</SelectItem>
                           <SelectItem value="woocommerce">WooCommerce</SelectItem>
                           <SelectItem value="tray">Tray</SelectItem>

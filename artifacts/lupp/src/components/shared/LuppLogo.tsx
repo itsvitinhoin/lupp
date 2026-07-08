@@ -1,11 +1,11 @@
-import React from 'react';
+import React from "react";
 
-export function LuppLogo({ className = '' }: { className?: string }) {
+export function LuppLogo({ className = "" }: { className?: string }) {
   return (
     <img
-      src="/luup-logo-white.png"
+      src="/luup-logo-blue.png"
       alt="Luup"
-      className={`h-8 w-auto object-contain ${className}`}
+      className={`h-9 w-auto object-contain ${className}`}
     />
   );
 }

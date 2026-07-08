@@ -1,10 +1,17 @@
 import { requireSupabase } from "@/lib/supabase";
 import { integrationsService } from "./integrations.service";
-import type { CreateProductPayload, UpdateProductPayload } from "@/types/product";
+import type {
+  CreateProductPayload,
+  UpdateProductPayload,
+} from "@/types/product";
 
 export const productsService = {
   async listProducts(storeId: string, search = "", status = "all") {
-    let query = requireSupabase().from("products").select("*").eq("store_id", storeId).order("created_at", { ascending: false });
+    let query = requireSupabase()
+      .from("products")
+      .select("*")
+      .eq("store_id", storeId)
+      .order("created_at", { ascending: false });
 
     if (search) query = query.ilike("name", `%${search}%`);
     if (status !== "all") query = query.eq("status", status);
@@ -15,23 +22,43 @@ export const productsService = {
   },
 
   async createProduct(payload: CreateProductPayload) {
-    const { data, error } = await requireSupabase().from("products").insert(payload).select("*").single();
+    const { data, error } = await requireSupabase()
+      .from("products")
+      .insert(payload)
+      .select("*")
+      .single();
     if (error) throw error;
     return data;
   },
 
   async updateProduct(productId: string, payload: UpdateProductPayload) {
-    const { data, error } = await requireSupabase().from("products").update(payload).eq("id", productId).select("*").single();
+    const { data, error } = await requireSupabase()
+      .from("products")
+      .update(payload)
+      .eq("id", productId)
+      .select("*")
+      .single();
     if (error) throw error;
     return data;
   },
 
   async deleteProduct(productId: string) {
-    const { error } = await requireSupabase().from("products").delete().eq("id", productId);
+    const { error } = await requireSupabase()
+      .from("products")
+      .delete()
+      .eq("id", productId);
     if (error) throw error;
   },
 
   async syncNuvemshopProducts(storeId: string) {
     return integrationsService.syncNuvemshopProducts(storeId);
+  },
+
+  async syncProductsForStore(store: { id: string; platform?: string | null }) {
+    return store.platform === "upzero"
+      ? integrationsService.syncUpzeroProducts(store.id)
+      : store.platform === "shopify"
+        ? integrationsService.syncShopifyProducts(store.id)
+        : integrationsService.syncNuvemshopProducts(store.id);
   },
 };

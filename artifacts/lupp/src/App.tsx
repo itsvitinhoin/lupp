@@ -1,17 +1,28 @@
-import React from 'react';
+import React from "react";
 import { Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
+import { initializeShopifyEmbeddedSession } from "@/lib/shopify-embedded";
 import { AppRoutes } from "@/routes/AppRoutes";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      staleTime: 30_000,
+      retry: 1,
+    },
+  },
+});
 
 function App() {
-  // Ensure dark mode is set on html
   React.useEffect(() => {
-    document.documentElement.classList.add('dark');
+    document.documentElement.classList.remove("dark");
+    document.documentElement.style.colorScheme = "light";
+    initializeShopifyEmbeddedSession();
   }, []);
 
   return (

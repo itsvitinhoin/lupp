@@ -9,9 +9,9 @@ export function EnvNotice() {
   return (
     <Alert className="border-amber-500/40 bg-amber-500/10 text-amber-100">
       <AlertCircle className="h-4 w-4 stroke-amber-300" />
-      <AlertTitle>Modo teste local</AlertTitle>
+      <AlertTitle>Configuração pendente</AlertTitle>
       <AlertDescription className="text-amber-100/80">
-        Supabase ainda não está configurado. Preencha {missing.join(" e ")} para testar conta, sessão e loja no banco real.
+        Preencha {missing.join(" e ")} para usar conta, sessão e loja no banco real.
       </AlertDescription>
     </Alert>
   );

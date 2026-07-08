@@ -1,8 +1,8 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { env, isSupabaseConfigured } from "./env";
+import { env } from "./env";
 import type { Database } from "@/types/database";
 
-export const supabase: SupabaseClient<Database> | null = isSupabaseConfigured
+export const supabase: SupabaseClient<Database> | null = env.supabaseUrl && env.supabaseAnonKey
   ? createClient<Database>(env.supabaseUrl, env.supabaseAnonKey, {
       auth: {
         persistSession: true,

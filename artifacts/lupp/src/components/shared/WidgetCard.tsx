@@ -24,11 +24,11 @@ export function WidgetCard({ widget, onToggle, onConfigure, onCopyCode, onPrevie
   const isActive = widget.status === 'ativo' || widget.status === 'active';
 
   return (
-    <Card className={`border-white/5 transition-all ${isActive ? 'bg-card/80 border-primary/20 shadow-md shadow-primary/5' : 'bg-card/30'}`}>
+    <Card className={`bg-white transition-all ${isActive ? 'border-primary/30 shadow-md shadow-primary/10' : ''}`}>
       <CardHeader className="flex flex-row items-start justify-between pb-2">
         <div>
           <CardTitle className="text-lg">{widget.name}</CardTitle>
-          <p className="mt-1 text-sm text-muted-foreground">{widget.description}</p>
+          <p className="mt-1 text-sm text-slate-500">{widget.description}</p>
         </div>
         <Switch 
           checked={isActive} 

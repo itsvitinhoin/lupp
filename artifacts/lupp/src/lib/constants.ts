@@ -12,16 +12,69 @@ export const LUPP_BRAND = {
   },
 } as const;
 
-export const VIDEO_STATUS = ["draft", "active", "paused", "archived"] as const;
+export const VIDEO_STATUS = ["draft", "active", "paused", "archived", "deleted"] as const;
 export const COMMENT_STATUS = ["pending", "approved", "hidden", "reported", "deleted"] as const;
 export const STORE_MEMBER_ROLES = ["owner", "admin", "marketing", "editor", "analyst"] as const;
 
 export const PLAN_LIMITS = {
-  start: { name: "Start", priceMonthly: 149, videoLimit: 30, viewLimit: 5000, widgetLimit: 1 },
-  growth: { name: "Growth", priceMonthly: 199, videoLimit: 80, viewLimit: 20000, widgetLimit: 5 },
-  pro: { name: "Pro", priceMonthly: 299, videoLimit: 200, viewLimit: 60000, widgetLimit: 999 },
-  scale: { name: "Scale", priceMonthly: 499, videoLimit: 500, viewLimit: 150000, widgetLimit: 999 },
+  start: { name: "Start", priceMonthly: 149, videoLimit: 100, viewLimit: 5000, widgetLimit: 1 },
+  growth: { name: "Growth", priceMonthly: 199, videoLimit: 300, viewLimit: 20000, widgetLimit: 5 },
+  pro: { name: "Pro", priceMonthly: 299, videoLimit: 1000, viewLimit: 60000, widgetLimit: 999 },
+  scale: { name: "Scale", priceMonthly: 499, videoLimit: 5000, viewLimit: 150000, widgetLimit: 999 },
 } as const;
+
+export type LuupPlanId = keyof typeof PLAN_LIMITS;
+
+type WidgetLike = {
+  settings?: unknown;
+  status?: string | null;
+  type?: string | null;
+};
+
+function asRecord(value: unknown): Record<string, any> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, any>)
+    : {};
+}
+
+export function isLuupPlanId(value: unknown): value is LuupPlanId {
+  return typeof value === "string" && value in PLAN_LIMITS;
+}
+
+export function normalizeLuupPlanId(value: unknown): LuupPlanId {
+  return isLuupPlanId(value) ? value : "start";
+}
+
+export function planAllowsHorizontalFeed(value: unknown) {
+  const planId = normalizeLuupPlanId(value);
+  return PLAN_LIMITS[planId].widgetLimit >= 2;
+}
+
+export function isHorizontalFeedEnabledInSettings(settingsValue: unknown) {
+  const settings = asRecord(settingsValue);
+  const carousel = asRecord(settings.carousel);
+  return carousel.enabled === true;
+}
+
+export function countBillableWidgets(widgets: WidgetLike[]) {
+  const activeWidgets = widgets.filter((widget) => widget.status === "active");
+  const hasFloatingWidget = activeWidgets.some((widget) =>
+    ["floating_video", "floating_launcher"].includes(String(widget.type || "")),
+  );
+  const standaloneWidgets = activeWidgets.filter(
+    (widget) =>
+      !["floating_video", "floating_launcher"].includes(
+        String(widget.type || ""),
+      ) && String(widget.type || "") !== "home_carousel",
+  ).length;
+  const hasHomeCarousel =
+    activeWidgets.some((widget) => String(widget.type || "") === "home_carousel") ||
+    activeWidgets.some((widget) =>
+      isHorizontalFeedEnabledInSettings(widget.settings),
+    );
+
+  return (hasFloatingWidget ? 1 : 0) + (hasHomeCarousel ? 1 : 0) + standaloneWidgets;
+}
 
 export const DEFAULT_WIDGETS = [
   { name: "Product Video", type: "product_video", target: "product" },
@@ -53,6 +106,8 @@ export const ANALYTICS_EVENT_TYPES = [
   "comment_create",
   "widget_view",
   "feed_open",
+  "launcher_impression",
+  "feed_close",
 ] as const;
 
 const configuredVideoUploadMb = Number(import.meta.env.VITE_MAX_VIDEO_UPLOAD_MB || 200);

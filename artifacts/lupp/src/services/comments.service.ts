@@ -3,7 +3,12 @@ import type { CommentStatus, TableUpdate } from "@/types/database";
 
 export const commentsService = {
   async listComments(storeId: string, status = "all") {
-    let query = requireSupabase().from("comments").select("*").eq("store_id", storeId).order("created_at", { ascending: false });
+    let query = requireSupabase()
+      .from("comments")
+      .select("*, videos(title, video_products(products(name)))")
+      .eq("store_id", storeId)
+      .neq("status", "deleted")
+      .order("created_at", { ascending: false });
     if (status !== "all") query = query.eq("status", status as CommentStatus);
 
     const { data, error } = await query;
@@ -22,8 +27,14 @@ export const commentsService = {
     return data ?? [];
   },
 
-  async createPublicComment(payload: { storeId: string; videoId: string; authorName: string; authorEmail?: string; body: string }) {
-    const { data, error } = await requireSupabase()
+  async createPublicComment(payload: {
+    storeId: string;
+    videoId: string;
+    authorName: string;
+    authorEmail?: string;
+    body: string;
+  }) {
+    const { error } = await requireSupabase()
       .from("comments")
       .insert({
         store_id: payload.storeId,
@@ -32,21 +43,26 @@ export const commentsService = {
         author_email: payload.authorEmail || null,
         body: payload.body,
         status: "pending",
-      })
-      .select("id")
+      });
+    if (error) throw error;
+  },
+
+  async updateComment(commentId: string, updates: TableUpdate<"comments">) {
+    const { data, error } = await requireSupabase()
+      .from("comments")
+      .update(updates)
+      .eq("id", commentId)
+      .select("*")
       .single();
     if (error) throw error;
     return data;
   },
 
-  async updateComment(commentId: string, updates: TableUpdate<"comments">) {
-    const { data, error } = await requireSupabase().from("comments").update(updates).eq("id", commentId).select("*").single();
-    if (error) throw error;
-    return data;
-  },
-
   async deleteComment(commentId: string) {
-    const { error } = await requireSupabase().from("comments").delete().eq("id", commentId);
+    const { error } = await requireSupabase()
+      .from("comments")
+      .delete()
+      .eq("id", commentId);
     if (error) throw error;
   },
 };

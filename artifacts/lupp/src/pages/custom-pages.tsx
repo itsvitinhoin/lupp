@@ -1,12 +1,19 @@
-import React from 'react';
-import { AppLayout } from '@/components/layout/AppLayout';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { StatusBadge } from '@/components/shared/StatusBadge';
-import { mockPages } from '@/data/mock';
-import { Plus, Edit2, ExternalLink } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import React from "react";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { mockPages } from "@/data/mock";
+import { Plus, Edit2, ExternalLink } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function CustomPages() {
   const { toast } = useToast();
@@ -22,8 +29,12 @@ export default function CustomPages() {
     <AppLayout title="Páginas Personalizadas">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Páginas de Vídeo</h2>
-          <p className="text-muted-foreground mt-1">Crie páginas exclusivas agrupando vídeos específicos.</p>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-950">
+            Páginas de Vídeo
+          </h2>
+          <p className="mt-1 text-slate-500">
+            Crie páginas exclusivas agrupando vídeos específicos.
+          </p>
         </div>
         <Button onClick={handleCreate} className="shadow-lg shadow-primary/20">
           <Plus className="mr-2 h-4 w-4" />
@@ -31,12 +42,12 @@ export default function CustomPages() {
         </Button>
       </div>
 
-      <Card className="border-white/5 bg-card/50">
+      <Card className="border-slate-200 bg-white text-slate-950 shadow-sm">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="border-white/5 hover:bg-transparent">
+                <TableRow className="border-slate-100 bg-slate-50 hover:bg-slate-50">
                   <TableHead>Nome</TableHead>
                   <TableHead>URL</TableHead>
                   <TableHead className="text-right">Vídeos</TableHead>
@@ -46,24 +57,50 @@ export default function CustomPages() {
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody className="divide-y divide-white/5">
+              <TableBody className="divide-y divide-slate-100">
                 {mockPages.map((page) => (
-                  <TableRow key={page.id} className="border-white/5 hover:bg-white/[0.02]">
-                    <TableCell className="font-medium">{page.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{page.path}</TableCell>
-                    <TableCell className="text-right">{page.videoCount}</TableCell>
-                    <TableCell className="text-right">{page.views.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{page.clicks.toLocaleString()}</TableCell>
+                  <TableRow
+                    key={page.id}
+                    className="border-slate-100 hover:bg-slate-50"
+                  >
+                    <TableCell className="font-medium text-slate-950">
+                      {page.name}
+                    </TableCell>
+                    <TableCell className="text-slate-500">
+                      {page.path}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {page.videoCount}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {page.views.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {page.clicks.toLocaleString()}
+                    </TableCell>
                     <TableCell>
                       <StatusBadge status={page.status} />
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                        >
                           <Edit2 className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" asChild>
-                          <a href="/preview/feed" target="_blank" rel="noopener noreferrer">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                          asChild
+                        >
+                          <a
+                            href="/preview/feed"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
                             <ExternalLink className="h-4 w-4" />
                           </a>
                         </Button>

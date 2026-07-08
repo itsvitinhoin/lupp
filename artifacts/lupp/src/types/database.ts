@@ -1,6 +1,17 @@
-import type { ANALYTICS_EVENT_TYPES, COMMENT_STATUS, STORE_MEMBER_ROLES, VIDEO_STATUS } from "@/lib/constants";
+import type {
+  ANALYTICS_EVENT_TYPES,
+  COMMENT_STATUS,
+  STORE_MEMBER_ROLES,
+  VIDEO_STATUS,
+} from "@/lib/constants";
 
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
 
 export type VideoStatus = (typeof VIDEO_STATUS)[number];
 export type CommentStatus = (typeof COMMENT_STATUS)[number];
@@ -45,6 +56,8 @@ export interface Database {
           button_color: string;
           status: string;
           plan_id: string;
+          trial_started_at: string | null;
+          trial_ends_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -62,6 +75,8 @@ export interface Database {
           button_color?: string;
           status?: string;
           plan_id?: string;
+          trial_started_at?: string | null;
+          trial_ends_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -69,9 +84,23 @@ export interface Database {
         Relationships: [];
       };
       store_members: {
-        Row: { id: string; store_id: string; user_id: string; role: StoreMemberRole; created_at: string };
-        Insert: { id?: string; store_id: string; user_id: string; role?: StoreMemberRole; created_at?: string };
-        Update: Partial<Database["public"]["Tables"]["store_members"]["Insert"]>;
+        Row: {
+          id: string;
+          store_id: string;
+          user_id: string;
+          role: StoreMemberRole;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          store_id: string;
+          user_id: string;
+          role?: StoreMemberRole;
+          created_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["store_members"]["Insert"]
+        >;
         Relationships: [];
       };
       products: {
@@ -91,8 +120,46 @@ export interface Database {
           created_at: string;
           updated_at: string;
         };
-        Insert: Partial<Database["public"]["Tables"]["products"]["Row"]> & { store_id: string; name: string };
+        Insert: Partial<Database["public"]["Tables"]["products"]["Row"]> & {
+          store_id: string;
+          name: string;
+        };
         Update: Partial<Database["public"]["Tables"]["products"]["Insert"]>;
+        Relationships: [];
+      };
+      product_variants: {
+        Row: {
+          id: string;
+          store_id: string;
+          product_id: string;
+          platform: string;
+          external_id: string;
+          sku: string | null;
+          color_name: string | null;
+          color_code: string | null;
+          color_hex: string | null;
+          size_name: string | null;
+          size_code: string | null;
+          price: number | null;
+          compare_at_price: number | null;
+          stock_qty: number | null;
+          image_url: string | null;
+          asset_id: string | null;
+          status: string;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<
+          Database["public"]["Tables"]["product_variants"]["Row"]
+        > & {
+          store_id: string;
+          product_id: string;
+          external_id: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["product_variants"]["Insert"]
+        >;
         Relationships: [];
       };
       videos: {
@@ -105,6 +172,10 @@ export interface Database {
           thumbnail_url: string | null;
           storage_path: string | null;
           provider: string;
+          provider_video_id: string | null;
+          playback_url: string | null;
+          processing_status: "uploading" | "processing" | "ready" | "failed" | "archived";
+          file_size: number | null;
           duration_seconds: number | null;
           aspect_ratio: string;
           status: VideoStatus;
@@ -115,18 +186,37 @@ export interface Database {
           allow_comments: boolean;
           allow_sharing: boolean;
           is_featured: boolean;
+          product_visibility_scope: "product" | "variant";
+          product_visibility_url: string | null;
           sort_order: number;
           created_at: string;
           updated_at: string;
         };
-        Insert: Partial<Database["public"]["Tables"]["videos"]["Row"]> & { store_id: string; title: string };
+        Insert: Partial<Database["public"]["Tables"]["videos"]["Row"]> & {
+          store_id: string;
+          title: string;
+        };
         Update: Partial<Database["public"]["Tables"]["videos"]["Insert"]>;
         Relationships: [];
       };
       video_products: {
-        Row: { id: string; video_id: string; product_id: string; is_primary: boolean; created_at: string };
-        Insert: { id?: string; video_id: string; product_id: string; is_primary?: boolean; created_at?: string };
-        Update: Partial<Database["public"]["Tables"]["video_products"]["Insert"]>;
+        Row: {
+          id: string;
+          video_id: string;
+          product_id: string;
+          is_primary: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          video_id: string;
+          product_id: string;
+          is_primary?: boolean;
+          created_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["video_products"]["Insert"]
+        >;
         Relationships: [];
       };
       widgets: {
@@ -141,7 +231,11 @@ export interface Database {
           created_at: string;
           updated_at: string;
         };
-        Insert: Partial<Database["public"]["Tables"]["widgets"]["Row"]> & { store_id: string; name: string; type: string };
+        Insert: Partial<Database["public"]["Tables"]["widgets"]["Row"]> & {
+          store_id: string;
+          name: string;
+          type: string;
+        };
         Update: Partial<Database["public"]["Tables"]["widgets"]["Insert"]>;
         Relationships: [];
       };
@@ -158,14 +252,32 @@ export interface Database {
           created_at: string;
           updated_at: string;
         };
-        Insert: Partial<Database["public"]["Tables"]["custom_pages"]["Row"]> & { store_id: string; name: string; slug: string };
+        Insert: Partial<Database["public"]["Tables"]["custom_pages"]["Row"]> & {
+          store_id: string;
+          name: string;
+          slug: string;
+        };
         Update: Partial<Database["public"]["Tables"]["custom_pages"]["Insert"]>;
         Relationships: [];
       };
       custom_page_videos: {
-        Row: { id: string; page_id: string; video_id: string; sort_order: number; created_at: string };
-        Insert: { id?: string; page_id: string; video_id: string; sort_order?: number; created_at?: string };
-        Update: Partial<Database["public"]["Tables"]["custom_page_videos"]["Insert"]>;
+        Row: {
+          id: string;
+          page_id: string;
+          video_id: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          page_id: string;
+          video_id: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["custom_page_videos"]["Insert"]
+        >;
         Relationships: [];
       };
       comments: {
@@ -180,13 +292,29 @@ export interface Database {
           created_at: string;
           updated_at: string;
         };
-        Insert: Partial<Database["public"]["Tables"]["comments"]["Row"]> & { store_id: string; video_id: string; body: string };
+        Insert: Partial<Database["public"]["Tables"]["comments"]["Row"]> & {
+          store_id: string;
+          video_id: string;
+          body: string;
+        };
         Update: Partial<Database["public"]["Tables"]["comments"]["Insert"]>;
         Relationships: [];
       };
       video_likes: {
-        Row: { id: string; video_id: string; store_id: string; visitor_id: string | null; created_at: string };
-        Insert: { id?: string; video_id: string; store_id: string; visitor_id?: string | null; created_at?: string };
+        Row: {
+          id: string;
+          video_id: string;
+          store_id: string;
+          visitor_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          video_id: string;
+          store_id: string;
+          visitor_id?: string | null;
+          created_at?: string;
+        };
         Update: Partial<Database["public"]["Tables"]["video_likes"]["Insert"]>;
         Relationships: [];
       };
@@ -205,8 +333,12 @@ export interface Database {
           metadata: Json;
           created_at: string;
         };
-        Insert: Partial<Database["public"]["Tables"]["analytics_events"]["Row"]> & { store_id: string; event_type: AnalyticsEventType };
-        Update: Partial<Database["public"]["Tables"]["analytics_events"]["Insert"]>;
+        Insert: Partial<
+          Database["public"]["Tables"]["analytics_events"]["Row"]
+        > & { store_id: string; event_type: AnalyticsEventType };
+        Update: Partial<
+          Database["public"]["Tables"]["analytics_events"]["Insert"]
+        >;
         Relationships: [];
       };
       integrations: {
@@ -223,13 +355,26 @@ export interface Database {
           created_at: string;
           updated_at: string;
         };
-        Insert: Partial<Database["public"]["Tables"]["integrations"]["Row"]> & { store_id: string; provider: string };
+        Insert: Partial<Database["public"]["Tables"]["integrations"]["Row"]> & {
+          store_id: string;
+          provider: string;
+        };
         Update: Partial<Database["public"]["Tables"]["integrations"]["Insert"]>;
         Relationships: [];
       };
       plans: {
-        Row: { id: string; name: string | null; price_monthly: number | null; video_limit: number | null; view_limit: number | null; widget_limit: number | null; features: Json };
-        Insert: Partial<Database["public"]["Tables"]["plans"]["Row"]> & { id: string };
+        Row: {
+          id: string;
+          name: string | null;
+          price_monthly: number | null;
+          video_limit: number | null;
+          view_limit: number | null;
+          widget_limit: number | null;
+          features: Json;
+        };
+        Insert: Partial<Database["public"]["Tables"]["plans"]["Row"]> & {
+          id: string;
+        };
         Update: Partial<Database["public"]["Tables"]["plans"]["Insert"]>;
         Relationships: [];
       };
@@ -241,20 +386,73 @@ export interface Database {
           status: string;
           current_period_start: string | null;
           current_period_end: string | null;
+          discount_coupon_id: string | null;
+          discount_code: string | null;
+          discount_percent: number | null;
+          discount_amount: number | null;
           provider: string | null;
           provider_customer_id: string | null;
+          provider_checkout_id: string | null;
+          provider_checkout_url: string | null;
+          provider_payment_id: string | null;
+          provider_status: string | null;
           provider_subscription_id: string | null;
+          metadata: Json;
           created_at: string;
           updated_at: string;
         };
-        Insert: Partial<Database["public"]["Tables"]["subscriptions"]["Row"]> & { store_id: string };
-        Update: Partial<Database["public"]["Tables"]["subscriptions"]["Insert"]>;
+        Insert: Partial<
+          Database["public"]["Tables"]["subscriptions"]["Row"]
+        > & { store_id: string };
+        Update: Partial<
+          Database["public"]["Tables"]["subscriptions"]["Insert"]
+        >;
+        Relationships: [];
+      };
+      discount_coupons: {
+        Row: {
+          id: string;
+          code: string;
+          name: string | null;
+          description: string | null;
+          percent_off: number | null;
+          amount_off: number | null;
+          duration: string;
+          max_redemptions: number | null;
+          redemption_count: number;
+          starts_at: string | null;
+          expires_at: string | null;
+          is_active: boolean;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<
+          Database["public"]["Tables"]["discount_coupons"]["Row"]
+        > & {
+          code: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["discount_coupons"]["Insert"]
+        >;
         Relationships: [];
       };
       feed_settings: {
-        Row: { id: string; store_id: string; is_active: boolean; slug: string; settings: Json; created_at: string; updated_at: string };
-        Insert: Partial<Database["public"]["Tables"]["feed_settings"]["Row"]> & { store_id: string };
-        Update: Partial<Database["public"]["Tables"]["feed_settings"]["Insert"]>;
+        Row: {
+          id: string;
+          store_id: string;
+          is_active: boolean;
+          slug: string;
+          settings: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<
+          Database["public"]["Tables"]["feed_settings"]["Row"]
+        > & { store_id: string };
+        Update: Partial<
+          Database["public"]["Tables"]["feed_settings"]["Insert"]
+        >;
         Relationships: [];
       };
     };
@@ -265,6 +463,9 @@ export interface Database {
   };
 }
 
-export type TableRow<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
-export type TableInsert<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Insert"];
-export type TableUpdate<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Update"];
+export type TableRow<T extends keyof Database["public"]["Tables"]> =
+  Database["public"]["Tables"][T]["Row"];
+export type TableInsert<T extends keyof Database["public"]["Tables"]> =
+  Database["public"]["Tables"][T]["Insert"];
+export type TableUpdate<T extends keyof Database["public"]["Tables"]> =
+  Database["public"]["Tables"][T]["Update"];

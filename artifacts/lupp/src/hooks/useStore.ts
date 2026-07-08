@@ -14,7 +14,18 @@ export function useStores() {
 }
 
 export function useCurrentStore() {
+  const { embeddedStore, isShopifyEmbedded } = useAuth();
   const storesQuery = useStores();
+
+  if (isShopifyEmbedded && embeddedStore) {
+    return {
+      ...storesQuery,
+      data: [embeddedStore],
+      isLoading: false,
+      store: embeddedStore,
+    };
+  }
+
   return {
     ...storesQuery,
     store: storesQuery.data?.[0] ?? null,

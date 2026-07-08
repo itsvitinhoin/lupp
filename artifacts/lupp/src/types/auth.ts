@@ -5,6 +5,8 @@ export interface AuthState {
   user: User | null;
   session: Session | null;
   profile: TableRow<"profiles"> | null;
+  embeddedStore?: TableRow<"stores"> | null;
+  isShopifyEmbedded?: boolean;
   loading: boolean;
   error: Error | null;
 }

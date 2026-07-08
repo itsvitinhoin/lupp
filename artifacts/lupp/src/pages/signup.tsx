@@ -5,9 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LuppLogo } from '@/components/shared/LuppLogo';
-import { EnvNotice } from '@/components/shared/EnvNotice';
 import { authService } from '@/services/auth.service';
-import { isSupabaseConfigured } from '@/lib/env';
 import { useToast } from '@/hooks/use-toast';
 import { Link, useLocation } from 'wouter';
 
@@ -40,24 +38,18 @@ export default function Signup() {
 
     persistOnboardingPrefill();
 
-    if (!isSupabaseConfigured) {
-      localStorage.setItem('lupp_demo_auth', JSON.stringify({ email, name }));
-      toast({ title: 'Conta de teste criada localmente', description: 'Configure Supabase para criar o usuário real.' });
-      setLocation('/onboarding');
-      return;
-    }
-
     try {
       setIsSubmitting(true);
       const data = await authService.signUp({ name, email, password });
 
       if (!data.session) {
-        setPendingConfirmationEmail(email.trim());
+        const confirmationEmail = email.trim();
+        setPendingConfirmationEmail(confirmationEmail);
         toast({
           title: 'Cadastro criado',
           description: 'Confirme seu e-mail para entrar e concluir o onboarding.',
         });
-        setLocation('/login');
+        setLocation(`/login?confirm_email=${encodeURIComponent(confirmationEmail)}`);
         return;
       }
 
@@ -77,11 +69,6 @@ export default function Signup() {
     const targetEmail = pendingConfirmationEmail || email.trim();
     if (!targetEmail) {
       toast({ title: 'Informe o e-mail cadastrado.' });
-      return;
-    }
-
-    if (!isSupabaseConfigured) {
-      toast({ title: 'Modo teste local', description: 'Configure Supabase para reenviar confirmação real.' });
       return;
     }
 
@@ -116,7 +103,6 @@ export default function Signup() {
           </p>
         </CardHeader>
         <CardContent className="space-y-4 pb-8">
-          <EnvNotice />
           <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-2">
             <Label htmlFor="name">Nome completo</Label>

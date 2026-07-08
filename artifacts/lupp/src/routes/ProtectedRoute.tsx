@@ -1,17 +1,10 @@
 import React from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
-import { isSupabaseConfigured } from "@/lib/env";
+import { ShopifyEmbeddedRecovery } from "@/components/shared/ShopifyEmbeddedRecovery";
 import { useAuth } from "@/hooks/useAuth";
 import { useCurrentStore } from "@/hooks/useStore";
-
-function hasDemoAuth() {
-  return Boolean(localStorage.getItem("lupp_demo_auth"));
-}
-
-function hasDemoStore() {
-  return Boolean(localStorage.getItem("lupp_demo_store"));
-}
+import { isShopifyEmbeddedSession } from "@/lib/shopify-embedded";
 
 function RouteLoading({ label = "Carregando..." }: { label?: string }) {
   return (
@@ -25,25 +18,15 @@ function RouteLoading({ label = "Carregando..." }: { label?: string }) {
 
 export function ProtectedRoute({ children, requireStore = true }: { children: React.ReactNode; requireStore?: boolean }) {
   const [, setLocation] = useLocation();
-  const { user, loading } = useAuth();
+  const { error, user, loading } = useAuth();
   const storesQuery = useCurrentStore();
+  const isEmbedded = isShopifyEmbeddedSession();
 
   React.useEffect(() => {
-    if (!isSupabaseConfigured) {
-      if (!hasDemoAuth()) {
-        setLocation("/login");
-        return;
-      }
-
-      if (requireStore && !hasDemoStore()) {
-        setLocation("/onboarding");
-      }
-      return;
-    }
-
     if (loading) return;
 
     if (!user) {
+      if (isEmbedded) return;
       setLocation("/login");
       return;
     }
@@ -51,14 +34,15 @@ export function ProtectedRoute({ children, requireStore = true }: { children: Re
     if (requireStore && !storesQuery.isLoading && !storesQuery.store) {
       setLocation("/onboarding");
     }
-  }, [loading, requireStore, setLocation, storesQuery.isLoading, storesQuery.store, user]);
+  }, [isEmbedded, loading, requireStore, setLocation, storesQuery.isLoading, storesQuery.store, user]);
 
-  if (!isSupabaseConfigured) {
-    if (!hasDemoAuth()) return <RouteLoading label="Redirecionando para login..." />;
-    if (requireStore && !hasDemoStore()) return <RouteLoading label="Abrindo onboarding..." />;
-    return <>{children}</>;
+  if (isEmbedded && (loading || (user && requireStore && storesQuery.isLoading))) {
+    return <ShopifyEmbeddedRecovery connecting error={error} />;
   }
   if (loading || (user && requireStore && storesQuery.isLoading)) return <RouteLoading />;
+  if (!user && isEmbedded) {
+    return error ? <ShopifyEmbeddedRecovery error={error} /> : <RouteLoading label="Conectando com a Shopify..." />;
+  }
   if (!user) return <RouteLoading label="Redirecionando para login..." />;
   if (requireStore && !storesQuery.store) return <RouteLoading label="Abrindo onboarding..." />;
 
@@ -67,23 +51,25 @@ export function ProtectedRoute({ children, requireStore = true }: { children: Re
 
 export function AuthRoute({ children }: { children: React.ReactNode }) {
   const [, setLocation] = useLocation();
-  const { user, loading } = useAuth();
+  const { error, user, loading } = useAuth();
   const storesQuery = useCurrentStore();
+  const isEmbedded = isShopifyEmbeddedSession();
 
   React.useEffect(() => {
-    if (!isSupabaseConfigured) {
-      if (hasDemoAuth()) {
-        setLocation(hasDemoStore() ? "/app" : "/onboarding");
-      }
-      return;
-    }
-
-    if (!isSupabaseConfigured || loading || !user || storesQuery.isLoading) return;
+    if (loading || !user || storesQuery.isLoading) return;
     setLocation(storesQuery.store ? "/app" : "/onboarding");
   }, [loading, setLocation, storesQuery.isLoading, storesQuery.store, user]);
 
-  if (isSupabaseConfigured && (loading || (user && storesQuery.isLoading))) {
+  if (isEmbedded && (loading || (user && storesQuery.isLoading))) {
+    return <ShopifyEmbeddedRecovery connecting error={error} />;
+  }
+
+  if (loading || (user && storesQuery.isLoading)) {
     return <RouteLoading />;
+  }
+
+  if (!user && isEmbedded) {
+    return error ? <ShopifyEmbeddedRecovery error={error} /> : <RouteLoading label="Conectando com a Shopify..." />;
   }
 
   return <>{children}</>;

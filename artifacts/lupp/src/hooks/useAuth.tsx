@@ -2,6 +2,7 @@ import React from "react";
 import type { AuthState } from "@/types/auth";
 import { authService } from "@/services/auth.service";
 import { isSupabaseConfigured } from "@/lib/env";
+import { fetchShopifyEmbeddedSession, isShopifyEmbeddedSession } from "@/lib/shopify-embedded";
 import { supabase } from "@/lib/supabase";
 
 interface AuthContextValue extends AuthState {
@@ -27,7 +28,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      setState((current) => ({ ...current, loading: true, error: null }));
+      setState((current) => ({ ...current, loading: !current.session, error: null }));
+
+      if (isShopifyEmbeddedSession()) {
+        const embeddedSession = await fetchShopifyEmbeddedSession();
+        setState({
+          embeddedStore: embeddedSession.store,
+          error: null,
+          isShopifyEmbedded: true,
+          loading: false,
+          profile: embeddedSession.profile,
+          session: null,
+          user: embeddedSession.user,
+        });
+        return;
+      }
+
       const session = await authService.getSession();
       const user = session?.user ?? null;
       let profile = null;
@@ -38,9 +54,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profile = data;
       }
 
-      setState({ session, user, profile, loading: false, error: null });
+      setState({ embeddedStore: null, isShopifyEmbedded: false, session, user, profile, loading: false, error: null });
     } catch (error) {
-      setState({ user: null, session: null, profile: null, loading: false, error: error as Error });
+      setState((current) => ({
+        ...current,
+        loading: false,
+        error: error as Error,
+      }));
     }
   }, []);
 
@@ -59,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (isSupabaseConfigured) {
       await authService.signOut();
     }
-    setState({ user: null, session: null, profile: null, loading: false, error: null });
+    setState({ user: null, session: null, profile: null, embeddedStore: null, isShopifyEmbedded: false, loading: false, error: null });
   }, []);
 
   return <AuthContext.Provider value={{ ...state, refresh, signOut }}>{children}</AuthContext.Provider>;

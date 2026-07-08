@@ -13,19 +13,39 @@ import Widgets from "@/pages/widgets";
 import CustomPages from "@/pages/custom-pages";
 import Products from "@/pages/products";
 import Comments from "@/pages/comments";
-import Analytics from "@/pages/analytics";
+import Feedbacks from "@/pages/feedbacks";
+import Ordering from "@/pages/ordering";
 import Integrations from "@/pages/integrations";
 import Billing from "@/pages/billing";
 import Settings from "@/pages/settings";
+import MasterConsole from "@/pages/master-console";
 import PreviewFeed from "@/pages/preview/feed";
 import PreviewProduct from "@/pages/preview/product";
+import {
+  PrivacyPolicyPage,
+  PublicSettingsPage,
+  SupportPage,
+} from "@/pages/public-pages";
 import TestStore from "@/pages/test-store";
 import { AuthRoute, ProtectedRoute } from "./ProtectedRoute";
+import { isShopifyEmbeddedSession } from "@/lib/shopify-embedded";
+
+function RootRoute() {
+  if (isShopifyEmbeddedSession()) {
+    return (
+      <ProtectedRoute>
+        <Dashboard />
+      </ProtectedRoute>
+    );
+  }
+
+  return <Landing />;
+}
 
 export function AppRoutes() {
   return (
     <Switch>
-      <Route path="/" component={Landing} />
+      <Route path="/" component={RootRoute} />
       <Route path="/login">
         <AuthRoute>
           <Login />
@@ -36,6 +56,9 @@ export function AppRoutes() {
           <Signup />
         </AuthRoute>
       </Route>
+      <Route path="/configuracoes" component={PublicSettingsPage} />
+      <Route path="/privacidade" component={PrivacyPolicyPage} />
+      <Route path="/suporte" component={SupportPage} />
       <Route path="/onboarding">
         <ProtectedRoute requireStore={false}>
           <Onboarding />
@@ -43,40 +66,72 @@ export function AppRoutes() {
       </Route>
 
       <Route path="/app">
-        <ProtectedRoute><Dashboard /></ProtectedRoute>
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
       </Route>
       <Route path="/app/videos">
-        <ProtectedRoute><VideosList /></ProtectedRoute>
+        <ProtectedRoute>
+          <VideosList />
+        </ProtectedRoute>
       </Route>
       <Route path="/app/videos/new">
-        <ProtectedRoute><VideosNew /></ProtectedRoute>
+        <ProtectedRoute>
+          <VideosNew />
+        </ProtectedRoute>
       </Route>
       <Route path="/app/feed">
-        <ProtectedRoute><FeedConfig /></ProtectedRoute>
+        <ProtectedRoute>
+          <FeedConfig />
+        </ProtectedRoute>
       </Route>
       <Route path="/app/widgets">
-        <ProtectedRoute><Widgets /></ProtectedRoute>
+        <ProtectedRoute>
+          <Widgets />
+        </ProtectedRoute>
       </Route>
       <Route path="/app/pages">
-        <ProtectedRoute><CustomPages /></ProtectedRoute>
+        <ProtectedRoute>
+          <CustomPages />
+        </ProtectedRoute>
       </Route>
       <Route path="/app/products">
-        <ProtectedRoute><Products /></ProtectedRoute>
+        <ProtectedRoute>
+          <Products />
+        </ProtectedRoute>
       </Route>
       <Route path="/app/comments">
-        <ProtectedRoute><Comments /></ProtectedRoute>
+        <ProtectedRoute>
+          <Comments />
+        </ProtectedRoute>
       </Route>
-      <Route path="/app/analytics">
-        <ProtectedRoute><Analytics /></ProtectedRoute>
+      <Route path="/app/feedbacks">
+        <ProtectedRoute>
+          <Feedbacks />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/app/ordering">
+        <ProtectedRoute>
+          <Ordering />
+        </ProtectedRoute>
       </Route>
       <Route path="/app/integrations">
-        <ProtectedRoute><Integrations /></ProtectedRoute>
+        <ProtectedRoute>
+          <Integrations />
+        </ProtectedRoute>
       </Route>
       <Route path="/app/billing">
-        <ProtectedRoute><Billing /></ProtectedRoute>
+        <ProtectedRoute>
+          <Billing />
+        </ProtectedRoute>
       </Route>
       <Route path="/app/settings">
-        <ProtectedRoute><Settings /></ProtectedRoute>
+        <ProtectedRoute>
+          <Settings />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/master">
+        <MasterConsole />
       </Route>
 
       <Route path="/preview/feed" component={PreviewFeed} />

@@ -6,11 +6,26 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
 };
 
-type ScriptApiResponse = {
+type ScriptRecord = {
   id?: number | string;
-  result?: Array<{ id?: number | string; [key: string]: unknown }>;
+  script_id?: number | string;
+  handle?: string;
+  name?: string;
+  title?: string;
+  is_auto_install?: boolean;
+  status?: string;
   [key: string]: unknown;
 };
+
+type ScriptApiResponse =
+  | ScriptRecord[]
+  | {
+      id?: number | string;
+      result?: ScriptRecord[];
+      scripts?: ScriptRecord[];
+      data?: ScriptRecord[];
+      [key: string]: unknown;
+    };
 
 function jsonResponse(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -28,6 +43,116 @@ async function readJson(response: Response) {
   return (await response.json().catch(() => ({}))) as ScriptApiResponse;
 }
 
+function scriptList(value: ScriptApiResponse): ScriptRecord[] {
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value.result)) return value.result;
+  if (Array.isArray(value.scripts)) return value.scripts;
+  if (Array.isArray(value.data)) return value.data;
+  return [];
+}
+
+function externalMessage(value: unknown): string | null {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value.map(externalMessage).filter(Boolean).join(" | ") || null;
+  }
+  if (typeof value !== "object") return null;
+
+  const record = value as Record<string, unknown>;
+  const direct =
+    record.message ||
+    record.error_description ||
+    record.error ||
+    record.reason ||
+    record.description;
+  if (typeof direct === "string") return direct;
+
+  return (
+    externalMessage(record.errors) ||
+    externalMessage(record.details) ||
+    externalMessage(record.result)
+  );
+}
+
+function publicScriptSnapshot(script: ScriptRecord | null | undefined) {
+  if (!script) return null;
+  return {
+    handle: script.handle || null,
+    id: script.id || null,
+    is_auto_install: script.is_auto_install || false,
+    name: script.name || script.title || null,
+    script_id: script.script_id || null,
+    status: script.status || null,
+  };
+}
+
+function isLuupScript(script: ScriptRecord, scriptId: string) {
+  const handle = String(script.handle || "").toLowerCase();
+  const name = String(script.name || script.title || "").toLowerCase();
+  return (
+    String(script.id) === String(scriptId) ||
+    String(script.script_id) === String(scriptId) ||
+    handle === "lupp" ||
+    handle === "luup-video-experience" ||
+    name.includes("luup video experience")
+  );
+}
+
+async function tryInstallScript(
+  endpoint: string,
+  headers: Record<string, string>,
+  method: "POST" | "PUT",
+  payloads: Record<string, unknown>[],
+) {
+  const attempts: Array<{
+    body: ScriptApiResponse;
+    message: string | null;
+    ok: boolean;
+    payload_name: string;
+    status: number;
+  }> = [];
+
+  for (const payload of payloads) {
+    const payloadName = String(payload.__name || "payload");
+    const { __name: _name, ...requestPayload } = payload;
+    const response = await fetch(endpoint, {
+      body: JSON.stringify(requestPayload),
+      headers,
+      method,
+    });
+    const body = await readJson(response);
+    const message = externalMessage(body);
+    attempts.push({
+      body,
+      message,
+      ok: response.ok,
+      payload_name: payloadName,
+      status: response.status,
+    });
+    if (response.ok) {
+      return {
+        attempts,
+        body,
+        message,
+        ok: true,
+        payload_name: payloadName,
+        status: response.status,
+      };
+    }
+  }
+
+  const last = attempts[attempts.length - 1];
+  return {
+    attempts,
+    body: last?.body || {},
+    message: last?.message || null,
+    ok: false,
+    payload_name: last?.payload_name || "payload",
+    status: last?.status || 0,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -41,7 +166,8 @@ Deno.serve(async (req) => {
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const scriptId = Deno.env.get("NUVEMSHOP_SCRIPT_ID");
-  const appUrl = Deno.env.get("LUPP_APP_URL") || "https://lupp-lupp.vercel.app";
+  const scriptAutoInstall = (Deno.env.get("NUVEMSHOP_SCRIPT_AUTO_INSTALL") || "true") !== "false";
+  const appUrl = Deno.env.get("LUPP_APP_URL") || "https://www.playluup.com.br";
   const appUserAgent = Deno.env.get("NUVEMSHOP_USER_AGENT") || "Luup (suporte@luup.app)";
 
   if (!supabaseUrl || !serviceRoleKey || !supabaseAnonKey) {
@@ -73,7 +199,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "invalid_user" }, 401);
   }
 
-  if (!scriptId) {
+  if (!scriptId && !scriptAutoInstall) {
     return jsonResponse({ error: "missing_nuvemshop_script_id" }, 500);
   }
 
@@ -90,7 +216,7 @@ Deno.serve(async (req) => {
 
   const { data: store } = await supabase
     .from("stores")
-    .select("id, slug")
+    .select("id, slug, url")
     .eq("id", storeId)
     .maybeSingle();
 
@@ -121,14 +247,10 @@ Deno.serve(async (req) => {
   }
 
   const externalStoreId = String(integration.external_store_id);
-  const scriptApiBase = `https://api.tiendanube.com/2025-03/${externalStoreId}/scripts`;
-  const scriptApiHeaders = {
-    Authorization: `Bearer ${secret.access_token}`,
-    "Content-Type": "application/json",
-    "User-Agent": appUserAgent,
-  };
-  const apiScriptId = normalizeScriptId(scriptId);
   const queryParams = {
+    external_store_id: externalStoreId,
+    lupp_external_store_id: externalStoreId,
+    lupp_store_domain: store.url || "",
     lupp_store: store.slug,
     lupp_supabase_url: supabaseUrl,
     lupp_supabase_key: supabaseAnonKey,
@@ -136,10 +258,66 @@ Deno.serve(async (req) => {
     lupp_widget: "floating_launcher",
     lupp_require_active: "true",
   };
-  const payload = {
-    query_params: JSON.stringify(queryParams),
-    script_id: apiScriptId,
+
+  const integrationSettings =
+    integration.settings && typeof integration.settings === "object" && !Array.isArray(integration.settings)
+      ? integration.settings
+      : {};
+
+  if (scriptAutoInstall && !scriptId) {
+    await supabase
+      .from("integrations")
+      .update({
+        settings: {
+          ...integrationSettings,
+          script_install: {
+            installed_at: new Date().toISOString(),
+            script_id: scriptId || "nuvemshop-auto-install",
+            auto_installed: true,
+            external_store_id: externalStoreId,
+            installation_id: scriptId || "nuvemshop-auto-install",
+            query_params: queryParams,
+            source: "nuvemshop_app_auto_install",
+            status: "auto_install_expected",
+          },
+        },
+      })
+      .eq("id", integration.id);
+
+    return jsonResponse({
+      auto_installed: true,
+      installed: true,
+      method: "AUTO_INSTALL",
+      ok: true,
+      script_id: scriptId || "nuvemshop-auto-install",
+    });
+  }
+
+  const scriptApiBase = `https://api.tiendanube.com/2025-03/${externalStoreId}/scripts`;
+  const scriptApiHeaders = {
+    Authorization: `Bearer ${secret.access_token}`,
+    "Content-Type": "application/json",
+    "User-Agent": appUserAgent,
   };
+  const scriptIdForApi = scriptId || "";
+  const apiScriptId = normalizeScriptId(scriptIdForApi);
+  const payloads = [
+    {
+      __name: "query_params_object",
+      query_params: queryParams,
+      script_id: apiScriptId,
+    },
+    {
+      __name: "query_params_json",
+      query_params: JSON.stringify(queryParams),
+      script_id: apiScriptId,
+    },
+    {
+      __name: "params_object",
+      params: queryParams,
+      script_id: apiScriptId,
+    },
+  ];
 
   const listResponse = await fetch(`${scriptApiBase}?page=1&per_page=100`, {
     headers: scriptApiHeaders,
@@ -155,73 +333,94 @@ Deno.serve(async (req) => {
   }
 
   const listData = await readJson(listResponse);
-  const scripts = Array.isArray(listData.result) ? listData.result : [];
-  const existing = scripts.find((script) => String(script.id) === String(scriptId));
-  if (existing && existing.is_auto_install) {
-    const integrationSettings =
-      integration.settings && typeof integration.settings === "object" && !Array.isArray(integration.settings)
-        ? integration.settings
-        : {};
-
-    await supabase
-      .from("integrations")
-      .update({
-        settings: {
-          ...integrationSettings,
-          script_install: {
-            auto_installed: true,
-            installed_at: new Date().toISOString(),
-            script_id: scriptId,
-            source: "nuvemshop_auto_install",
-            status: existing.status || null,
-          },
-        },
-      })
-      .eq("id", integration.id);
-
-    return jsonResponse({
-      auto_installed: true,
-      installed: true,
-      ok: true,
-      script: existing,
-      script_id: scriptId,
-    });
-  }
+  const scripts = scriptList(listData);
+  const existing = scripts.find((script) => isLuupScript(script, scriptIdForApi));
 
   const method = existing ? "PUT" : "POST";
-  const endpoint = existing ? `${scriptApiBase}/${scriptId}` : scriptApiBase;
-  let installResponse = await fetch(endpoint, {
-    body: JSON.stringify(payload),
-    headers: scriptApiHeaders,
-    method,
-  });
+  const installationId = existing?.id ? String(existing.id) : scriptIdForApi;
+  const endpoint = existing ? `${scriptApiBase}/${installationId}` : scriptApiBase;
+  let installResult = await tryInstallScript(endpoint, scriptApiHeaders, method, payloads);
 
-  if (!installResponse.ok && installResponse.status === 409) {
-    installResponse = await fetch(`${scriptApiBase}/${scriptId}`, {
-      body: JSON.stringify(payload),
-      headers: scriptApiHeaders,
-      method: "PUT",
-    });
+  if (!installResult.ok && installResult.status === 409) {
+    const conflictResult = await tryInstallScript(`${scriptApiBase}/${scriptIdForApi}`, scriptApiHeaders, "PUT", payloads);
+    installResult = {
+      ...conflictResult,
+      attempts: [...installResult.attempts, ...conflictResult.attempts],
+    };
   }
 
-  const installData = await readJson(installResponse);
-  if (!installResponse.ok) {
+  const installData = installResult.body;
+  if (!installResult.ok) {
+    const message = installResult.message;
+
+    if (scriptAutoInstall) {
+      await supabase
+        .from("integrations")
+        .update({
+          settings: {
+            ...integrationSettings,
+            script_install: {
+              installed_at: new Date().toISOString(),
+              script_id: scriptIdForApi || "nuvemshop-auto-install",
+              auto_installed: true,
+              external_store_id: externalStoreId,
+              installation_id: scriptIdForApi || "nuvemshop-auto-install",
+              query_params: queryParams,
+              source: "nuvemshop_install_fallback",
+              status: "install_api_failed_auto_install_expected",
+              warning: message || "nuvemshop_script_install_failed",
+              warning_status: installResult.status,
+            },
+          },
+        })
+        .eq("id", integration.id);
+
+      return jsonResponse(
+        {
+          auto_installed: false,
+          existing_script: publicScriptSnapshot(existing),
+          installed: false,
+          install_attempts: installResult.attempts.map((attempt) => ({
+            message: attempt.message,
+            ok: attempt.ok,
+            payload_name: attempt.payload_name,
+            status: attempt.status,
+          })),
+          list_script_count: scripts.length,
+          method: `${method}_AUTO_INSTALL_FALLBACK`,
+          ok: false,
+          pending_manual_install: true,
+          script_id: scriptIdForApi || "nuvemshop-auto-install",
+          warning: message || "nuvemshop_script_install_failed",
+          warning_status: installResult.status,
+          error: "nuvemshop_script_install_not_confirmed",
+          message:
+            "A Nuvemshop nao confirmou a instalacao do script. Instale manualmente o codigo exibido no painel ou confira se o script do app esta aprovado e ativo.",
+        },
+        409,
+      );
+    }
+
     return jsonResponse(
       {
         details: installData,
-        error: [401, 403].includes(installResponse.status)
+        error: [401, 403].includes(installResult.status)
           ? "nuvemshop_scripts_permission_missing"
           : "nuvemshop_script_install_failed",
-        status: installResponse.status,
+        existing_script: publicScriptSnapshot(existing),
+        install_attempts: installResult.attempts.map((attempt) => ({
+          message: attempt.message,
+          ok: attempt.ok,
+          payload_name: attempt.payload_name,
+          status: attempt.status,
+        })),
+        list_script_count: scripts.length,
+        message,
+        status: installResult.status,
       },
-      [401, 403].includes(installResponse.status) ? 403 : 502,
+      [401, 403].includes(installResult.status) ? 403 : 502,
     );
   }
-
-  const integrationSettings =
-    integration.settings && typeof integration.settings === "object" && !Array.isArray(integration.settings)
-      ? integration.settings
-      : {};
 
   await supabase
     .from("integrations")
@@ -230,8 +429,13 @@ Deno.serve(async (req) => {
         ...integrationSettings,
         script_install: {
           installed_at: new Date().toISOString(),
-          script_id: scriptId,
+          script_id: scriptIdForApi,
+          auto_installed: Boolean(existing?.is_auto_install),
+          external_store_id: externalStoreId,
+          installation_id: installationId,
+          query_params: queryParams,
           source: "nuvemshop_public_api",
+          status: (installData as ScriptRecord).status || existing?.status || null,
         },
       },
     })
@@ -239,9 +443,10 @@ Deno.serve(async (req) => {
 
   return jsonResponse({
     installed: true,
-    method,
+    method: `${method}:${installResult.payload_name}`,
     ok: true,
     script: installData,
-    script_id: scriptId,
+    script_id: scriptIdForApi,
+    installation_id: installationId,
   });
 });
