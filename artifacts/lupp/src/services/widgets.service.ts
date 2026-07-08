@@ -34,6 +34,26 @@ function errorText(value: unknown): string | null {
   return errorText(record.details) || errorText(record.errors);
 }
 
+export type NuvemshopScriptInstallResult = {
+  installed: boolean;
+  method: string;
+  script_id: string;
+  message?: string;
+  pending_manual_install?: boolean;
+  verified?: boolean;
+  warning?: string;
+};
+
+export type WidgetBootstrapProbe = {
+  active: boolean;
+  carouselDisabledReason: string | null;
+  error: string | null;
+  httpStatus: number;
+  ok: boolean;
+  resolvedBy: string | null;
+  tried: string[];
+};
+
 export const widgetsService = {
   async listWidgets(storeId: string) {
     const { data, error } = await requireSupabase()
@@ -70,6 +90,7 @@ export const widgetsService = {
     const settings = asRecord(widget?.settings);
     const appearance = asRecord(settings.appearance);
     const display = asRecord(settings.display);
+    const carousel = asRecord(settings.carousel);
     const nextSettings = {
       ...settings,
       appearance,
@@ -86,6 +107,19 @@ export const widgetsService = {
         hide_without_videos: false,
         home_experience_enabled: display.home_experience_enabled ?? true,
         home_ordering: display.home_ordering || "manual",
+      },
+      // The DB carousel block is the widget's source of truth (the script
+      // attribute default is off) — seed it so stores that never saved the
+      // dashboard settings still render the horizontal feed. Plan gating
+      // stays server-side in the bootstrap (plan_widget_limit).
+      carousel: {
+        ...carousel,
+        before_heading: carousel.before_heading ?? "Com Capa",
+        description: carousel.description ?? "",
+        enabled: carousel.enabled ?? true,
+        max_items: carousel.max_items ?? 12,
+        mobile_max_items: carousel.mobile_max_items ?? 6,
+        title: carousel.title ?? "Descubra cada detalhe e Compre",
       },
     };
 
@@ -132,11 +166,7 @@ export const widgetsService = {
         "Sua sessão expirou. Entre novamente para instalar o script.",
       );
 
-    const { data, error } = await client.functions.invoke<{
-      installed: boolean;
-      method: string;
-      script_id: string;
-    }>("nuvemshop-install-script", {
+    const { data, error } = await client.functions.invoke<NuvemshopScriptInstallResult>("nuvemshop-install-script", {
       body: { store_id: storeId },
       headers: {
         Authorization: `Bearer ${session.access_token}`,
@@ -155,6 +185,43 @@ export const widgetsService = {
     }
 
     return data ?? { installed: true, method: "POST", script_id: "" };
+  },
+
+  // Queries the public widget bootstrap exactly like a storefront visitor
+  // would, so the admin can show whether the widget will actually render.
+  async probeWidgetBootstrap(params: {
+    provider?: string;
+    storeDomain?: string;
+    storeId?: string;
+  }): Promise<WidgetBootstrapProbe> {
+    const query = new URLSearchParams({
+      mode: "meta",
+      widget: "floating_video",
+    });
+    if (params.storeId) query.set("store_id", params.storeId);
+    if (params.storeDomain) {
+      query.set("provider", params.provider || "nuvemshop");
+      query.set("store_domain", params.storeDomain);
+    }
+
+    const response = await fetch(
+      `${env.supabaseUrl}/functions/v1/lupp-widget-bootstrap?${query.toString()}`,
+    );
+    const payload = asRecord(await response.json().catch(() => null));
+    const carousel = asRecord(asRecord(asRecord(payload.widget).settings).carousel);
+
+    return {
+      active: Boolean(payload.active),
+      carouselDisabledReason:
+        carousel.enabled === false
+          ? String(carousel.disabled_reason || "carousel_disabled")
+          : null,
+      error: payload.error ? String(payload.error) : null,
+      httpStatus: response.status,
+      ok: response.ok,
+      resolvedBy: payload.resolved_by ? String(payload.resolved_by) : null,
+      tried: Array.isArray(payload.tried) ? payload.tried.map(String) : [],
+    };
   },
 
   getEmbedCode(storeSlug: string, widgetType: string) {
@@ -176,7 +243,6 @@ export const widgetsService = {
   s.setAttribute('data-store', ${slug});
   s.setAttribute('data-widget', ${type});
   s.setAttribute('data-supabase-url', ${JSON.stringify(env.supabaseUrl).replace(/<\/script/gi, "<\\/script")});
-  s.setAttribute('data-supabase-key', ${JSON.stringify(env.supabaseAnonKey).replace(/<\/script/gi, "<\\/script")});
   s.setAttribute('data-lupp-url', ${JSON.stringify(env.appUrl).replace(/<\/script/gi, "<\\/script")});
 
   var firstScript = document.getElementsByTagName('script')[0];
