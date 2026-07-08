@@ -261,6 +261,54 @@ Deno.serve(async (req) => {
     .update({ platform: "nuvemshop" })
     .eq("id", payload.store_id);
 
+  // Best-effort: persist the storefront domains right away so the public
+  // widget bootstrap can resolve this store by domain before the first
+  // product sync runs. Failures here must not break the OAuth flow.
+  try {
+    const storeResponse = await fetch(
+      `https://api.nuvemshop.com.br/2025-03/${externalStoreId}/store`,
+      {
+        headers: {
+          Authentication: `bearer ${tokenData.access_token}`,
+          "Content-Type": "application/json",
+          "User-Agent":
+            Deno.env.get("NUVEMSHOP_USER_AGENT") || "Luup (playluup.com.br)",
+        },
+      },
+    );
+    if (storeResponse.ok) {
+      const nuvemshopStore = (await storeResponse.json()) as {
+        domains?: string[] | null;
+        original_domain?: string | null;
+      };
+      const { data: currentIntegration } = await supabase
+        .from("integrations")
+        .select("settings")
+        .eq("id", integration.id)
+        .maybeSingle();
+      const existingSettings =
+        currentIntegration?.settings &&
+        typeof currentIntegration.settings === "object" &&
+        !Array.isArray(currentIntegration.settings)
+          ? (currentIntegration.settings as Record<string, unknown>)
+          : {};
+      await supabase
+        .from("integrations")
+        .update({
+          settings: {
+            ...existingSettings,
+            nuvemshop_domains: Array.isArray(nuvemshopStore.domains)
+              ? nuvemshopStore.domains
+              : [],
+            nuvemshop_original_domain: nuvemshopStore.original_domain || null,
+          },
+        })
+        .eq("id", integration.id);
+    }
+  } catch (_) {
+    // Domain persistence is an optimization; the product sync repeats it.
+  }
+
   return redirectTo(returnTo, {
     connected: "nuvemshop",
     provider: "nuvemshop",

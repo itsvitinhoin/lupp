@@ -4,6 +4,45 @@
   var script = document.currentScript;
   if (!script) return;
 
+  // Opt-in diagnostics: set window.__LUUP_DEBUG__ = true before the widget
+  // loads to trace config resolution, bootstrap calls and abort reasons.
+  function debugLog() {
+    try {
+      if (!window.__LUUP_DEBUG__) return;
+      var args = ["[Luup:debug]"];
+      for (var argIndex = 0; argIndex < arguments.length; argIndex += 1) {
+        args.push(arguments[argIndex]);
+      }
+      console.log.apply(console, args);
+    } catch (_) {}
+  }
+
+  // Lifecycle handshake for wrapper scripts (e.g. the Nuvemshop light
+  // launcher): they must not remove their placeholder until the widget
+  // actually renders, and must clean up immediately when it aborts.
+  function emitWidgetLifecycleEvent(name, detail) {
+    try {
+      var event;
+      if (typeof window.CustomEvent === "function") {
+        event = new CustomEvent(name, { detail: detail || {} });
+      } else {
+        event = document.createEvent("CustomEvent");
+        event.initCustomEvent(name, false, false, detail || {});
+      }
+      document.dispatchEvent(event);
+    } catch (_) {}
+  }
+
+  function emitWidgetAborted(reason, detail) {
+    var payload = detail || {};
+    payload.reason = reason;
+    emitWidgetLifecycleEvent("luup:widget-aborted", payload);
+  }
+
+  function emitWidgetRendered(detail) {
+    emitWidgetLifecycleEvent("luup:widget-rendered", detail || {});
+  }
+
   function createAnchor(url) {
     var anchor = document.createElement("a");
     anchor.href = url || window.location.href;
@@ -525,11 +564,32 @@
     Boolean(externalStoreId) ||
     Boolean(storeDomain);
 
+  debugLog("config", {
+    canUseBootstrap: canUseBootstrap,
+    externalStoreId: externalStoreId,
+    hasSupabaseKey: Boolean(supabaseKey),
+    luppBaseUrl: luppBaseUrl,
+    requireActiveWidget: requireActiveWidget,
+    storeDomain: storeDomain,
+    storeId: storeId,
+    storeSlug: storeSlug,
+    supabaseUrl: supabaseUrl,
+    widgetType: widgetType,
+  });
+
   if (
     (!storeId && !storeSlug && !externalStoreId && !storeDomain) ||
     !supabaseUrl ||
     (!supabaseKey && !canUseBootstrap)
   ) {
+    debugLog("abort: initial gate", {
+      hasStoreIdentity: Boolean(
+        storeId || storeSlug || externalStoreId || storeDomain,
+      ),
+      hasSupabaseUrl: Boolean(supabaseUrl),
+      keylessBootstrapAllowed: canUseBootstrap,
+    });
+    emitWidgetAborted("initial_gate");
     console.warn(
       "[Luup] Configure data-store-id ou data-store, data-supabase-url e data-supabase-key para carregar o widget.",
     );
@@ -605,13 +665,27 @@
       params.set("store_domain", storeDomain);
     }
 
-    return fetch(bootstrapBase + "?" + params.toString()).then(
-      function (response) {
-        if (!response.ok)
-          throw new Error("Luup bootstrap error: " + response.status);
-        return response.json();
-      },
-    );
+    var bootstrapUrl = bootstrapBase + "?" + params.toString();
+    debugLog("bootstrap request", bootstrapUrl);
+    return fetch(bootstrapUrl).then(function (response) {
+      if (!response.ok) {
+        debugLog("bootstrap failed", { status: response.status });
+        throw new Error("Luup bootstrap error: " + response.status);
+      }
+      return response.json().then(function (payload) {
+        debugLog("bootstrap payload", {
+          active: payload && payload.active,
+          error: (payload && payload.error) || null,
+          hasWidgetConfig: Boolean(payload && payload.widget),
+          resolvedBy: (payload && payload.resolved_by) || null,
+          videoCount:
+            payload && payload.videos && payload.videos.length
+              ? payload.videos.length
+              : 0,
+        });
+        return payload;
+      });
+    });
   }
 
   function shouldUseBootstrap() {
@@ -3738,6 +3812,9 @@
 
     if ("MutationObserver" in window && document.body) {
       homeCarouselAnchorObserver = new MutationObserver(function () {
+        // The observer can fire during page teardown, when the document is
+        // already being destroyed.
+        if (!document || !document.body) return;
         if (!hasHomeCarouselAnchor()) return;
         clearHomeCarouselAnchorWatch();
         homeCarouselAnchorRetryCount = 0;
@@ -3814,12 +3891,16 @@
     lastRenderedUrl = window.location.href;
 
     if (!shouldDisplayOnCurrentUrl(displayConfig)) {
+      debugLog("render skipped: display rules", { path: currentPath() });
       root.innerHTML = "";
       removeHomeCarouselRoot();
       return;
     }
 
     if (isCarouselWidget() && carouselConfig.enabled === false) {
+      debugLog("render skipped: carousel disabled", {
+        hint: "settings.carousel.enabled=false ou data-home-carousel-enabled ausente",
+      });
       root.innerHTML = "";
       removeHomeCarouselRoot();
       return;
@@ -3832,10 +3913,15 @@
       !filteredVideos.length &&
       displayConfig.hideWithoutVideos
     ) {
+      debugLog("render skipped: hide_without_videos and no matching videos");
       root.innerHTML = "";
       removeHomeCarouselRoot();
       return;
     }
+    debugLog("render", {
+      videoCount: filteredVideos.length,
+      widgetType: widgetType,
+    });
     render(root, activeStore, filteredVideos);
     renderEmbeddedHomeCarousel(filteredVideos, root);
 
@@ -4706,6 +4792,7 @@
       (widgetType === "floating_launcher" || widgetType === "floating_video")
     ) {
       renderLauncher(root, store, []);
+      emitWidgetRendered({ videoCount: 0, widgetType: widgetType });
       return;
     }
 
@@ -4716,15 +4803,18 @@
 
     if (widgetType === "stories_bar") {
       renderStoriesBar(root, store, videos);
+      emitWidgetRendered({ videoCount: videos.length, widgetType: widgetType });
       return;
     }
 
     if (widgetType === "floating_launcher" || widgetType === "floating_video") {
       renderLauncher(root, store, videos);
+      emitWidgetRendered({ videoCount: videos.length, widgetType: widgetType });
       return;
     }
 
     renderCarousel(root, store, videos);
+    emitWidgetRendered({ videoCount: videos.length, widgetType: widgetType });
   }
 
   var root = createRoot();
@@ -4742,6 +4832,12 @@
           };
           var widgetConfig = payload.widget || null;
           if (!payload.active && requireActiveWidget) {
+            debugLog("abort: bootstrap inactive with require-active", {
+              error: payload.error || null,
+            });
+            emitWidgetAborted("bootstrap_inactive", {
+              error: payload.error || null,
+            });
             root.remove();
             return;
           }
@@ -4758,6 +4854,12 @@
           }
           applyWidgetSettings(widgetConfig);
           if (!shouldDisplayOnCurrentUrl(displayConfig)) {
+            debugLog("abort: display rules exclude current URL", {
+              excludePaths: displayConfig.excludePaths,
+              homeExperienceEnabled: displayConfig.homeExperienceEnabled,
+              path: currentPath(),
+            });
+            emitWidgetAborted("display_rules", { path: currentPath() });
             root.remove();
             return;
           }
@@ -4774,6 +4876,8 @@
           }
         })
         .catch(function (error) {
+          debugLog("abort: bootstrap error", error.message);
+          emitWidgetAborted("bootstrap_error", { message: error.message });
           console.warn("[Luup]", error.message);
           root.remove();
         });
@@ -4798,12 +4902,18 @@
 
         return widgetConfigPromise.then(function (widgetConfig) {
           if (!widgetConfig && requireActiveWidget) {
+            debugLog("abort: no active widget config with require-active");
+            emitWidgetAborted("no_active_widget");
             root.remove();
             return null;
           }
 
           applyWidgetSettings(widgetConfig);
           if (!shouldDisplayOnCurrentUrl(displayConfig)) {
+            debugLog("abort: display rules exclude current URL", {
+              path: currentPath(),
+            });
+            emitWidgetAborted("display_rules", { path: currentPath() });
             root.remove();
             return null;
           }
@@ -4818,12 +4928,14 @@
         });
       })
       .catch(function (error) {
+        debugLog("degraded render after fetch error", error.message);
         console.warn("[Luup]", error.message);
         renderLauncher(
           root,
           { id: null, slug: storeSlug, button_color: launcherConfig.accentColor },
           [],
         );
+        emitWidgetRendered({ degraded: true, widgetType: widgetType });
       });
   }
 

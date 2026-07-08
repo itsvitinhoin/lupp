@@ -99,6 +99,22 @@ function isLuupScript(script: ScriptRecord, scriptId: string) {
   );
 }
 
+async function verifyLuupScript(
+  scriptApiBase: string,
+  headers: Record<string, string>,
+  scriptId: string,
+) {
+  const response = await fetch(`${scriptApiBase}?page=1&per_page=100`, {
+    headers,
+  });
+  if (!response.ok) {
+    return { script: null, status: response.status, verified: false };
+  }
+  const scripts = scriptList(await readJson(response));
+  const script = scripts.find((item) => isLuupScript(item, scriptId)) || null;
+  return { script, status: response.status, verified: Boolean(script) };
+}
+
 async function tryInstallScript(
   endpoint: string,
   headers: Record<string, string>,
@@ -164,13 +180,12 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const scriptId = Deno.env.get("NUVEMSHOP_SCRIPT_ID");
   const scriptAutoInstall = (Deno.env.get("NUVEMSHOP_SCRIPT_AUTO_INSTALL") || "true") !== "false";
   const appUrl = Deno.env.get("LUPP_APP_URL") || "https://www.playluup.com.br";
   const appUserAgent = Deno.env.get("NUVEMSHOP_USER_AGENT") || "Luup (suporte@luup.app)";
 
-  if (!supabaseUrl || !serviceRoleKey || !supabaseAnonKey) {
+  if (!supabaseUrl || !serviceRoleKey) {
     return jsonResponse({ error: "missing_supabase_server_config" }, 500);
   }
 
@@ -253,7 +268,6 @@ Deno.serve(async (req) => {
     lupp_store_domain: store.url || "",
     lupp_store: store.slug,
     lupp_supabase_url: supabaseUrl,
-    lupp_supabase_key: supabaseAnonKey,
     lupp_url: appUrl,
     lupp_widget: "floating_launcher",
     lupp_require_active: "true",
@@ -264,33 +278,28 @@ Deno.serve(async (req) => {
       ? integration.settings
       : {};
 
-  if (scriptAutoInstall && !scriptId) {
+  // Auto-install mode no longer returns a blind success: the flow below
+  // always consults GET /scripts so the admin sees whether Nuvemshop is
+  // actually serving the Luup script, and refreshes its query params.
+  const autoInstallMode = scriptAutoInstall && !scriptId;
+
+  async function saveScriptInstall(record: Record<string, unknown>) {
     await supabase
       .from("integrations")
       .update({
         settings: {
           ...integrationSettings,
           script_install: {
-            installed_at: new Date().toISOString(),
-            script_id: scriptId || "nuvemshop-auto-install",
-            auto_installed: true,
+            auto_installed: autoInstallMode,
             external_store_id: externalStoreId,
-            installation_id: scriptId || "nuvemshop-auto-install",
+            installed_at: new Date().toISOString(),
             query_params: queryParams,
-            source: "nuvemshop_app_auto_install",
-            status: "auto_install_expected",
+            script_id: scriptId || "nuvemshop-auto-install",
+            ...record,
           },
         },
       })
       .eq("id", integration.id);
-
-    return jsonResponse({
-      auto_installed: true,
-      installed: true,
-      method: "AUTO_INSTALL",
-      ok: true,
-      script_id: scriptId || "nuvemshop-auto-install",
-    });
   }
 
   const scriptApiBase = `https://api.tiendanube.com/2025-03/${externalStoreId}/scripts`;
@@ -301,47 +310,92 @@ Deno.serve(async (req) => {
   };
   const scriptIdForApi = scriptId || "";
   const apiScriptId = normalizeScriptId(scriptIdForApi);
-  const payloads = [
-    {
-      __name: "query_params_object",
-      query_params: queryParams,
-      script_id: apiScriptId,
-    },
-    {
-      __name: "query_params_json",
-      query_params: JSON.stringify(queryParams),
-      script_id: apiScriptId,
-    },
-    {
-      __name: "params_object",
-      params: queryParams,
-      script_id: apiScriptId,
-    },
+  const payloadShapes: Array<Record<string, unknown>> = [
+    { __name: "query_params_object", query_params: queryParams },
+    { __name: "query_params_json", query_params: JSON.stringify(queryParams) },
+    { __name: "params_object", params: queryParams },
   ];
+  // Only reference a portal script id when one is configured; PUTs on an
+  // existing installation must not send an empty/zero script_id.
+  const payloads = payloadShapes.map((shape) =>
+    scriptIdForApi ? { ...shape, script_id: apiScriptId } : shape,
+  );
 
   const listResponse = await fetch(`${scriptApiBase}?page=1&per_page=100`, {
     headers: scriptApiHeaders,
   });
 
-  if (!listResponse.ok && ![401, 403].includes(listResponse.status)) {
+  if (!listResponse.ok) {
+    const permissionMissing = [401, 403].includes(listResponse.status);
+    if (autoInstallMode) {
+      // Cannot verify what Nuvemshop serves; be explicit instead of
+      // pretending the install is confirmed.
+      await saveScriptInstall({
+        source: "nuvemshop_app_auto_install",
+        status: "auto_install_unverified",
+        verified: false,
+        warning: permissionMissing
+          ? "nuvemshop_scripts_permission_missing"
+          : "nuvemshop_script_list_failed",
+        warning_status: listResponse.status,
+      });
+      return jsonResponse({
+        auto_installed: true,
+        installed: true,
+        method: "AUTO_INSTALL_UNVERIFIED",
+        ok: true,
+        script_id: "nuvemshop-auto-install",
+        verified: false,
+        warning: permissionMissing
+          ? "nuvemshop_scripts_permission_missing"
+          : "nuvemshop_script_list_failed",
+        warning_status: listResponse.status,
+        message:
+          "Nao foi possivel confirmar na API da Nuvemshop se o script do app esta ativo. Verifique a vitrine ou as permissoes do app (write_scripts).",
+      });
+    }
+    if (permissionMissing) {
+      return jsonResponse({ error: "nuvemshop_scripts_permission_missing", status: listResponse.status }, 403);
+    }
     const details = await listResponse.text().catch(() => "");
     return jsonResponse({ details: details.slice(0, 500), error: "nuvemshop_script_list_failed", status: listResponse.status }, 502);
-  }
-
-  if ([401, 403].includes(listResponse.status)) {
-    return jsonResponse({ error: "nuvemshop_scripts_permission_missing", status: listResponse.status }, 403);
   }
 
   const listData = await readJson(listResponse);
   const scripts = scriptList(listData);
   const existing = scripts.find((script) => isLuupScript(script, scriptIdForApi));
 
+  if (autoInstallMode && !existing) {
+    // The app should auto-inject its script, but Nuvemshop reports none
+    // installed for this store — surface the exact state to the admin.
+    await saveScriptInstall({
+      source: "nuvemshop_app_auto_install",
+      status: "auto_install_not_confirmed",
+      verified: false,
+    });
+    return jsonResponse(
+      {
+        auto_installed: false,
+        error: "nuvemshop_script_install_not_confirmed",
+        installed: false,
+        list_script_count: scripts.length,
+        method: "AUTO_INSTALL_NOT_CONFIRMED",
+        ok: false,
+        pending_manual_install: true,
+        verified: false,
+        message:
+          "A Nuvemshop nao registrou o script do app nesta loja. Confira se o script esta aprovado e ativo no Portal de Parceiros, ou reinstale o app na loja.",
+      },
+      409,
+    );
+  }
+
   const method = existing ? "PUT" : "POST";
   const installationId = existing?.id ? String(existing.id) : scriptIdForApi;
   const endpoint = existing ? `${scriptApiBase}/${installationId}` : scriptApiBase;
   let installResult = await tryInstallScript(endpoint, scriptApiHeaders, method, payloads);
 
-  if (!installResult.ok && installResult.status === 409) {
+  if (!installResult.ok && installResult.status === 409 && scriptIdForApi) {
     const conflictResult = await tryInstallScript(`${scriptApiBase}/${scriptIdForApi}`, scriptApiHeaders, "PUT", payloads);
     installResult = {
       ...conflictResult,
@@ -353,52 +407,38 @@ Deno.serve(async (req) => {
   if (!installResult.ok) {
     const message = installResult.message;
 
-    if (scriptAutoInstall) {
-      await supabase
-        .from("integrations")
-        .update({
-          settings: {
-            ...integrationSettings,
-            script_install: {
-              installed_at: new Date().toISOString(),
-              script_id: scriptIdForApi || "nuvemshop-auto-install",
-              auto_installed: true,
-              external_store_id: externalStoreId,
-              installation_id: scriptIdForApi || "nuvemshop-auto-install",
-              query_params: queryParams,
-              source: "nuvemshop_install_fallback",
-              status: "install_api_failed_auto_install_expected",
-              warning: message || "nuvemshop_script_install_failed",
-              warning_status: installResult.status,
-            },
-          },
-        })
-        .eq("id", integration.id);
+    if (autoInstallMode && existing) {
+      // The auto-injected script is live; only the query-params refresh
+      // failed. The loader has config fallbacks, so report installed but
+      // flag the stale config.
+      await saveScriptInstall({
+        installation_id: String(existing.id || "nuvemshop-auto-install"),
+        source: "nuvemshop_app_auto_install",
+        status: "active_query_params_refresh_failed",
+        verified: true,
+        warning: message || "nuvemshop_script_update_failed",
+        warning_status: installResult.status,
+      });
 
-      return jsonResponse(
-        {
-          auto_installed: false,
-          existing_script: publicScriptSnapshot(existing),
-          installed: false,
-          install_attempts: installResult.attempts.map((attempt) => ({
-            message: attempt.message,
-            ok: attempt.ok,
-            payload_name: attempt.payload_name,
-            status: attempt.status,
-          })),
-          list_script_count: scripts.length,
-          method: `${method}_AUTO_INSTALL_FALLBACK`,
-          ok: false,
-          pending_manual_install: true,
-          script_id: scriptIdForApi || "nuvemshop-auto-install",
-          warning: message || "nuvemshop_script_install_failed",
-          warning_status: installResult.status,
-          error: "nuvemshop_script_install_not_confirmed",
-          message:
-            "A Nuvemshop nao confirmou a instalacao do script. Instale manualmente o codigo exibido no painel ou confira se o script do app esta aprovado e ativo.",
-        },
-        409,
-      );
+      return jsonResponse({
+        auto_installed: true,
+        existing_script: publicScriptSnapshot(existing),
+        installed: true,
+        install_attempts: installResult.attempts.map((attempt) => ({
+          message: attempt.message,
+          ok: attempt.ok,
+          payload_name: attempt.payload_name,
+          status: attempt.status,
+        })),
+        method: `${method}_QUERY_PARAMS_REFRESH_FAILED`,
+        ok: true,
+        script_id: String(existing.id || "nuvemshop-auto-install"),
+        verified: true,
+        warning: message || "nuvemshop_script_update_failed",
+        warning_status: installResult.status,
+        message:
+          "O script do app esta ativo na loja, mas a Nuvemshop nao aceitou a atualizacao dos parametros de configuracao.",
+      });
     }
 
     return jsonResponse(
@@ -422,31 +462,35 @@ Deno.serve(async (req) => {
     );
   }
 
-  await supabase
-    .from("integrations")
-    .update({
-      settings: {
-        ...integrationSettings,
-        script_install: {
-          installed_at: new Date().toISOString(),
-          script_id: scriptIdForApi,
-          auto_installed: Boolean(existing?.is_auto_install),
-          external_store_id: externalStoreId,
-          installation_id: installationId,
-          query_params: queryParams,
-          source: "nuvemshop_public_api",
-          status: (installData as ScriptRecord).status || existing?.status || null,
-        },
-      },
-    })
-    .eq("id", integration.id);
+  // Read back the script list to confirm Nuvemshop actually persisted the
+  // installation, instead of trusting the write response alone.
+  const verification = await verifyLuupScript(
+    scriptApiBase,
+    scriptApiHeaders,
+    scriptIdForApi,
+  );
+
+  await saveScriptInstall({
+    auto_installed: Boolean(existing?.is_auto_install) || autoInstallMode,
+    installation_id: installationId,
+    source: "nuvemshop_public_api",
+    status:
+      (installData as ScriptRecord).status ||
+      verification.script?.status ||
+      existing?.status ||
+      null,
+    verified: verification.verified,
+    verified_at: new Date().toISOString(),
+  });
 
   return jsonResponse({
     installed: true,
+    installation_id: installationId,
     method: `${method}:${installResult.payload_name}`,
     ok: true,
     script: installData,
-    script_id: scriptIdForApi,
-    installation_id: installationId,
+    script_id: scriptIdForApi || String(installationId || ""),
+    verified: verification.verified,
+    verified_script: publicScriptSnapshot(verification.script),
   });
 });

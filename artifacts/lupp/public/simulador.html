@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Simulador do Widget Luup</title>
+
+    <!-- Snippet Luup (igual ao instalado via GTM na loja) -->
+    <script>
+      (function () {
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = "http://localhost:5173/widget.js";
+
+        s.setAttribute('data-store-id', "c322b7b4-22ce-4ff2-ad42-0a2cce9af325");
+        s.setAttribute('data-store', "phize");
+        s.setAttribute('data-store-name', "Phize");
+        s.setAttribute('data-store-url', "https://revendedorphize.com.br/");
+        s.setAttribute('data-widget', 'floating_launcher');
+        s.setAttribute('data-supabase-url', "https://duktrvqfbvpfajuajhci.supabase.co");
+        s.setAttribute('data-lupp-url', "http://localhost:5173");
+        s.setAttribute('data-require-active', 'true');
+
+        var firstScript = document.getElementsByTagName('script')[0];
+        firstScript.parentNode.insertBefore(s, firstScript);
+      })();
+    </script>
+
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        font-family: "Inter", -apple-system, "Segoe UI", Roboto, sans-serif;
+        background: #f7f7f8;
+        min-height: 100vh;
+      }
+      main { max-width: 1080px; margin: 0 auto; padding: 40px 20px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <!--
+        Instância "carousel" do widget: o widget.js insere o carrossel
+        imediatamente após esta tag <script> (createRoot). O tipo
+        "carousel" renderiza em qualquer rota — o tipo "home_carousel"
+        só renderiza quando o path da página é "/".
+      -->
+      <script
+        async
+        src="http://localhost:5173/widget.js"
+        data-store-id="c322b7b4-22ce-4ff2-ad42-0a2cce9af325"
+        data-store="phize"
+        data-store-name="Phize"
+        data-store-url="https://revendedorphize.com.br/"
+        data-widget="carousel"
+        data-home-carousel-enabled="true"
+        data-supabase-url="https://duktrvqfbvpfajuajhci.supabase.co"
+        data-lupp-url="http://localhost:5173"
+        data-require-active="true"
+      ></script>
+    </main>
+  </body>
+</html>

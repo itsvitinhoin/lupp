@@ -20,7 +20,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCurrentStore } from "@/hooks/useStore";
 import { integrationsService } from "@/services/integrations.service";
 import { storesService } from "@/services/stores.service";
-import { widgetsService } from "@/services/widgets.service";
+import {
+  widgetsService,
+  type NuvemshopScriptInstallResult,
+  type WidgetBootstrapProbe,
+} from "@/services/widgets.service";
 import { env } from "@/lib/env";
 import type { LuppStore } from "@/types/store";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -137,6 +141,137 @@ function hasNuvemshopScriptInstalled(settings: unknown) {
   );
 }
 
+type WidgetInstallCheck = {
+  detail?: string;
+  label: string;
+  status: "ok" | "warning" | "error";
+};
+
+function describeBootstrapError(error: string | null) {
+  if (error === "store_not_found") {
+    return "A vitrine não consegue localizar esta loja na Luup. Sincronize os produtos ou confira a URL cadastrada nas configurações.";
+  }
+  if (error === "trial_expired") {
+    return "O período de teste ou a assinatura expirou — o widget fica oculto até regularizar o billing.";
+  }
+  if (error === "no_active_widget") {
+    return "Nenhum widget ativo configurado. Ative a bolinha na aba Widgets.";
+  }
+  return error ? error.replace(/_/g, " ") : null;
+}
+
+function buildWidgetInstallChecks(
+  install: NuvemshopScriptInstallResult | null,
+  probeById: WidgetBootstrapProbe | null,
+  probeByDomain: WidgetBootstrapProbe | null,
+  hasStoreUrl: boolean,
+): WidgetInstallCheck[] {
+  const checks: WidgetInstallCheck[] = [];
+
+  if (install) {
+    if (install.verified === true) {
+      checks.push({
+        detail: "Confirmado pela API da Nuvemshop.",
+        label: "Script instalado na Nuvemshop",
+        status: "ok",
+      });
+    } else if (install.pending_manual_install || install.installed === false) {
+      checks.push({
+        detail:
+          install.message ||
+          "A Nuvemshop não confirmou o script. Verifique a aprovação do app ou instale manualmente.",
+        label: "Script instalado na Nuvemshop",
+        status: "error",
+      });
+    } else {
+      checks.push({
+        detail:
+          install.message ||
+          install.warning?.replace(/_/g, " ") ||
+          "Instalação registrada, mas sem confirmação da Nuvemshop.",
+        label: "Script instalado na Nuvemshop",
+        status: install.verified === false ? "warning" : "ok",
+      });
+    }
+  } else {
+    checks.push({
+      detail: "A instalação falhou. Veja a mensagem de erro acima.",
+      label: "Script instalado na Nuvemshop",
+      status: "error",
+    });
+  }
+
+  if (probeById) {
+    if (probeById.active) {
+      checks.push({
+        detail: "Loja ativa, billing em dia e widget configurado.",
+        label: "Widget liberado para a loja",
+        status: "ok",
+      });
+    } else {
+      checks.push({
+        detail:
+          describeBootstrapError(probeById.error) ||
+          "A vitrine não recebeu um widget ativo para esta loja.",
+        label: "Widget liberado para a loja",
+        status: probeById.error === "no_active_widget" ? "warning" : "error",
+      });
+    }
+  }
+
+  if (hasStoreUrl) {
+    if (probeByDomain?.active) {
+      checks.push({
+        detail: `Domínio resolvido pela vitrine (via ${probeByDomain.resolvedBy || "domínio"}).`,
+        label: "Loja localizável pelo domínio",
+        status: "ok",
+      });
+    } else if (probeByDomain) {
+      checks.push({
+        detail:
+          probeByDomain.error === "store_not_found"
+            ? "O domínio da loja não resolve para a Luup — rode uma sincronização de produtos ou confira a URL cadastrada."
+            : describeBootstrapError(probeByDomain.error) ||
+              "Falha ao consultar a vitrine pelo domínio.",
+        label: "Loja localizável pelo domínio",
+        status: "error",
+      });
+    }
+  } else {
+    checks.push({
+      detail:
+        "Cadastre a URL da loja nas configurações para a vitrine localizar a loja pelo domínio.",
+      label: "Loja localizável pelo domínio",
+      status: "warning",
+    });
+  }
+
+  const carouselReason =
+    probeById?.carouselDisabledReason || probeByDomain?.carouselDisabledReason;
+  if (carouselReason === "plan_widget_limit") {
+    checks.push({
+      detail:
+        "O plano atual não inclui o carrossel horizontal (disponível a partir do Growth).",
+      label: "Carrossel horizontal",
+      status: "warning",
+    });
+  } else if (carouselReason) {
+    checks.push({
+      detail: "Carrossel desativado nas configurações do widget.",
+      label: "Carrossel horizontal",
+      status: "warning",
+    });
+  } else if (probeById?.active) {
+    checks.push({
+      detail: "Liberado para renderizar quando configurado.",
+      label: "Carrossel horizontal",
+      status: "ok",
+    });
+  }
+
+  return checks;
+}
+
 function isShopifyCustomManualSettings(settings: unknown) {
   if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
     return false;
@@ -165,7 +300,6 @@ function getManualSnippet(store: LuppStore | null) {
   s.setAttribute('data-widget', 'floating_launcher');
   s.setAttribute('data-lupp-url', ${jsStringLiteral(env.appUrl)});
   s.setAttribute('data-supabase-url', ${jsStringLiteral(env.supabaseUrl)});
-  s.setAttribute('data-supabase-key', ${jsStringLiteral(env.supabaseAnonKey)});
   s.setAttribute('data-require-active', 'true');
 
   var firstScript = document.getElementsByTagName('script')[0];
@@ -189,6 +323,9 @@ export default function Integrations() {
   );
   const [installingWidgetProvider, setInstallingWidgetProvider] =
     React.useState<string | null>(null);
+  const [widgetInstallChecks, setWidgetInstallChecks] = React.useState<
+    WidgetInstallCheck[] | null
+  >(null);
   const [upzeroDialogOpen, setUpzeroDialogOpen] = React.useState(false);
   const [shopifyDialogOpen, setShopifyDialogOpen] = React.useState(false);
   const [shopifyShopDomain, setShopifyShopDomain] = React.useState("");
@@ -724,6 +861,33 @@ export default function Integrations() {
     }
   };
 
+  const runWidgetInstallProbes = async (
+    installResult: NuvemshopScriptInstallResult | null,
+  ) => {
+    if (!store) return;
+    const [probeById, probeByDomain] = await Promise.all([
+      widgetsService
+        .probeWidgetBootstrap({ storeId: store.id })
+        .catch(() => null),
+      store.url
+        ? widgetsService
+            .probeWidgetBootstrap({
+              provider: "nuvemshop",
+              storeDomain: store.url,
+            })
+            .catch(() => null)
+        : Promise.resolve(null),
+    ]);
+    setWidgetInstallChecks(
+      buildWidgetInstallChecks(
+        installResult,
+        probeById,
+        probeByDomain,
+        Boolean(store.url),
+      ),
+    );
+  };
+
   const handleInstallWidget = async (integration: Integration) => {
     const provider = getProviderKey(integration);
     if (!store || provider !== "nuvemshop") return;
@@ -731,17 +895,30 @@ export default function Integrations() {
     try {
       setInstallingWidgetProvider(provider);
       await widgetsService.ensureFloatingWidgetForProductPage(store.id);
-      await widgetsService.installNuvemshopScript(store.id);
+      const installResult = await widgetsService.installNuvemshopScript(
+        store.id,
+      );
       await queryClient.invalidateQueries({
         queryKey: ["widgets", store.id],
       });
       await integrationsQuery.refetch();
-      toast({
-        title: "Widget instalado na Nuvemshop",
-        description:
-          "A bolinha da Luup foi ativada na loja. Se já existe vídeo ativo, ela deve aparecer na vitrine em alguns instantes.",
-      });
+      await runWidgetInstallProbes(installResult);
+      if (installResult.verified === false || installResult.pending_manual_install) {
+        toast({
+          title: "Widget instalado, aguardando confirmação",
+          description:
+            installResult.message ||
+            "A Nuvemshop ainda não confirmou o script ativo. Confira o status detalhado abaixo dos cards.",
+        });
+      } else {
+        toast({
+          title: "Widget instalado na Nuvemshop",
+          description:
+            "Instalação confirmada. Confira o status detalhado abaixo dos cards de integração.",
+        });
+      }
     } catch (error) {
+      await runWidgetInstallProbes(null).catch(() => undefined);
       toast({
         title: "Não foi possível instalar o widget",
         description:
@@ -807,6 +984,46 @@ export default function Integrations() {
               );
             })}
           </div>
+
+          {widgetInstallChecks && (
+            <Card className="mt-6 border-slate-200 bg-white text-slate-950 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base text-slate-950">
+                  Status do widget na vitrine
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3 text-sm">
+                  {widgetInstallChecks.map((check) => (
+                    <li key={check.label} className="flex items-start gap-2">
+                      <span
+                        aria-hidden="true"
+                        className={
+                          check.status === "ok"
+                            ? "mt-0.5 text-emerald-600"
+                            : check.status === "warning"
+                              ? "mt-0.5 text-amber-500"
+                              : "mt-0.5 text-red-600"
+                        }
+                      >
+                        ●
+                      </span>
+                      <div>
+                        <p className="font-medium text-slate-950">
+                          {check.label}
+                        </p>
+                        {check.detail && (
+                          <p className="mt-0.5 text-slate-500">
+                            {check.detail}
+                          </p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         <div>
