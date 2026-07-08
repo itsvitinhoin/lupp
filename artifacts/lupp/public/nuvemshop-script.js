@@ -139,12 +139,6 @@
     setAttribute(widgetScript, "data-store", readConfig("lupp_store", ""));
     setAttribute(widgetScript, "data-widget", readConfig("lupp_widget", "floating_launcher"));
     setAttribute(widgetScript, "data-lupp-url", appUrl);
-    setAttribute(
-      widgetScript,
-      "data-supabase-url",
-      readConfig("lupp_supabase_url", "https://duktrvqfbvpfajuajhci.supabase.co")
-    );
-    setAttribute(widgetScript, "data-supabase-key", readConfig("lupp_supabase_key", ""));
     setAttribute(widgetScript, "data-require-active", readConfig("lupp_require_active", "true"));
     setAttribute(widgetScript, "data-load-strategy", readConfig("lupp_load_strategy", "balanced"));
     setAttribute(widgetScript, "data-preview-mode", readConfig("lupp_preview_mode", "balanced"));

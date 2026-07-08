@@ -1,5 +1,4 @@
 const LUUP_APP_URL = "https://www.playluup.com.br";
-const LUUP_SUPABASE_URL = "https://duktrvqfbvpfajuajhci.supabase.co";
 
 function cleanStoreId(value) {
   if (value === undefined || value === null) return "";
@@ -95,7 +94,6 @@ function loadLuupLoader(nube, attempt = 0) {
     script.src =
       `${LUUP_APP_URL}/nuvemshop-script.js` +
       `?lupp_url=${encodeURIComponent(LUUP_APP_URL)}` +
-      `&lupp_supabase_url=${encodeURIComponent(LUUP_SUPABASE_URL)}` +
       `&lupp_external_store_id=${encodeURIComponent(externalStoreId)}` +
       `&lupp_store_domain=${encodeURIComponent(storeDomain)}` +
       "&lupp_widget=floating_launcher" +

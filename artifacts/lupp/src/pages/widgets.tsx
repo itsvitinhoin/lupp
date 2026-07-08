@@ -292,8 +292,6 @@ export default function Widgets() {
   s.setAttribute('data-custom-pix-discount-percent', ${jsStringLiteral(customPixDiscountPercent)});
   s.setAttribute('data-custom-payment-note', ${jsStringLiteral(customPaymentNote)});
   s.setAttribute('data-require-active', 'true');
-  s.setAttribute('data-supabase-url', ${jsStringLiteral(env.supabaseUrl)});
-  s.setAttribute('data-supabase-key', ${jsStringLiteral(env.supabaseAnonKey)});
   s.setAttribute('data-lupp-url', ${jsStringLiteral(env.appUrl)});
 
   var firstScript = document.getElementsByTagName('script')[0];
@@ -325,8 +323,6 @@ export default function Widgets() {
   s.setAttribute('data-carousel-mobile-max-items', ${jsStringLiteral(carouselMobileCount)});
   s.setAttribute('data-home-experience-enabled', ${jsStringLiteral(String(homeExperienceEnabled))});
   s.setAttribute('data-require-active', 'true');
-  s.setAttribute('data-supabase-url', ${jsStringLiteral(env.supabaseUrl)});
-  s.setAttribute('data-supabase-key', ${jsStringLiteral(env.supabaseAnonKey)});
   s.setAttribute('data-lupp-url', ${jsStringLiteral(env.appUrl)});
 
   var firstScript = document.getElementsByTagName('script')[0];

@@ -531,7 +531,7 @@
     (!supabaseKey && !canUseBootstrap)
   ) {
     console.warn(
-      "[Luup] Configure data-store-id ou data-store, data-supabase-url e data-supabase-key para carregar o widget.",
+      "[Luup] Configure data-store-id, data-store ou data-store-domain para carregar o widget.",
     );
     return;
   }

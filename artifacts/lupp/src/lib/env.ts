@@ -17,9 +17,6 @@ export interface PublicEnv {
 const publicFallbackEnv: Record<string, string> = {
   VITE_BUNNY_CDN_HOSTNAME: "vz-11a4fb3b-4f0.b-cdn.net",
   VITE_BUNNY_LIBRARY_ID: "686560",
-  VITE_SUPABASE_URL: "https://duktrvqfbvpfajuajhci.supabase.co",
-  VITE_SUPABASE_ANON_KEY:
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1a3RydnFmYnZwZmFqdWFqaGNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MzkxMTUsImV4cCI6MjA5NzExNTExNX0.YIknu3rVb8BkRFENdf0PMTqqgLvOYGHslj5mcPBncNE",
   VITE_VIDEO_PROVIDER: "bunny",
 };
 
