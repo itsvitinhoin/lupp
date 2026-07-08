@@ -862,11 +862,29 @@
     );
   }
 
+  function pageTextWithoutLuppWidgets() {
+    var body = document.body;
+    if (!body) return "";
+    if (!body.querySelector("[data-lupp-widget-root],[data-lupp-feed-overlay]")) {
+      return String(body.innerText || "");
+    }
+    var clone = body.cloneNode(true);
+    var ownNodes = clone.querySelectorAll(
+      "[data-lupp-widget-root],[data-lupp-feed-overlay],script,style",
+    );
+    for (var index = 0; index < ownNodes.length; index += 1) {
+      if (ownNodes[index].parentNode) {
+        ownNodes[index].parentNode.removeChild(ownNodes[index]);
+      }
+    }
+    return String(clone.textContent || "");
+  }
+
   function inferUpzeroCustomerStatusFromPage() {
     try {
-      var text = String(
-        document.body && document.body.innerText ? document.body.innerText : "",
-      )
+      // Widget-rendered copy ("Entre ou cadastre-se para visualizar valores")
+      // must not feed this inference, or render -> infer -> re-render loops.
+      var text = pageTextWithoutLuppWidgets()
         .replace(/\s+/g, " ")
         .toLowerCase();
       if (!text) return null;
@@ -4659,11 +4677,23 @@
     if (
       isUpzeroStore(store) &&
       (!upzeroCustomerStatusCache ||
-        !upzeroCustomerStatusCache.approved ||
         Date.now() - upzeroCustomerStatusLastRefreshAt > 2500)
     ) {
+      var statusKeyBeforeRefresh = upzeroCustomerStatusCache
+        ? String(upzeroCustomerStatusCache.status) +
+          ":" +
+          String(upzeroCustomerStatusCache.approved)
+        : "";
       detectUpzeroCustomerStatus(store, { forceRefresh: true })
         .then(function () {
+          var statusKeyAfterRefresh = upzeroCustomerStatusCache
+            ? String(upzeroCustomerStatusCache.status) +
+              ":" +
+              String(upzeroCustomerStatusCache.approved)
+            : "";
+          // Only re-render on an actual status change; re-rendering
+          // unconditionally loops forever for logged-out visitors.
+          if (statusKeyAfterRefresh === statusKeyBeforeRefresh) return;
           if (root && root.parentNode) renderCarousel(root, store, videos);
         })
         .catch(function () {});
