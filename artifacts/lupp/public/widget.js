@@ -292,6 +292,11 @@
     ["lupp_widget", "widget"],
     "floating_launcher",
   ).replace(/-/g, "_");
+  var nubesdkFrameMode = readScriptValue(
+    "data-nubesdk-frame",
+    ["lupp_nubesdk_frame"],
+    "",
+  );
   var configuredProductUrl = readScriptValue(
     "data-product-url",
     ["lupp_product_url", "product_url"],
@@ -2782,6 +2787,9 @@
   }
 
   function currentPath() {
+    if (nubesdkFrameMode && configuredProductUrl) {
+      return normalizePath(configuredProductUrl);
+    }
     return normalizePath(window.location.pathname);
   }
 
@@ -3986,6 +3994,9 @@
   }
 
   function positionStyles() {
+    if (nubesdkFrameMode === "launcher") {
+      return "position:relative;z-index:1;left:0;top:0;right:auto;bottom:auto";
+    }
     var styles = ["position:fixed", "z-index:2147483000"];
     var x = launcherConfig.offsetX + "px";
     var y = launcherConfig.offsetY + "px";
@@ -4175,6 +4186,33 @@
   }
 
   function openFeedOverlay(store, videoId, fallbackVideo, productUrlOverride) {
+    if (nubesdkFrameMode) {
+      var framePreviewVideo = previewVideoFor(videoId, fallbackVideo);
+      try {
+        window.parent.postMessage(
+          {
+            type: "LUPP_NUBESDK_OPEN_FEED",
+            videoId: videoId || "",
+            productUrl: productUrlOverride || currentProductUrl(),
+            previewVideoUrl: framePreviewVideo
+              ? videoMediaUrl(framePreviewVideo)
+              : "",
+            previewPosterUrl:
+              framePreviewVideo && framePreviewVideo.thumbnail_url
+                ? framePreviewVideo.thumbnail_url
+                : "",
+          },
+          "*",
+        );
+        if (store && store.id) {
+          track(store.id, "feed_open", videoId || null, null, {
+            opened_from: "nubesdk_frame",
+          });
+        }
+      } catch (_) {}
+      return;
+    }
+
     var existing = document.querySelector("[data-lupp-feed-overlay]");
     if (existing) existing.remove();
 

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Luup</title>
+    <style>
+      html,
+      body {
+        width: 100%;
+        min-height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: transparent;
+      }
+      body[data-mode="carousel"] {
+        overflow: visible;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      (function () {
+        "use strict";
+
+        var params = new URLSearchParams(window.location.search);
+        var mode = params.get("mode") === "carousel" ? "carousel" : "launcher";
+        var externalStoreId = String(params.get("external_store_id") || "").trim();
+        var storeDomain = String(params.get("store_domain") || "").trim();
+        var pageUrl = String(params.get("page_url") || "").trim();
+        if (!externalStoreId && !storeDomain) return;
+
+        document.body.setAttribute("data-mode", mode);
+
+        function send(message) {
+          window.parent.postMessage(message, "*");
+        }
+
+        function reportSize() {
+          var root = document.querySelector("[data-lupp-widget-root]");
+          if (!root) return;
+          var rect = root.getBoundingClientRect();
+          send({
+            type: "resize",
+            width: mode === "launcher" ? Math.ceil(rect.width || 116) : undefined,
+            height: Math.ceil(Math.max(rect.height, document.body.scrollHeight, 1)),
+          });
+        }
+
+        document.addEventListener("luup:widget-rendered", function () {
+          window.setTimeout(reportSize, 80);
+          window.setTimeout(reportSize, 600);
+        });
+
+        var script = document.createElement("script");
+        script.async = true;
+        script.src = "https://www.playluup.com.br/widget.js";
+        script.setAttribute("data-widget", mode === "carousel" ? "home_carousel" : "floating_launcher");
+        script.setAttribute("data-external-store-id", externalStoreId);
+        script.setAttribute("data-store-domain", storeDomain);
+        script.setAttribute("data-product-url", pageUrl);
+        script.setAttribute("data-nubesdk-frame", mode);
+        script.setAttribute("data-lupp-url", "https://www.playluup.com.br");
+        script.setAttribute("data-require-active", "true");
+        script.setAttribute("data-offset-x", "0");
+        script.setAttribute("data-offset-y", "0");
+        script.setAttribute("data-load-strategy", "immediate");
+        document.head.appendChild(script);
+      })();
+    </script>
+  </body>
+</html>
