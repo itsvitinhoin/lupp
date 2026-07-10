@@ -554,7 +554,6 @@
   debugLog("config", {
     canUseBootstrap: canUseBootstrap,
     externalStoreId: externalStoreId,
-    hasSupabaseKey: Boolean(supabaseKey),
     luppBaseUrl: luppBaseUrl,
     requireActiveWidget: requireActiveWidget,
     storeDomain: storeDomain,
