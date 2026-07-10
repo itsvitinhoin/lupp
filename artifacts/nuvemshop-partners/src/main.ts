@@ -213,15 +213,11 @@ export function App(nube: NubeSDK) {
     nube.send("cart:add", () => ({ cart: { items } }));
   }
 
-  async function renderWidgets(state: Readonly<NubeSDKState>) {
+  function renderWidgets(state: Readonly<NubeSDKState>) {
     try {
-      const payload = await getBootstrap(state);
-      if (!payload.active) {
-        nube.clearSlot("corner_bottom_left");
-        nube.clearSlot("before_section_products_sale");
-        return;
-      }
-
+      // Render the SDK-owned frames immediately. Besides improving perceived
+      // load time, this gives the temporary legacy fallback a reliable signal
+      // that NubeSDK is active before it attempts to load the classic widget.
       const launcher = Iframe({
         id: "luup-nuvemshop-launcher",
         src: frameUrl("launcher", state),
@@ -279,7 +275,7 @@ export function App(nube: NubeSDK) {
     pendingCartRequests.splice(0);
   });
 
-  nube.on("page:loaded", (state) => void renderWidgets(state));
-  nube.on("location:updated", (state) => void renderWidgets(state));
-  void renderWidgets(nube.getState());
+  nube.on("page:loaded", (state) => renderWidgets(state));
+  nube.on("location:updated", (state) => renderWidgets(state));
+  renderWidgets(nube.getState());
 }

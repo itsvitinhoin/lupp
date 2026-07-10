@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import vm from "node:vm";
 
 globalThis.self = { __APP_DATA__: { id: "luup-test" } };
 
@@ -143,3 +144,50 @@ assert.deepEqual(iframeMessages.at(-1)?.message, {
 });
 
 console.log("NubeSDK Partners bundle: launcher, carousel, feed and cart OK");
+
+const transitionBundle = await readFile(
+  new URL("../dist/luup-nuvemshop-transition.js", import.meta.url),
+  "utf8",
+);
+assert.doesNotMatch(
+  transitionBundle,
+  /(?:service_role|supabase-key|data-supabase-key|eyJ[A-Za-z0-9_-]{20,})/,
+);
+
+function runTransition({ sdkFrame = false } = {}) {
+  const appended = [];
+  const timers = [];
+  const document = {
+    body: { appendChild: (node) => appended.push(node) },
+    documentElement: { appendChild: (node) => appended.push(node) },
+    head: { appendChild: (node) => appended.push(node) },
+    createElement() {
+      return {
+        setAttribute(name, value) {
+          this[name] = value;
+        },
+      };
+    },
+    querySelector(selector) {
+      if (selector.includes("nuvemshop-widget-frame")) {
+        return sdkFrame ? {} : null;
+      }
+      return null;
+    },
+  };
+  const window = {
+    setTimeout(callback) {
+      timers.push(callback);
+      return timers.length;
+    },
+  };
+  vm.runInNewContext(transitionBundle, { document, window });
+  timers.forEach((callback) => callback());
+  return appended;
+}
+
+assert.equal(runTransition({ sdkFrame: true }).length, 0);
+const fallbackScripts = runTransition();
+assert.equal(fallbackScripts.length, 1);
+assert.match(fallbackScripts[0].src || "", /\/nuvemshop-script\.js/);
+console.log("Nuvemshop transition: SDK guard and legacy fallback OK");
