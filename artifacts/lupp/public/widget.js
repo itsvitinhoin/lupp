@@ -2819,8 +2819,18 @@
     return configuredProductUrl || window.location.href;
   }
 
+  function isUpzeroDevelopmentHomePath(path) {
+    var host = normalizedHostname(window.location.hostname || "");
+    return /^\/\d+\/?$/.test(normalizePath(path)) && /(^|\.)upzero\.com\.br$/.test(host);
+  }
+
   function isHomePath(path) {
-    return path === "/" || path === "";
+    var normalizedPath = normalizePath(path);
+    return (
+      normalizedPath === "/" ||
+      normalizedPath === "" ||
+      isUpzeroDevelopmentHomePath(normalizedPath)
+    );
   }
 
   function isLikelyProductPath(path) {

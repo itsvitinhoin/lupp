@@ -397,12 +397,77 @@ async function scenarioUpzeroCarouselFallsBackToProductShowcase() {
   window.close();
 }
 
+async function scenarioUpzeroDevelopmentHomePathRendersCarousel() {
+  console.log("scenario: UP Zero development numeric home path renders carousel");
+  const window = makeWindow({
+    html: `<!doctype html><html><body><main>
+      <div id="hero">Banner principal</div>
+      <div id="benefits">ENTREGA PARA TODO O BRASIL EXCLUSIVO COMPRA SEM PEDIDO MÍNIMO PAGAMENTO EM ATÉ 6X PAGAMENTO NO PIX</div>
+      <script id="w" data-store-id="store-1" data-store="mx-fashion" data-widget="floating_launcher"
+        data-supabase-url="https://example.supabase.co"
+        data-lupp-url="https://www.playluup.com.br"></script>
+      </main></body></html>`,
+    url: "https://vitrine-plus.upzero.com.br/38",
+  });
+  window.fetch = (url) => {
+    const mode = new URL(String(url)).searchParams.get("mode") || "feed";
+    return Promise.resolve(
+      new Response(
+        JSON.stringify(bootstrapPayload({ mode, platform: "upzero" })),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+  };
+  runAs(window, window.document.getElementById("w"), widgetSource);
+  await sleep(2200);
+
+  check(
+    "numeric UP Zero development path is treated as home",
+    Boolean(
+      window.document.querySelector("[data-lupp-widget-root='home_carousel']"),
+    ),
+  );
+  window.close();
+}
+
+async function scenarioUpzeroDevelopmentProductPathDoesNotRenderCarousel() {
+  console.log("scenario: UP Zero development product path does not render carousel");
+  const window = makeWindow({
+    html: `<!doctype html><html><body><main>
+      <div id="hero">Produto</div>
+      <script id="w" data-store-id="store-1" data-store="mx-fashion" data-widget="floating_launcher"
+        data-supabase-url="https://example.supabase.co"
+        data-lupp-url="https://www.playluup.com.br"></script>
+      </main></body></html>`,
+    url: "https://vitrine-plus.upzero.com.br/38/produtos/ref1280-vestido-ref-1280/azul-marinho",
+  });
+  window.fetch = (url) => {
+    const mode = new URL(String(url)).searchParams.get("mode") || "feed";
+    return Promise.resolve(
+      new Response(
+        JSON.stringify(bootstrapPayload({ mode, platform: "upzero" })),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+  };
+  runAs(window, window.document.getElementById("w"), widgetSource);
+  await sleep(2200);
+
+  check(
+    "numeric UP Zero product path is not treated as home",
+    !window.document.querySelector("[data-lupp-widget-root='home_carousel']"),
+  );
+  window.close();
+}
+
 await scenarioNuvemshopRendersByDomain();
 await scenarioUnknownStoreCleansUp();
 await scenarioCarouselFollowsDbConfig();
 await scenarioLegacyCarouselDefaultsOn();
 await scenarioUpzeroCarouselUsesBenefitsAnchor();
 await scenarioUpzeroCarouselFallsBackToProductShowcase();
+await scenarioUpzeroDevelopmentHomePathRendersCarousel();
+await scenarioUpzeroDevelopmentProductPathDoesNotRenderCarousel();
 
 if (failures) {
   console.error(`\n${failures} check(s) FAILED`);
