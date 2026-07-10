@@ -34,9 +34,33 @@
     return "";
   }
 
+  // Opt-in diagnostics: set window.__LUUP_DEBUG__ = true before this script
+  // runs to trace config sources, store-id resolution and widget injection.
+  function debugLog() {
+    try {
+      if (!window.__LUUP_DEBUG__) return;
+      var args = ["[Luup:nuvemshop:debug]"];
+      for (var argIndex = 0; argIndex < arguments.length; argIndex += 1) {
+        args.push(arguments[argIndex]);
+      }
+      console.log.apply(console, args);
+    } catch (_) {}
+  }
+
   function readConfig(name, fallback) {
     var fromQuery = readQueryValue(currentScript && currentScript.src, name);
     if (fromQuery) return fromQuery;
+    // Nuvemshop pode servir o script sem os query params registrados; o
+    // NubeSDK e integrações manuais publicam a config neste global.
+    try {
+      var globalConfig = window.__LUUP_NUVEMSHOP_CONFIG__;
+      if (globalConfig && typeof globalConfig === "object") {
+        var fromGlobal = globalConfig[name];
+        if (fromGlobal !== undefined && fromGlobal !== null && String(fromGlobal) !== "") {
+          return String(fromGlobal);
+        }
+      }
+    } catch (_) {}
     return fallback || "";
   }
 
@@ -51,7 +75,12 @@
       if (window.Tiendanube && window.Tiendanube.storeId !== undefined && window.Tiendanube.storeId !== null) {
         return String(window.Tiendanube.storeId);
       }
-      var match = window.location.hostname.match(/^(\d+)\.lojavirtualnuvem\.com\.br$/i);
+      if (window.__LUUP_NUVEMSHOP_SDK_STORE_ID__) {
+        return String(window.__LUUP_NUVEMSHOP_SDK_STORE_ID__);
+      }
+      var match = window.location.hostname.match(
+        /^(\d+)\.(?:lojavirtualnuvem\.com\.br|mitiendanube\.com|tiendanube\.com)$/i,
+      );
       if (match) return match[1];
     } catch (_) {}
     return "";
@@ -99,12 +128,32 @@
     window.setTimeout(callback, 1);
   }
 
-  function removeLauncherSoon() {
-    window.setTimeout(function () {
-      if (launcher && launcher.parentNode) launcher.parentNode.removeChild(launcher);
-      launcher = null;
-    }, 2200);
+  function removeLauncherSoon(delay) {
+    window.setTimeout(
+      function () {
+        if (launcher && launcher.parentNode) launcher.parentNode.removeChild(launcher);
+        launcher = null;
+      },
+      typeof delay === "number" ? delay : 2200,
+    );
   }
+
+  // Handshake with widget.js: keep the light launcher until the real widget
+  // renders; drop it immediately when the widget aborts so no dead blue
+  // button stays on the page.
+  var widgetLifecycleSeen = false;
+
+  document.addEventListener("luup:widget-rendered", function () {
+    widgetLifecycleSeen = true;
+    debugLog("widget rendered — removing light launcher");
+    removeLauncherSoon(300);
+  });
+
+  document.addEventListener("luup:widget-aborted", function (event) {
+    widgetLifecycleSeen = true;
+    debugLog("widget aborted", (event && event.detail) || {});
+    removeLauncherSoon(0);
+  });
 
   function resolveExternalStoreId() {
     return (
@@ -143,10 +192,25 @@
     setAttribute(widgetScript, "data-load-strategy", readConfig("lupp_load_strategy", "balanced"));
     setAttribute(widgetScript, "data-preview-mode", readConfig("lupp_preview_mode", "balanced"));
 
-    widgetScript.onload = removeLauncherSoon;
+    widgetScript.onload = function () {
+      // Old cached widget.js builds do not emit lifecycle events; fall back
+      // to removing the light launcher a while after the script loads.
+      window.setTimeout(function () {
+        if (!widgetLifecycleSeen) removeLauncherSoon(0);
+      }, 8000);
+    };
     widgetScript.onerror = function () {
+      debugLog("widget.js failed to load", widgetScript.src);
       if (launcher) launcher.removeAttribute("data-lupp-loading");
     };
+
+    debugLog("injecting widget.js", {
+      externalStoreId: externalStoreId || null,
+      src: widgetScript.src,
+      storeDomain: widgetScript.getAttribute("data-store-domain") || null,
+      storeSlug: widgetScript.getAttribute("data-store") || null,
+      widget: widgetScript.getAttribute("data-widget") || null,
+    });
 
     return widgetScript;
   }
@@ -168,6 +232,11 @@
       widgetRequested = false;
       storeIdWaitStartedAt = 0;
       if (launcher) launcher.removeAttribute("data-lupp-loading");
+      debugLog("abort: store id/domain unresolved after 6s", {
+        hasLS: Boolean(window.LS),
+        hasTiendanube: Boolean(window.Tiendanube),
+        hostname: window.location.hostname,
+      });
       if (window.console && typeof window.console.warn === "function") {
         window.console.warn("[Luup] Nuvemshop store id ainda não disponível para iniciar o widget.");
       }
@@ -238,6 +307,13 @@
   }
 
   onReady(function () {
+    debugLog("loaded", {
+      externalStoreId: resolveExternalStoreId() || null,
+      ofiSafeMode: isOfiSafeMode(),
+      src: (currentScript && currentScript.src) || null,
+      storeDomain: resolveStoreDomain() || null,
+      storeSlug: readConfig("lupp_store", "") || null,
+    });
     createLightLauncher();
     bindIntentEvents();
     scheduleAutoRequest();

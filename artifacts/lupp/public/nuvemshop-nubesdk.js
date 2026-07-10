@@ -87,6 +87,24 @@ function loadLuupLoader(nube, attempt = 0) {
   window.__LUUP_NUVEMSHOP_SDK_LOADER_REQUESTED__ = true;
   window.__LUUP_NUVEMSHOP_SDK_STORE_ID__ = externalStoreId;
 
+  // Config fallback consumed by nuvemshop-script.js readConfig — survives
+  // Nuvemshop stripping or reordering the script URL query params.
+  window.__LUUP_NUVEMSHOP_CONFIG__ = Object.assign(
+    {},
+    window.__LUUP_NUVEMSHOP_CONFIG__ || {},
+    {
+      lupp_auto_load_delay: "1800",
+      lupp_external_store_id: externalStoreId || "",
+      lupp_load_strategy: "balanced",
+      lupp_ofi: "true",
+      lupp_require_active: "true",
+      lupp_store_domain: storeDomain || "",
+      lupp_supabase_url: LUUP_SUPABASE_URL,
+      lupp_url: LUUP_APP_URL,
+      lupp_widget: "floating_launcher",
+    },
+  );
+
   scheduleLuupLoader(() => {
     const script = document.createElement("script");
     script.async = true;
