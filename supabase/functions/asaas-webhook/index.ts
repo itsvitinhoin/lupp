@@ -58,19 +58,21 @@ Deno.serve(async (req) => {
   }
 
   const webhookToken = String(Deno.env.get("ASAAS_WEBHOOK_TOKEN") || "").trim();
-  if (webhookToken) {
-    const authorization = req.headers
-      .get("authorization")
-      ?.replace(/^Bearer\s+/i, "");
-    const received =
-      req.headers.get("asaas-access-token") ||
-      req.headers.get("access_token") ||
-      req.headers.get("x-asaas-token") ||
-      authorization ||
-      "";
-    if (String(received).trim() !== webhookToken) {
-      return jsonResponse({ error: "invalid_webhook_token" }, 401);
-    }
+  if (!webhookToken) {
+    return jsonResponse({ error: "missing_asaas_webhook_token" }, 500);
+  }
+
+  const authorization = req.headers
+    .get("authorization")
+    ?.replace(/^Bearer\s+/i, "");
+  const received =
+    req.headers.get("asaas-access-token") ||
+    req.headers.get("access_token") ||
+    req.headers.get("x-asaas-token") ||
+    authorization ||
+    "";
+  if (String(received).trim() !== webhookToken) {
+    return jsonResponse({ error: "invalid_webhook_token" }, 401);
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");

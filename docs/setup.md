@@ -93,13 +93,25 @@ O MVP inclui `artifacts/lupp/public/widget.js`.
 Exemplo local:
 
 ```html
-<script
-  src="http://localhost:5173/widget.js"
-  data-store="bella-moda"
-  data-widget="home-showcase"
-  data-supabase-url="https://PROJECT.supabase.co"
-  data-supabase-key="sb_publishable_xxx"
-></script>
+<script>
+(function () {
+  var s = document.createElement("script");
+  s.async = true;
+  s.src = "https://www.playluup.com.br/widget.js";
+  s.setAttribute("data-store-id", "ID_DA_LOJA_LUUP");
+  s.setAttribute("data-store", "slug-da-loja");
+  s.setAttribute("data-store-name", "Nome da loja");
+  s.setAttribute("data-store-url", "https://loja.com.br/");
+  s.setAttribute("data-widget", "floating_launcher");
+  s.setAttribute("data-lupp-url", "https://www.playluup.com.br");
+  s.setAttribute("data-require-active", "true");
+
+  var firstScript = document.getElementsByTagName("script")[0];
+  firstScript.parentNode.insertBefore(s, firstScript);
+})();
+</script>
 ```
 
-Em produção, prefira injetar `window.LUPP_SUPABASE_URL` e `window.LUPP_SUPABASE_ANON_KEY` no script servido pela Lupp para que o lojista use apenas `data-store` e `data-widget`.
+Em produção, o lojista não deve colar chaves de Supabase, UP Zero, Shopify,
+Asaas ou Bunny no HTML da loja. O `widget.js` resolve a configuração pública pelo
+bootstrap da Luup e qualquer chamada sensível deve passar por Edge Functions.

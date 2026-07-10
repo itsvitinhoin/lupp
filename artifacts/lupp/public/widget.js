@@ -271,12 +271,7 @@
   var supabaseUrl = readScriptValue(
     "data-supabase-url",
     ["lupp_supabase_url", "supabase_url"],
-    window.LUPP_SUPABASE_URL || "",
-  );
-  var supabaseKey = readScriptValue(
-    "data-supabase-key",
-    ["lupp_supabase_key", "supabase_key"],
-    window.LUPP_SUPABASE_ANON_KEY || "",
+    window.LUPP_SUPABASE_URL || "https://duktrvqfbvpfajuajhci.supabase.co",
   );
   var luppBaseUrl = readScriptValue(
     "data-lupp-url",
@@ -305,14 +300,6 @@
       ["store_domain", "lupp_store_domain", "domain", "hostname"],
       window.location.hostname || "",
     ),
-  );
-  var upzeroStorefrontKey = readScriptValue(
-    "data-upzero-storefront-key",
-    ["upzero_storefront_key", "storefront_key", "upzero_api_key", "x_api_key"],
-    window.UPZERO_STOREFRONT_API_KEY ||
-      window.UPZERO_API_KEY ||
-      window.__UPZERO_STOREFRONT_KEY__ ||
-      "",
   );
   var upzeroConfig = {};
 
@@ -528,7 +515,7 @@
   if (
     (!storeId && !storeSlug && !externalStoreId && !storeDomain) ||
     !supabaseUrl ||
-    (!supabaseKey && !canUseBootstrap)
+    !canUseBootstrap
   ) {
     console.warn(
       "[Luup] Configure data-store-id, data-store ou data-store-domain para carregar o widget.",
@@ -536,13 +523,10 @@
     return;
   }
 
-  var apiBase = supabaseUrl.replace(/\/$/, "") + "/rest/v1";
   var bootstrapBase =
     supabaseUrl.replace(/\/$/, "") + "/functions/v1/lupp-widget-bootstrap";
-  var headers = {
-    apikey: supabaseKey,
-    Authorization: "Bearer " + supabaseKey,
-  };
+  var upzeroProxyBase =
+    supabaseUrl.replace(/\/$/, "") + "/functions/v1/upzero-storefront-proxy";
 
   function ensureVisitorId() {
     var key = "lupp_visitor_id";
@@ -918,6 +902,34 @@
     );
   }
 
+  function upzeroProxyHeaders() {
+    var headers = {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    };
+    var authToken = readUpzeroAuthToken();
+    if (authToken) headers.Authorization = "Bearer " + authToken;
+    return headers;
+  }
+
+  function upzeroProxyRequest(action, body, signal) {
+    if (!activeStore || !activeStore.id) {
+      return Promise.reject(new Error("upzero_store_not_ready"));
+    }
+    var payload = body && typeof body === "object" ? body : {};
+    payload.action = action;
+    payload.store_id = activeStore.id;
+
+    return fetch(upzeroProxyBase, {
+      body: JSON.stringify(payload),
+      cache: "no-store",
+      credentials: "omit",
+      headers: upzeroProxyHeaders(),
+      method: "POST",
+      signal: signal,
+    });
+  }
+
   function detectUpzeroCustomerStatus(store, options) {
     var forceRefresh = Boolean(options && options.forceRefresh);
     if (!isUpzeroStore(store)) {
@@ -973,22 +985,19 @@
       var timeout = window.setTimeout(function () {
         if (controller) controller.abort();
       }, 4000);
-      var headers = { Accept: "application/json" };
-      if (upzeroStorefrontKey) headers["X-API-Key"] = upzeroStorefrontKey;
-      if (authToken) headers.Authorization = "Bearer " + authToken;
 
-      return fetch("https://api.upzero.com.br/v1/clients/me", {
-        credentials: authToken ? "omit" : "include",
-        headers: headers,
-        signal: controller ? controller.signal : undefined,
-      })
+      return upzeroProxyRequest(
+        "customer_status",
+        {},
+        controller ? controller.signal : undefined,
+      )
         .then(function (response) {
           window.clearTimeout(timeout);
           if (response.status === 401) {
             return {
               approved: false,
               loggedIn: false,
-              source: authToken ? "bearer" : "storefront",
+              source: authToken ? "bearer_proxy" : "storefront_proxy",
               status: "UNAUTHENTICATED",
             };
           }
@@ -1002,7 +1011,7 @@
             return {
               approved: isApprovedCustomerStatus(status),
               loggedIn: true,
-              source: authToken ? "bearer" : "storefront",
+              source: authToken ? "bearer_proxy" : "storefront_proxy",
               status: status || "UNKNOWN",
             };
           });
@@ -1734,23 +1743,7 @@
     pendingStorefrontCartDetail = detail;
   }
 
-  function upzeroCartApiHeaders(options) {
-    var includeStorefrontKey = Boolean(options && options.includeStorefrontKey);
-    var headers = {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    };
-    if (includeStorefrontKey && upzeroStorefrontKey) {
-      headers["X-API-Key"] = upzeroStorefrontKey;
-      headers["x-api-key"] = upzeroStorefrontKey;
-    }
-    var authToken = readUpzeroAuthToken();
-    if (authToken) headers.Authorization = "Bearer " + authToken;
-    return headers;
-  }
-
   function addUpzeroItemsToCartApi(items, storefrontStoreId, sessionId) {
-    var headers = upzeroCartApiHeaders({ includeStorefrontKey: true });
     var snakeItems = items.map(function (item) {
       var payload = {
         product_variant_id: item.productVariantId,
@@ -1789,12 +1782,10 @@
     ];
 
     function postPayload(payload) {
-      return fetch("https://api.upzero.com.br/v1/cart/batch", {
-        body: JSON.stringify(payload),
-        cache: "no-store",
-        credentials: "omit",
-        headers: headers,
-        method: "POST",
+      return upzeroProxyRequest("cart_batch", {
+        payloads: [payload],
+        session_id: sessionId || null,
+        storefront_store_id: storefrontStoreId,
       }).then(function (response) {
         return response
           .text()
@@ -3448,21 +3439,9 @@
       ),
     };
 
-    if (!supabaseKey) {
-      fetch(bootstrapBase, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }).catch(function () {});
-      return;
-    }
-
-    fetch(apiBase + "/analytics_events", {
+    fetch(bootstrapBase, {
       method: "POST",
-      headers: Object.assign(
-        { "Content-Type": "application/json", Prefer: "return=minimal" },
-        headers,
-      ),
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     }).catch(function () {});
   }
@@ -4716,9 +4695,6 @@
             return;
           }
 
-          if (!upzeroStorefrontKey && payload.upzero_storefront_key) {
-            upzeroStorefrontKey = String(payload.upzero_storefront_key);
-          }
           if (payload.upzero_config && typeof payload.upzero_config === "object") {
             upzeroConfig = payload.upzero_config;
             store.upzero_config = upzeroConfig;

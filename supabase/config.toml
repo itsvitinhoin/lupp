@@ -3,6 +3,9 @@ project_id = "duktrvqfbvpfajuajhci"
 [functions.lupp-widget-bootstrap]
 verify_jwt = false
 
+[functions.upzero-storefront-proxy]
+verify_jwt = false
+
 [functions.nuvemshop-oauth-callback]
 verify_jwt = false
 

@@ -329,7 +329,17 @@ async function findStore(
 }
 
 function mappedWidgetType(type: string) {
-  return type === "floating_launcher" ? "floating_video" : type;
+  if (
+    type === "floating_launcher" ||
+    type === "home_carousel" ||
+    type === "horizontal_feed" ||
+    type === "home_video_carousel" ||
+    type === "carousel" ||
+    type === "video_carousel"
+  ) {
+    return "floating_video";
+  }
+  return type;
 }
 
 function allowsHorizontalFeed(planId: unknown) {
@@ -532,7 +542,6 @@ Deno.serve(async (req) => {
     videos = data ?? [];
   }
 
-  let upzeroStorefrontKey: string | null = null;
   let upzeroConfig: Record<string, unknown> | null = null;
   if (String(store.platform || "").toLowerCase() === "upzero") {
     const { data: integration } = await supabase
@@ -584,12 +593,6 @@ Deno.serve(async (req) => {
         storefront_store_id: storefrontStoreId,
         storefront_url: storefrontUrl,
       };
-      const { data: secret } = await supabase
-        .from("integration_secrets")
-        .select("access_token")
-        .eq("integration_id", integration.id)
-        .maybeSingle();
-      upzeroStorefrontKey = secret?.access_token || null;
     }
   }
 
@@ -598,7 +601,6 @@ Deno.serve(async (req) => {
     mode,
     store,
     upzero_config: upzeroConfig,
-    upzero_storefront_key: upzeroStorefrontKey,
     videos: videos ?? [],
     widget: effectiveWidget,
   });

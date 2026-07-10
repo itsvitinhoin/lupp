@@ -1,118 +1,135 @@
-# Arquitetura Lupp MVP
+# Arquitetura Luup
 
-## Visão geral
+## Visao Geral
 
-A Lupp segue React + TypeScript + Vite no frontend, Supabase para Auth, PostgreSQL, Storage e RLS, e uma camada de services em `artifacts/lupp/src/services`.
+A Luup e uma plataforma de video commerce com experiencia de feed vertical, bolinha flutuante e carrossel horizontal dentro do e-commerce do cliente.
 
-O objetivo desta base é permitir migração progressiva dos mocks para dados reais sem reescrever a interface existente.
+A base atual usa:
+
+- React, TypeScript e Vite no admin em `artifacts/lupp`.
+- Supabase Auth, Postgres, Edge Functions e metadados operacionais.
+- Bunny Stream/CDN como provider principal de video.
+- Scripts publicos em `artifacts/lupp/public` para rodar dentro das lojas.
+- Edge Functions como fronteira obrigatoria entre navegador e APIs privadas de provedores.
+
+## Principios
+
+- Nenhuma chave privada pode sair do servidor.
+- O widget nunca chama APIs administrativas de provedores diretamente.
+- Toda integracao precisa ter um contrato separado para conectar, sincronizar catalogo, validar sessao/preco, adicionar ao carrinho e receber webhooks.
+- Novas funcionalidades devem passar por `security:scan`, `integration:audit`, typecheck e build antes de deploy.
 
 ## Camadas
 
-- `src/lib`: env, constantes e client Supabase.
-- `src/types`: contratos de banco e domínio.
-- `src/services`: operações de auth, loja, vídeos, produtos, comentários, analytics, widgets, billing e integrações.
-- `src/hooks`: hooks React Query/Auth para ligar services às páginas.
-- `supabase/migrations`: schema, seed, RLS e storage.
-- `public/widget.js`: widget leve em JavaScript puro para embed.
+- `artifacts/lupp/src/lib`: env, constantes e client Supabase do admin.
+- `artifacts/lupp/src/types`: contratos de banco e dominio.
+- `artifacts/lupp/src/services`: operacoes de auth, lojas, videos, produtos, analytics, billing e integracoes.
+- `artifacts/lupp/src/hooks`: hooks React que ligam services as paginas.
+- `artifacts/lupp/public/widget.js`: runtime publico do widget.
+- `artifacts/lupp/public/nuvemshop-*.js`: scripts aprovados/auxiliares da Nuvemshop.
+- `supabase/functions`: fronteira server-side para providers, billing, widgets e integracoes.
+- `supabase/migrations`: schema, RLS, storage e seeds.
 
-## Tabelas principais
+## Widget Publico
 
-- `profiles`
-- `stores`
-- `store_members`
-- `products`
-- `videos`
-- `video_products`
-- `widgets`
-- `custom_pages`
-- `custom_page_videos`
-- `comments`
-- `video_likes`
-- `analytics_events`
-- `integrations`
-- `plans`
-- `subscriptions`
-- `feed_settings`
+O `widget.js` deve ser tratado como codigo publico e nao confiavel. Ele pode:
 
-## Autenticação
+- Ler atributos publicos do script, como `data-store-id`, `data-store` e `data-store-url`.
+- Chamar `lupp-widget-bootstrap` para carregar configuracao publica da loja, videos ativos e widgets liberados.
+- Chamar `upzero-storefront-proxy` para fluxos UP Zero que exigem credenciais ou normalizacao de sessao.
+- Registrar eventos publicos de analytics por fronteiras controladas.
 
-O fluxo preparado é:
+O `widget.js` nao pode:
 
-1. cadastro por e-mail/senha via Supabase Auth;
-2. upsert de `profiles`;
-3. onboarding cria `stores`, `store_members`, trial em `subscriptions`, widgets padrão, página padrão e `feed_settings`;
-4. rotas privadas passam a depender de `AuthProvider` e da loja atual.
+- Receber `data-supabase-key`.
+- Montar `X-API-Key` de provedores.
+- Ler `integration_secrets`.
+- Chamar Supabase REST diretamente.
+- Conter tokens Shopify, Asaas, Bunny, UP Zero ou service role.
 
-## Upload
+## Videos
 
-`VideoStorageProvider` define a interface comum. O provider ativo é `SupabaseVideoProvider`.
+Bunny Stream/CDN e o provider principal para upload, processamento e playback.
 
-Providers Bunny Stream e Cloudflare Stream existem como placeholders seguros, sem credenciais hardcoded e sem comportamento inventado.
+Supabase armazena metadados, relacionamentos, status, produtos vinculados, metricas e configuracoes. Videos antigos em Supabase Storage devem ser migrados/removidos com Storage API, nunca por delete direto nas tabelas internas do storage.
 
-## Feed público
+Funcoes relevantes:
 
-O feed público deve buscar `stores` ativas por slug, vídeos ativos com `is_feed_enabled`, produtos linkados e registrar eventos em `analytics_events`.
+- `bunny-upload-video`
+- `bunny-video-status`
+- `bunny-delete-video`
 
-Visitantes usam:
+## Integracoes
 
-- `localStorage.lupp_visitor_id`;
-- `sessionStorage.lupp_session_id`.
+Cada integracao tem um adapter com responsabilidades explicitas:
 
-## Widgets
+- Conexao: OAuth, token manual, app personalizado ou API key.
+- Sync: produtos, imagens, variantes, estoque, URLs canonicas e dados comerciais permitidos.
+- Runtime: status de login, visibilidade de preco, carrinho e redirecionamentos.
+- Webhooks: privacidade, produto, estoque, preco, pedido e billing quando aplicavel.
 
-`widget.js` usa a REST API do Supabase com RLS. Widgets planejados:
+Integracoes ativas:
 
-- Product Video;
-- Home Showcase;
-- Floating Video;
-- Stories Bar;
-- Collection Feed.
-
-O script registra `widget_view` e `video_view`; os próximos passos adicionam `product_click` e deep links por produto.
+- UP Zero: B2B, preco condicionado a login/aprovacao e carrinho via proxy Luup.
+- Nuvemshop: B2C, script oficial aprovado e carrinho pela camada publica/NubeSDK.
+- Shopify: B2C, OAuth publico ou app customizado, sync server-side e carrinho via storefront/theme.
+- Asaas: billing da Luup, sempre server-side.
+- Bunny: videos, sempre server-side para escrita e CDN publico para leitura.
 
 ## Analytics
 
-Eventos são salvos em `analytics_events`. O dashboard calcula:
+Eventos sao registrados em `analytics_events` e agregados no dashboard. Metricas principais:
 
-- views;
+- impressoes da bolinha;
+- aberturas do feed;
+- views de video;
 - cliques em produto;
-- CTR;
-- add to cart;
-- receita apenas quando `metadata.value` existir;
-- likes;
-- comentários pendentes;
-- vídeos ativos.
+- adicoes ao carrinho;
+- checkout iniciado quando a integracao permitir;
+- tempo medio na experiencia;
+- feedbacks, estrelas e comentarios.
+
+Conversoes finais so devem aparecer como metrica ativa quando a integracao realmente permitir atribuicao de compra.
 
 ## Planos
 
-Planos seedados:
+Os limites devem ser validados por uso real da loja:
 
-- Start: R$149, 30 vídeos, 5k views, 1 widget.
-- Growth: R$199, 80 vídeos, 20k views, 5 widgets.
-- Pro: R$299, 200 vídeos, 60k views.
-- Scale: R$499, 500 vídeos, 150k views.
+- videos ativos;
+- views mensais;
+- widgets ativos;
+- funcionalidades avancadas.
 
-`billingService` concentra cálculo de uso e bloqueios básicos.
+O plano Starter permite 1 widget ativo. Usar bolinha flutuante e carrossel horizontal simultaneamente exige Growth ou superior.
 
-## Segurança
+## Billing
 
-- RLS está ativa nas tabelas expostas.
-- Usuários autenticados só acessam lojas nas quais são membros.
-- Dados públicos exigem loja e vídeo ativos.
-- Comentários públicos entram como `pending`.
-- Eventos públicos são inseríveis apenas para lojas ativas.
-- Chaves secretas não entram no frontend.
+Asaas e a fonte de cobranca da Luup. Criacao, troca, downgrade, cancelamento e webhooks devem ficar centralizados nas Edge Functions de billing.
 
-## Integrações futuras
+Funcoes relevantes:
 
-As integrações de e-commerce implementam `EcommerceIntegration` e começam como placeholders:
+- `asaas-create-subscription`
+- `asaas-change-plan`
+- `asaas-cancel-subscription`
+- `asaas-webhook`
 
-- Nuvemshop
-- Shopify
-- WooCommerce
-- Tray
-- Yampi
-- Loja Integrada
-- VTEX
+O webhook do Asaas deve exigir `ASAAS_WEBHOOK_TOKEN`.
 
-Tracking GA4, Meta Pixel, TikTok Pixel e Webhook deve salvar settings no banco e disparar eventos apenas quando configurado.
+## Guardrails
+
+Comandos locais:
+
+```bash
+pnpm run security:scan
+pnpm run integration:audit
+pnpm run quality:check
+pnpm run build
+```
+
+GitHub Actions:
+
+- `Quality Gates`: roda em push/PR para `main`.
+- `Integration Audit`: roda manualmente e a cada 6 horas.
+- `Production Smoke`: monitora landing, widget e rotas publicas em producao.
+
+Quando uma integracao falhar, a primeira pergunta deve ser: o contrato dela quebrou ou o provider mudou comportamento?
