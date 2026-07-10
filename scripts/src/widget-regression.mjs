@@ -72,10 +72,26 @@ const DEMO_VIDEO = {
   thumbnail_url: "https://cdn.example.com/v.jpg",
   is_feed_enabled: true,
   is_product_page_enabled: true,
-  video_products: [],
+  video_products: [
+    {
+      products: {
+        id: "p1",
+        name: "Vestido Ref: 1280",
+        price: "269.00",
+        product_url:
+          "https://revendedorphize.com.br/produtos/ref1280-vestido-ref-1280/azul-marinho",
+        image_url: "https://cdn.example.com/p.jpg",
+      },
+    },
+  ],
 };
 
-function bootstrapPayload({ carouselEnabled = true, mode, videoCount = 3 }) {
+function bootstrapPayload({
+  carouselEnabled = true,
+  mode,
+  videoCount = 3,
+  platform = "nuvemshop",
+}) {
   return {
     active: true,
     mode,
@@ -85,7 +101,7 @@ function bootstrapPayload({ carouselEnabled = true, mode, videoCount = 3 }) {
       slug: "demo",
       button_color: "#006BFF",
       status: "active",
-      platform: "nuvemshop",
+      platform,
       url: "https://demo.com.br",
       plan_id: "growth",
     },
@@ -111,6 +127,12 @@ function bootstrapPayload({ carouselEnabled = true, mode, videoCount = 3 }) {
       },
     },
   };
+}
+
+function bootstrapPayloadWithoutCarousel({ mode, videoCount = 3 }) {
+  const payload = bootstrapPayload({ mode, videoCount });
+  delete payload.widget.settings.carousel;
+  return payload;
 }
 
 function mockBootstrapFetch(window, { matchDomain }) {
@@ -258,9 +280,129 @@ async function scenarioCarouselFollowsDbConfig() {
   }
 }
 
+async function scenarioLegacyCarouselDefaultsOn() {
+  console.log("scenario: legacy widget settings default carousel on");
+  const window = makeWindow({
+    html: `<!doctype html><html><body><main>
+      <script id="w" data-store="demo" data-widget="floating_launcher"
+        data-supabase-url="https://example.supabase.co"
+        data-lupp-url="https://www.playluup.com.br"></script>
+      </main></body></html>`,
+    url: "https://demo.com.br/",
+  });
+  window.fetch = (url) => {
+    const mode = new URL(String(url)).searchParams.get("mode") || "feed";
+    return Promise.resolve(
+      new Response(JSON.stringify(bootstrapPayloadWithoutCarousel({ mode })), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+  };
+  runAs(window, window.document.getElementById("w"), widgetSource);
+  await sleep(3200);
+
+  check(
+    "missing settings.carousel still renders carousel cards",
+    window.document.querySelectorAll(".lupp-home-carousel-product").length > 0,
+  );
+  window.close();
+}
+
+async function scenarioUpzeroCarouselUsesBenefitsAnchor() {
+  console.log("scenario: UP Zero carousel is inserted after benefits bar");
+  const window = makeWindow({
+    html: `<!doctype html><html><body><main>
+      <div id="hero">Banner principal</div>
+      <div id="benefits">ENTREGA PARA TODO O BRASIL EXCLUSIVO COMPRA SEM PEDIDO MÍNIMO PAGAMENTO EM ATÉ 6X PAGAMENTO NO PIX</div>
+      <div id="first-showcase">
+        <h2>Vestidos em destaque</h2>
+        <a href="/produtos/ref1280-vestido-ref-1280/azul-marinho">Vestido Ref: 1280</a>
+      </div>
+      <script id="w" data-store="demo" data-widget="floating_launcher"
+        data-supabase-url="https://example.supabase.co"
+        data-lupp-url="https://www.playluup.com.br"></script>
+      </main></body></html>`,
+    url: "https://revendedorphize.com.br/",
+  });
+  window.fetch = (url) => {
+    const mode = new URL(String(url)).searchParams.get("mode") || "feed";
+    return Promise.resolve(
+      new Response(
+        JSON.stringify(bootstrapPayload({ mode, platform: "upzero" })),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+  };
+  runAs(window, window.document.getElementById("w"), widgetSource);
+  await sleep(2200);
+
+  const benefits = window.document.getElementById("benefits");
+  const carousel = window.document.querySelector(
+    "[data-lupp-widget-root='home_carousel']",
+  );
+  check("UP Zero carousel rendered", Boolean(carousel));
+  check(
+    "UP Zero carousel appears right after the benefits bar",
+    benefits?.nextElementSibling === carousel,
+  );
+  check(
+    "UP Zero carousel does not fall back to the top of main",
+    window.document.querySelector("main")?.firstElementChild?.id === "hero",
+  );
+  window.close();
+}
+
+async function scenarioUpzeroCarouselFallsBackToProductShowcase() {
+  console.log("scenario: UP Zero carousel falls back before product showcase");
+  const window = makeWindow({
+    html: `<!doctype html><html><body><main>
+      <div id="hero">Banner principal</div>
+      <div id="promo">Novidades da marca</div>
+      <div id="first-showcase">
+        <h2>Vestidos em destaque</h2>
+        <a href="/produtos/ref1280-vestido-ref-1280/azul-marinho">Vestido Ref: 1280</a>
+      </div>
+      <script id="w" data-store="demo" data-widget="floating_launcher"
+        data-supabase-url="https://example.supabase.co"
+        data-lupp-url="https://www.playluup.com.br"></script>
+      </main></body></html>`,
+    url: "https://useceleb.com.br/",
+  });
+  window.fetch = (url) => {
+    const mode = new URL(String(url)).searchParams.get("mode") || "feed";
+    return Promise.resolve(
+      new Response(
+        JSON.stringify(bootstrapPayload({ mode, platform: "upzero" })),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+  };
+  runAs(window, window.document.getElementById("w"), widgetSource);
+  await sleep(2200);
+
+  const showcase = window.document.getElementById("first-showcase");
+  const carousel = window.document.querySelector(
+    "[data-lupp-widget-root='home_carousel']",
+  );
+  check("UP Zero fallback carousel rendered", Boolean(carousel));
+  check(
+    "UP Zero fallback carousel appears before first product showcase",
+    showcase?.previousElementSibling === carousel,
+  );
+  check(
+    "UP Zero fallback keeps hero as first content",
+    window.document.querySelector("main")?.firstElementChild?.id === "hero",
+  );
+  window.close();
+}
+
 await scenarioNuvemshopRendersByDomain();
 await scenarioUnknownStoreCleansUp();
 await scenarioCarouselFollowsDbConfig();
+await scenarioLegacyCarouselDefaultsOn();
+await scenarioUpzeroCarouselUsesBenefitsAnchor();
+await scenarioUpzeroCarouselFallsBackToProductShowcase();
 
 if (failures) {
   console.error(`\n${failures} check(s) FAILED`);

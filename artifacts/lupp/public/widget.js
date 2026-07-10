@@ -508,7 +508,7 @@
       readScriptValue(
         "data-home-carousel-enabled",
         ["lupp_home_carousel_enabled"],
-        "false",
+        "true",
       ) !== "false",
     beforeHeading: readScriptValue(
       "data-carousel-before-heading",
@@ -3599,6 +3599,50 @@
     return element;
   }
 
+  function hasAncestorTag(element, tags) {
+    var node = element;
+    while (node && node !== document.body && node !== document.documentElement) {
+      var tagName = node.tagName ? node.tagName.toLowerCase() : "";
+      for (var index = 0; index < tags.length; index += 1) {
+        if (tagName === tags[index]) return true;
+      }
+      node = node.parentNode;
+    }
+    return false;
+  }
+
+  function closestHomeBlock(element) {
+    var main = document.querySelector("main, #MainContent, [role='main']");
+    var node = element;
+    while (node && node !== document.body && node !== document.documentElement) {
+      var tagName = node.tagName ? node.tagName.toLowerCase() : "";
+      var signature = normalizeText(
+        (node.id || "") + " " + (node.className || ""),
+      );
+      if (
+        tagName === "section" ||
+        tagName === "article" ||
+        tagName === "ul" ||
+        tagName === "ol" ||
+        (main && node.parentNode === main) ||
+        signature.indexOf("vitrine") !== -1 ||
+        signature.indexOf("showcase") !== -1 ||
+        signature.indexOf("benefit") !== -1 ||
+        signature.indexOf("beneficio") !== -1 ||
+        signature.indexOf("vantag") !== -1 ||
+        signature.indexOf("inform") !== -1 ||
+        signature.indexOf("product") !== -1 ||
+        signature.indexOf("produto") !== -1 ||
+        signature.indexOf("collection") !== -1 ||
+        signature.indexOf("shelf") !== -1
+      ) {
+        return node;
+      }
+      node = node.parentNode;
+    }
+    return element;
+  }
+
   function closestShopifySection(element) {
     var node = element;
     while (node && node !== document.body && node !== document.documentElement) {
@@ -3659,6 +3703,53 @@
     return null;
   }
 
+  function findUpzeroProductShowcaseSection() {
+    var productLinks = document.querySelectorAll("a[href*='/produtos/']");
+    for (var linkIndex = 0; linkIndex < productLinks.length; linkIndex += 1) {
+      if (hasAncestorTag(productLinks[linkIndex], ["header", "nav", "footer"])) continue;
+      var linkBlock = closestHomeBlock(productLinks[linkIndex]);
+      if (linkBlock && linkBlock !== document.body && linkBlock !== document.documentElement) {
+        return linkBlock;
+      }
+    }
+
+    var selectors = [
+      "[class*='vitrine']",
+      "[id*='vitrine']",
+      "[class*='showcase']",
+      "[id*='showcase']",
+      "[class*='shelf']",
+      "[id*='shelf']",
+      "[class*='collection']",
+      "[id*='collection']",
+      "[class*='product-list']",
+      "[class*='product-grid']",
+      "[class*='product-card']",
+      "[class*='produto-list']",
+      "[class*='produto-grid']",
+      "[class*='produto-card']",
+    ];
+
+    for (var index = 0; index < selectors.length; index += 1) {
+      var target = document.querySelector(selectors[index]);
+      if (!target || hasAncestorTag(target, ["header", "nav", "footer"])) continue;
+      var block = closestHomeBlock(target);
+      var hasProductLink =
+        target.matches("a[href*='/produtos/']") ||
+        (block && block.querySelector && block.querySelector("a[href*='/produtos/']"));
+      if (
+        hasProductLink &&
+        block &&
+        block !== document.body &&
+        block !== document.documentElement
+      ) {
+        return block;
+      }
+    }
+
+    return null;
+  }
+
   function findCarouselAnchorBySelector() {
     var selector = String(carouselConfig.anchorSelector || "").trim();
     if (!selector) return null;
@@ -3705,16 +3796,67 @@
   }
 
   function findHomeBenefitsSection() {
-    var sections = document.querySelectorAll("section");
-    for (var index = 0; index < sections.length; index += 1) {
-      var text = normalizeText(sections[index].textContent);
+    var candidates = [];
+    var seen = [];
+    var selectors = [
+      "section",
+      "main > div",
+      "main > ul",
+      "main > nav",
+      "[class]",
+      "[id]",
+    ];
+
+    function addCandidate(candidate) {
+      if (!candidate || candidate === document.body || candidate === document.documentElement) {
+        return;
+      }
+      if (seen.indexOf(candidate) !== -1) return;
+      seen.push(candidate);
+      candidates.push(candidate);
+    }
+
+    for (var selectorIndex = 0; selectorIndex < selectors.length; selectorIndex += 1) {
+      var nodes = document.querySelectorAll(selectors[selectorIndex]);
+      for (var nodeIndex = 0; nodeIndex < nodes.length; nodeIndex += 1) {
+        addCandidate(nodes[nodeIndex]);
+      }
+    }
+
+    for (var index = 0; index < candidates.length; index += 1) {
+      var candidate = candidates[index];
+      if (hasAncestorTag(candidate, ["header", "nav", "footer"])) continue;
+      var text = normalizeText(candidate.textContent);
+      if (text.length < 12 || text.length > 1500) continue;
+
+      var score = 0;
       if (
-        text.indexOf("entrega") !== -1 &&
-        text.indexOf("exclusivo") !== -1 &&
-        text.indexOf("pagamento") !== -1 &&
-        text.indexOf("pix") !== -1
+        text.indexOf("entrega") !== -1 ||
+        text.indexOf("frete") !== -1 ||
+        text.indexOf("envio") !== -1
       ) {
-        return sections[index];
+        score += 1;
+      }
+      if (
+        text.indexOf("exclusivo") !== -1 ||
+        text.indexOf("pedido") !== -1 ||
+        text.indexOf("mínimo") !== -1 ||
+        text.indexOf("minimo") !== -1
+      ) {
+        score += 1;
+      }
+      if (
+        text.indexOf("pagamento") !== -1 ||
+        text.indexOf("parcela") !== -1 ||
+        text.indexOf("cartão") !== -1 ||
+        text.indexOf("cartao") !== -1
+      ) {
+        score += 1;
+      }
+      if (text.indexOf("pix") !== -1) score += 1;
+
+      if (score >= 3) {
+        return closestHomeBlock(candidate);
       }
     }
     return null;
@@ -3732,28 +3874,54 @@
       return homeCarouselRoot;
     }
 
-    var beforeNode = findHomeCarouselBeforeNode();
-    if (beforeNode && beforeNode.parentNode) {
-      beforeNode.parentNode.insertBefore(homeCarouselRoot, beforeNode);
-      return homeCarouselRoot;
-    }
+    if (isUpzeroStore(activeStore)) {
+      var upzeroBenefitsSection = findHomeBenefitsSection();
+      if (upzeroBenefitsSection && upzeroBenefitsSection.parentNode) {
+        upzeroBenefitsSection.parentNode.insertBefore(
+          homeCarouselRoot,
+          upzeroBenefitsSection.nextSibling,
+        );
+        return homeCarouselRoot;
+      }
 
-    var benefitsSection = findHomeBenefitsSection();
-    if (benefitsSection && benefitsSection.parentNode) {
-      benefitsSection.parentNode.insertBefore(
-        homeCarouselRoot,
-        benefitsSection.nextSibling,
-      );
-      return homeCarouselRoot;
-    }
+      var upzeroBeforeNode = findHomeCarouselBeforeNode();
+      if (upzeroBeforeNode && upzeroBeforeNode.parentNode) {
+        upzeroBeforeNode.parentNode.insertBefore(homeCarouselRoot, upzeroBeforeNode);
+        return homeCarouselRoot;
+      }
 
-    var productShowcaseSection = findShopifyProductShowcaseSection();
-    if (productShowcaseSection && productShowcaseSection.parentNode) {
-      productShowcaseSection.parentNode.insertBefore(
-        homeCarouselRoot,
-        productShowcaseSection,
-      );
-      return homeCarouselRoot;
+      var upzeroProductShowcaseSection = findUpzeroProductShowcaseSection();
+      if (upzeroProductShowcaseSection && upzeroProductShowcaseSection.parentNode) {
+        upzeroProductShowcaseSection.parentNode.insertBefore(
+          homeCarouselRoot,
+          upzeroProductShowcaseSection,
+        );
+        return homeCarouselRoot;
+      }
+    } else {
+      var beforeNode = findHomeCarouselBeforeNode();
+      if (beforeNode && beforeNode.parentNode) {
+        beforeNode.parentNode.insertBefore(homeCarouselRoot, beforeNode);
+        return homeCarouselRoot;
+      }
+
+      var benefitsSection = findHomeBenefitsSection();
+      if (benefitsSection && benefitsSection.parentNode) {
+        benefitsSection.parentNode.insertBefore(
+          homeCarouselRoot,
+          benefitsSection.nextSibling,
+        );
+        return homeCarouselRoot;
+      }
+
+      var productShowcaseSection = findShopifyProductShowcaseSection();
+      if (productShowcaseSection && productShowcaseSection.parentNode) {
+        productShowcaseSection.parentNode.insertBefore(
+          homeCarouselRoot,
+          productShowcaseSection,
+        );
+        return homeCarouselRoot;
+      }
     }
 
     var main = document.querySelector("main, #MainContent, [role='main']");
@@ -3776,6 +3944,7 @@
       findCarouselAnchorBySelector() ||
         findHomeCarouselBeforeNode() ||
         findHomeBenefitsSection() ||
+        (isUpzeroStore(activeStore) ? findUpzeroProductShowcaseSection() : null) ||
         findShopifyProductShowcaseSection() ||
         document.querySelector("main, #MainContent, [role='main']"),
     );
@@ -3885,7 +4054,7 @@
 
     if (isCarouselWidget() && carouselConfig.enabled === false) {
       debugLog("render skipped: carousel disabled", {
-        hint: "settings.carousel.enabled=false ou data-home-carousel-enabled ausente",
+        hint: "settings.carousel.enabled=false ou data-home-carousel-enabled=false",
       });
       root.innerHTML = "";
       removeHomeCarouselRoot();

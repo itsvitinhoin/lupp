@@ -76,6 +76,35 @@ export function countBillableWidgets(widgets: WidgetLike[]) {
   return (hasFloatingWidget ? 1 : 0) + (hasHomeCarousel ? 1 : 0) + standaloneWidgets;
 }
 
+export function withDefaultFloatingWidgetSettings(settingsValue?: unknown) {
+  const settings = asRecord(settingsValue);
+  const display = asRecord(settings.display);
+  const carousel = asRecord(settings.carousel);
+
+  return {
+    ...settings,
+    display: {
+      mode: "all",
+      include_paths: [],
+      exclude_paths: ["/checkout", "/carrinho", "/cart"],
+      product_mode: "linked_or_all",
+      hide_without_videos: false,
+      home_experience_enabled: true,
+      home_ordering: "manual",
+      ...display,
+    },
+    carousel: {
+      enabled: true,
+      title: "Descubra cada detalhe e Compre",
+      description: "",
+      before_heading: "Com Capa",
+      max_items: 12,
+      mobile_max_items: 6,
+      ...carousel,
+    },
+  };
+}
+
 export const DEFAULT_WIDGETS = [
   { name: "Product Video", type: "product_video", target: "product" },
   { name: "Home Showcase", type: "home_showcase", target: "home" },

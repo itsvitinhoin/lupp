@@ -1,4 +1,7 @@
-import { DEFAULT_WIDGETS } from "@/lib/constants";
+import {
+  DEFAULT_WIDGETS,
+  withDefaultFloatingWidgetSettings,
+} from "@/lib/constants";
 import { requireSupabase } from "@/lib/supabase";
 import type { TableUpdate } from "@/types/database";
 import type { CreateStorePayload } from "@/types/store";
@@ -115,12 +118,16 @@ export const storesService = {
     await supabase
       .from("widgets")
       .insert(
-        DEFAULT_WIDGETS.map((widget, index) => ({
+        DEFAULT_WIDGETS.map((widget) => ({
           store_id: store.id,
           name: widget.name,
           type: widget.type,
           target: widget.target,
           status: widget.type === "floating_video" ? "active" : "inactive",
+          settings:
+            widget.type === "floating_video"
+              ? withDefaultFloatingWidgetSettings()
+              : {},
         })),
       )
       .throwOnError();

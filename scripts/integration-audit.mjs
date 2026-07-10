@@ -202,6 +202,50 @@ function auditBootstrapContract() {
     /public_settings|stores|widgets|videos/s,
     "Widget bootstrap should remain the public runtime configuration boundary.",
   );
+  assertContains(
+    bootstrap,
+    /plan_widget_limit/,
+    "Horizontal widgets must keep server-side plan enforcement.",
+  );
+}
+
+function auditWidgetDefaults() {
+  assertContains(
+    "artifacts/lupp/src/services/stores.service.ts",
+    /withDefaultFloatingWidgetSettings/,
+    "New stores must seed both floating and horizontal widget settings.",
+  );
+  assertContains(
+    "supabase/functions/shopify-oauth-callback/index.ts",
+    /carousel:\s*\{[\s\S]*enabled:\s*true/,
+    "Shopify-created stores must seed horizontal widget settings.",
+  );
+
+  const migrations = "supabase/migrations";
+  const normalizationMigration = existsSync(path.join(root, migrations))
+    ? readFileSync(
+        path.join(
+          root,
+          migrations,
+          "20260710172527_normalize_carousel_defaults_and_upzero_platform.sql",
+        ),
+        "utf8",
+      )
+    : "";
+  if (!/normalize_floating_widget_settings/.test(normalizationMigration)) {
+    fail(
+      "high",
+      "supabase/migrations/20260710172527_normalize_carousel_defaults_and_upzero_platform.sql",
+      "Database writes must normalize missing floating/carousel defaults.",
+    );
+  }
+  if (!/stores\.slug = 'lipcem'[\s\S]*provider = 'upzero'/.test(normalizationMigration)) {
+    fail(
+      "high",
+      "supabase/migrations/20260710172527_normalize_carousel_defaults_and_upzero_platform.sql",
+      "Lipcem must only be reclassified when an active UP Zero integration exists.",
+    );
+  }
 }
 
 function auditCatalogSyncContracts() {
@@ -250,6 +294,7 @@ auditRequiredFiles();
 auditBrowserContracts();
 auditUpzeroContract();
 auditBootstrapContract();
+auditWidgetDefaults();
 auditCatalogSyncContracts();
 auditBillingAndWebhookContracts();
 auditShopifyComplianceContracts();

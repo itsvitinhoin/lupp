@@ -271,6 +271,25 @@ async function ensureShopifyBootstrapStore(
       store_id: storeId,
       target: "site",
       type: "floating_video",
+      settings: {
+        display: {
+          mode: "all",
+          include_paths: [],
+          exclude_paths: ["/checkout", "/carrinho", "/cart"],
+          product_mode: "linked_or_all",
+          hide_without_videos: false,
+          home_experience_enabled: true,
+          home_ordering: "manual",
+        },
+        carousel: {
+          enabled: true,
+          title: "Descubra cada detalhe e Compre",
+          description: "",
+          before_heading: "Com Capa",
+          max_items: 12,
+          mobile_max_items: 6,
+        },
+      },
     },
     {
       name: "Stories Bar",
