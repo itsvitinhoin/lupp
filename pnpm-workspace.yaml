@@ -39,6 +39,7 @@ packages:
   - lib/*
   - lib/integrations/*
   - scripts
+  - server
 
 catalog:
   '@replit/vite-plugin-cartographer': ^0.5.21
@@ -69,9 +70,11 @@ catalog:
 autoInstallPeers: false
 
 onlyBuiltDependencies:
+  - '@prisma/engines'
   - '@swc/core'
   - esbuild
   - msw
+  - prisma
   - unrs-resolver
 
 overrides:
@@ -156,4 +159,6 @@ overrides:
   esbuild: "0.27.3"
 
 allowBuilds:
+  '@prisma/engines': true
   esbuild: true
+  prisma: true

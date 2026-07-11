@@ -1,0 +1,617 @@
+// Ported 1:1 from supabase/migrations (consolidated state after
+// 20260710172527). Deviations from the Supabase original:
+// - auth.users + profiles are merged into the User model (this server owns
+//   auth; Supabase split them only because auth.users is unmanaged).
+// - text + CHECK pseudo-enums become Prisma enums; columns without a CHECK
+//   (subscriptions.status, integrations.provider/status, videos.provider,
+//   stores.plan_id linkage) stay String exactly as in the original.
+// - updated_at triggers become @updatedAt.
+// - The upper(code) unique index on discount_coupons is an expression index
+//   Prisma can't model — codes must be normalized to uppercase app-side.
+// - products had two overlapping unique indexes on (store_id, platform,
+//   external_id) (one partial, one full); only the dominating full one is kept.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  // No url here — the connection is supplied at runtime through the pg
+  // adapter (src/lib/prisma.ts) and prisma.config.ts for CLI commands.
+}
+
+// ---------------------------------------------------------------------------
+// Enums (from CHECK constraints in the Supabase schema)
+// ---------------------------------------------------------------------------
+
+enum StoreStatus {
+  active
+  paused
+  disabled
+}
+
+enum StoreMemberRole {
+  owner
+  admin
+  marketing
+  editor
+  analyst
+}
+
+enum ProductStatus {
+  active
+  draft
+  archived
+}
+
+enum VideoStatus {
+  draft
+  active
+  paused
+  archived
+  deleted
+}
+
+enum ProductVisibilityScope {
+  product
+  variant
+}
+
+enum VideoProcessingStatus {
+  uploading
+  processing
+  ready
+  failed
+  archived
+}
+
+enum WidgetType {
+  product_video
+  home_showcase
+  floating_video
+  collection_feed
+  stories_bar
+}
+
+enum WidgetStatus {
+  active
+  inactive
+}
+
+enum CustomPageLayout {
+  vertical_feed
+  grid
+  carousel
+}
+
+enum CustomPageStatus {
+  draft
+  active
+  inactive
+}
+
+enum CommentStatus {
+  pending
+  approved
+  hidden
+  reported
+  deleted
+}
+
+enum AnalyticsEventType {
+  video_view
+  video_progress
+  video_complete
+  product_click
+  add_to_cart_click
+  share_click
+  like_click
+  comment_create
+  widget_view
+  feed_open
+  launcher_impression
+  feed_close
+}
+
+enum CouponDuration {
+  once
+  forever
+}
+
+// ---------------------------------------------------------------------------
+// Auth (replaces Supabase auth.users + profiles)
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String   @id @default(uuid(7))
+  name          String
+  email         String   @unique
+  password_hash String
+  role          String   @default("agent")
+  avatar_url    String?
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime @updatedAt @db.Timestamptz(6)
+
+  stores      Store[]
+  memberships StoreMember[]
+  audit_logs  MasterConsoleAuditLog[]
+
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Billing catalog
+// ---------------------------------------------------------------------------
+
+model Plan {
+  id            String   @id
+  name          String?
+  price_monthly Decimal?
+  video_limit   Int?
+  view_limit    Int?
+  widget_limit  Int?
+  features      Json     @default("[]")
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model DiscountCoupon {
+  id               String         @id @default(uuid(7))
+  code             String         @unique
+  name             String?
+  description      String?
+  // Exactly one of percent_off / amount_off must be set (> 0, percent ≤ 100)
+  // — was a CHECK constraint in Supabase; enforced app-side here.
+  percent_off      Decimal?
+  amount_off       Decimal?
+  duration         CouponDuration @default(once)
+  max_redemptions  Int?
+  redemption_count Int            @default(0)
+  starts_at        DateTime?      @db.Timestamptz(6)
+  expires_at       DateTime?      @db.Timestamptz(6)
+  is_active        Boolean        @default(true)
+  metadata         Json           @default("{}")
+  created_at       DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime       @updatedAt @db.Timestamptz(6)
+
+  subscriptions Subscription[]
+
+  @@map("discount_coupons")
+}
+
+// ---------------------------------------------------------------------------
+// Stores & membership
+// ---------------------------------------------------------------------------
+
+model Store {
+  id               String      @id @default(uuid(7))
+  owner_id         String
+  name             String
+  slug             String      @unique
+  url              String?
+  platform         String?
+  segment          String?
+  logo_url         String?
+  primary_color    String      @default("#006BFF")
+  secondary_color  String      @default("#00D4FF")
+  button_color     String      @default("#006BFF")
+  status           StoreStatus @default(active)
+  // Plain text in the original schema (NOT an FK to plans).
+  plan_id          String      @default("start")
+  trial_started_at DateTime?   @db.Timestamptz(6)
+  trial_ends_at    DateTime?   @db.Timestamptz(6)
+  created_at       DateTime    @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime    @updatedAt @db.Timestamptz(6)
+
+  owner            User                    @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  members          StoreMember[]
+  products         Product[]
+  product_variants ProductVariant[]
+  videos           Video[]
+  widgets          Widget[]
+  custom_pages     CustomPage[]
+  comments         Comment[]
+  video_likes      VideoLike[]
+  analytics_events AnalyticsEvent[]
+  integrations     Integration[]
+  subscriptions    Subscription[]
+  feed_settings    FeedSetting?
+  audit_logs       MasterConsoleAuditLog[]
+
+  @@map("stores")
+}
+
+model StoreMember {
+  id         String          @id @default(uuid(7))
+  store_id   String
+  user_id    String
+  role       StoreMemberRole @default(admin)
+  created_at DateTime        @default(now()) @db.Timestamptz(6)
+
+  store Store @relation(fields: [store_id], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([store_id, user_id])
+  @@map("store_members")
+}
+
+// ---------------------------------------------------------------------------
+// Catalog (products & variants)
+// ---------------------------------------------------------------------------
+
+model Product {
+  id               String        @id @default(uuid(7))
+  store_id         String
+  external_id      String?
+  name             String
+  description      String?
+  price            Decimal?
+  compare_at_price Decimal?
+  currency         String        @default("BRL")
+  image_url        String?
+  product_url      String?
+  platform         String?
+  status           ProductStatus @default(active)
+  created_at       DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime      @updatedAt @db.Timestamptz(6)
+
+  store            Store            @relation(fields: [store_id], references: [id], onDelete: Cascade)
+  variants         ProductVariant[]
+  video_products   VideoProduct[]
+  analytics_events AnalyticsEvent[]
+
+  @@unique([store_id, platform, external_id])
+  @@index([store_id])
+  @@map("products")
+}
+
+model ProductVariant {
+  id               String        @id @default(uuid(7))
+  store_id         String
+  product_id       String
+  platform         String        @default("upzero")
+  external_id      String
+  sku              String?
+  color_name       String?
+  color_code       String?
+  color_hex        String?
+  size_name        String?
+  size_code        String?
+  price            Decimal?
+  compare_at_price Decimal?
+  stock_qty        Int?
+  image_url        String?
+  asset_id         String?
+  status           ProductStatus @default(active)
+  metadata         Json          @default("{}")
+  created_at       DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime      @updatedAt @db.Timestamptz(6)
+
+  store   Store   @relation(fields: [store_id], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@unique([store_id, platform, external_id])
+  @@index([store_id])
+  @@index([product_id])
+  @@index([platform, external_id])
+  @@map("product_variants")
+}
+
+// ---------------------------------------------------------------------------
+// Videos
+// ---------------------------------------------------------------------------
+
+model Video {
+  id                      String                 @id @default(uuid(7))
+  store_id                String
+  title                   String
+  description             String?
+  video_url               String?
+  thumbnail_url           String?
+  storage_path            String?
+  provider                String                 @default("supabase")
+  duration_seconds        Int?
+  aspect_ratio            String                 @default("9:16")
+  status                  VideoStatus            @default(draft)
+  cta_label               String                 @default("Ver produto")
+  is_feed_enabled         Boolean                @default(true)
+  is_product_page_enabled Boolean                @default(true)
+  allow_likes             Boolean                @default(true)
+  allow_comments          Boolean                @default(false)
+  allow_sharing           Boolean                @default(true)
+  is_featured             Boolean                @default(false)
+  sort_order              Int                    @default(0)
+  product_visibility_scope ProductVisibilityScope @default(product)
+  product_visibility_url  String?
+  provider_video_id       String?
+  playback_url            String?
+  processing_status       VideoProcessingStatus  @default(ready)
+  file_size               BigInt?
+  created_at              DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime               @updatedAt @db.Timestamptz(6)
+
+  store              Store             @relation(fields: [store_id], references: [id], onDelete: Cascade)
+  video_products     VideoProduct[]
+  custom_page_videos CustomPageVideo[]
+  comments           Comment[]
+  likes              VideoLike[]
+  analytics_events   AnalyticsEvent[]
+
+  @@index([store_id, status])
+  @@index([provider, provider_video_id])
+  @@map("videos")
+}
+
+model VideoProduct {
+  id         String   @id @default(uuid(7))
+  video_id   String
+  product_id String
+  is_primary Boolean  @default(false)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  video   Video   @relation(fields: [video_id], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@unique([video_id, product_id])
+  @@index([video_id])
+  @@index([product_id])
+  @@map("video_products")
+}
+
+// ---------------------------------------------------------------------------
+// Widgets & custom pages
+// ---------------------------------------------------------------------------
+
+model Widget {
+  id         String       @id @default(uuid(7))
+  store_id   String
+  name       String
+  type       WidgetType
+  status     WidgetStatus @default(inactive)
+  target     String?
+  // floating_video widgets get default display/carousel keys merged in by a
+  // DB trigger in Supabase; replicated app-side in the widgets use-case.
+  settings   Json         @default("{}")
+  created_at DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at DateTime     @updatedAt @db.Timestamptz(6)
+
+  store Store @relation(fields: [store_id], references: [id], onDelete: Cascade)
+
+  @@map("widgets")
+}
+
+model CustomPage {
+  id          String           @id @default(uuid(7))
+  store_id    String
+  name        String
+  slug        String
+  description String?
+  layout      CustomPageLayout @default(vertical_feed)
+  status      CustomPageStatus @default(draft)
+  settings    Json             @default("{}")
+  created_at  DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime         @updatedAt @db.Timestamptz(6)
+
+  store  Store             @relation(fields: [store_id], references: [id], onDelete: Cascade)
+  videos CustomPageVideo[]
+
+  @@unique([store_id, slug])
+  @@map("custom_pages")
+}
+
+model CustomPageVideo {
+  id         String   @id @default(uuid(7))
+  page_id    String
+  video_id   String
+  sort_order Int      @default(0)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  page  CustomPage @relation(fields: [page_id], references: [id], onDelete: Cascade)
+  video Video      @relation(fields: [video_id], references: [id], onDelete: Cascade)
+
+  @@unique([page_id, video_id])
+  @@map("custom_page_videos")
+}
+
+// ---------------------------------------------------------------------------
+// Engagement (comments, likes, analytics)
+// ---------------------------------------------------------------------------
+
+model Comment {
+  id           String        @id @default(uuid(7))
+  store_id     String
+  video_id     String
+  author_name  String?
+  author_email String?
+  body         String
+  status       CommentStatus @default(pending)
+  created_at   DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime      @updatedAt @db.Timestamptz(6)
+
+  store Store @relation(fields: [store_id], references: [id], onDelete: Cascade)
+  video Video @relation(fields: [video_id], references: [id], onDelete: Cascade)
+
+  @@index([store_id, status])
+  @@map("comments")
+}
+
+model VideoLike {
+  id         String   @id @default(uuid(7))
+  video_id   String
+  store_id   String
+  visitor_id String?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  video Video @relation(fields: [video_id], references: [id], onDelete: Cascade)
+  store Store @relation(fields: [store_id], references: [id], onDelete: Cascade)
+
+  @@unique([video_id, visitor_id])
+  @@index([video_id])
+  @@map("video_likes")
+}
+
+model AnalyticsEvent {
+  id         String             @id @default(uuid(7))
+  store_id   String
+  video_id   String?
+  product_id String?
+  event_type AnalyticsEventType
+  visitor_id String?
+  session_id String?
+  url        String?
+  referrer   String?
+  user_agent String?
+  metadata   Json               @default("{}")
+  created_at DateTime           @default(now()) @db.Timestamptz(6)
+
+  store   Store    @relation(fields: [store_id], references: [id], onDelete: Cascade)
+  video   Video?   @relation(fields: [video_id], references: [id], onDelete: SetNull)
+  product Product? @relation(fields: [product_id], references: [id], onDelete: SetNull)
+
+  @@index([store_id, created_at(sort: Desc)])
+  @@index([video_id])
+  @@index([store_id, event_type, created_at(sort: Desc)])
+  @@map("analytics_events")
+}
+
+// ---------------------------------------------------------------------------
+// Integrations (platform connections, secrets, webhook inbox)
+// ---------------------------------------------------------------------------
+
+model Integration {
+  id                String   @id @default(uuid(7))
+  store_id          String
+  provider          String
+  status            String   @default("available")
+  credentials       Json     @default("{}")
+  settings          Json     @default("{}")
+  external_store_id String?
+  connected_at      DateTime? @db.Timestamptz(6)
+  last_sync_at      DateTime? @db.Timestamptz(6)
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @updatedAt @db.Timestamptz(6)
+
+  store  Store              @relation(fields: [store_id], references: [id], onDelete: Cascade)
+  secret IntegrationSecret?
+
+  @@unique([store_id, provider])
+  @@unique([provider, external_store_id])
+  @@map("integrations")
+}
+
+// Service-role only in Supabase (all grants revoked). Never expose through
+// user-facing routes.
+model IntegrationSecret {
+  integration_id    String   @id
+  provider          String
+  external_store_id String
+  access_token      String
+  token_type        String?
+  scope             String?
+  metadata          Json     @default("{}")
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @updatedAt @db.Timestamptz(6)
+
+  integration Integration @relation(fields: [integration_id], references: [id], onDelete: Cascade)
+
+  @@unique([provider, external_store_id])
+  @@map("integration_secrets")
+}
+
+model IntegrationWebhookEvent {
+  id                String    @id @default(uuid(7))
+  provider          String
+  external_store_id String?
+  event             String
+  payload           Json      @default("{}")
+  status            String    @default("received")
+  error             String?
+  processed_at      DateTime? @db.Timestamptz(6)
+  created_at        DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([provider, external_store_id, created_at(sort: Desc)])
+  @@index([event, created_at(sort: Desc)])
+  @@map("integration_webhook_events")
+}
+
+// ---------------------------------------------------------------------------
+// Billing (subscriptions)
+// ---------------------------------------------------------------------------
+
+model Subscription {
+  id                       String    @id @default(uuid(7))
+  store_id                 String
+  plan_id                  String?
+  // Free text in the original schema (trialing/active/canceling/…).
+  status                   String    @default("trialing")
+  current_period_start     DateTime? @db.Timestamptz(6)
+  current_period_end       DateTime? @db.Timestamptz(6)
+  provider                 String?
+  provider_customer_id     String?
+  provider_subscription_id String?
+  provider_checkout_id     String?
+  provider_checkout_url    String?
+  provider_payment_id      String?
+  provider_status          String?
+  metadata                 Json      @default("{}")
+  discount_coupon_id       String?
+  discount_code            String?
+  discount_percent         Decimal?
+  discount_amount          Decimal?
+  created_at               DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime  @updatedAt @db.Timestamptz(6)
+
+  store           Store           @relation(fields: [store_id], references: [id], onDelete: Cascade)
+  plan            Plan?           @relation(fields: [plan_id], references: [id])
+  discount_coupon DiscountCoupon? @relation(fields: [discount_coupon_id], references: [id], onDelete: SetNull)
+
+  @@index([provider_checkout_id])
+  @@index([provider_payment_id])
+  @@index([provider_subscription_id])
+  @@index([discount_coupon_id])
+  @@map("subscriptions")
+}
+
+// ---------------------------------------------------------------------------
+// Feed settings (one per store)
+// ---------------------------------------------------------------------------
+
+model FeedSetting {
+  id         String   @id @default(uuid(7))
+  store_id   String   @unique
+  is_active  Boolean  @default(true)
+  slug       String   @default("videos")
+  settings   Json     @default("{}")
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @updatedAt @db.Timestamptz(6)
+
+  store Store @relation(fields: [store_id], references: [id], onDelete: Cascade)
+
+  @@map("feed_settings")
+}
+
+// ---------------------------------------------------------------------------
+// Master console audit trail (service-role only in Supabase)
+// ---------------------------------------------------------------------------
+
+model MasterConsoleAuditLog {
+  id              String   @id @default(uuid(7))
+  admin_user_id   String?
+  admin_email     String?
+  action          String
+  target_store_id String?
+  payload         Json     @default("{}")
+  result          Json     @default("{}")
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  admin        User?  @relation(fields: [admin_user_id], references: [id], onDelete: SetNull)
+  target_store Store? @relation(fields: [target_store_id], references: [id], onDelete: SetNull)
+
+  @@index([created_at(sort: Desc)])
+  @@index([target_store_id])
+  @@map("master_console_audit_logs")
+}

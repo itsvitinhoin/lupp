@@ -1,0 +1,27 @@
+# Explicit project name — the default would be the directory name ("server"),
+# which collides with other projects whose compose file also lives in server/.
+name: lupp
+
+services:
+  postgres:
+    container_name: postgres-lupp
+    image: postgres:18
+    # Host port 5433 — 5432 is taken by another local Postgres (crm-dzns).
+    ports:
+      - 5433:5432
+    environment:
+      - POSTGRES_USER=docker
+      - POSTGRES_PASSWORD=docker
+      - POSTGRES_DB=lupp
+    volumes:
+      # postgres:18 images store data in a version-specific subdirectory —
+      # the mount must be /var/lib/postgresql (not .../data).
+      - lupp-pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docker -d lupp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  lupp-pgdata:

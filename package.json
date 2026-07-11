@@ -12,7 +12,7 @@
     "test:widget": "pnpm --filter @workspace/scripts run test:widget",
     "test:nuvemshop-partners": "pnpm --filter @workspace/nuvemshop-partners run test",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --filter \"./server\" --if-present run typecheck"
   },
   "private": true,
   "devDependencies": {
