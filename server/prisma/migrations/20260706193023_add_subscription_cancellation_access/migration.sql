@@ -1,0 +1,4 @@
+-- No-op. The Supabase migration only redefined the store_has_billing_access()
+-- security-definer function (and its grants) to keep canceled-but-paid-up
+-- subscriptions accessible. Billing access rules live in application code on
+-- this server.

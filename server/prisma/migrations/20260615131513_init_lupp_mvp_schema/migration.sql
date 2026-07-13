@@ -1,3 +1,10 @@
+-- Ported from supabase/migrations/20260615131513_init_lupp_mvp_schema.sql for
+-- plain Postgres. auth.users + profiles are merged into a single "users" table
+-- (this server owns auth), text + CHECK pseudo-enums become real enums, ids are
+-- app-generated TEXT (uuid(7)) instead of uuid DEFAULT gen_random_uuid(), and
+-- updated_at triggers are replaced by Prisma @updatedAt. RLS, policies, grants
+-- and the pgcrypto extension are dropped (no Supabase roles here).
+
 -- CreateEnum
 CREATE TYPE "StoreStatus" AS ENUM ('active', 'paused', 'disabled');
 
@@ -8,13 +15,7 @@ CREATE TYPE "StoreMemberRole" AS ENUM ('owner', 'admin', 'marketing', 'editor', 
 CREATE TYPE "ProductStatus" AS ENUM ('active', 'draft', 'archived');
 
 -- CreateEnum
-CREATE TYPE "VideoStatus" AS ENUM ('draft', 'active', 'paused', 'archived', 'deleted');
-
--- CreateEnum
-CREATE TYPE "ProductVisibilityScope" AS ENUM ('product', 'variant');
-
--- CreateEnum
-CREATE TYPE "VideoProcessingStatus" AS ENUM ('uploading', 'processing', 'ready', 'failed', 'archived');
+CREATE TYPE "VideoStatus" AS ENUM ('draft', 'active', 'paused', 'archived');
 
 -- CreateEnum
 CREATE TYPE "WidgetType" AS ENUM ('product_video', 'home_showcase', 'floating_video', 'collection_feed', 'stories_bar');
@@ -32,12 +33,9 @@ CREATE TYPE "CustomPageStatus" AS ENUM ('draft', 'active', 'inactive');
 CREATE TYPE "CommentStatus" AS ENUM ('pending', 'approved', 'hidden', 'reported', 'deleted');
 
 -- CreateEnum
-CREATE TYPE "AnalyticsEventType" AS ENUM ('video_view', 'video_progress', 'video_complete', 'product_click', 'add_to_cart_click', 'share_click', 'like_click', 'comment_create', 'widget_view', 'feed_open', 'launcher_impression', 'feed_close');
+CREATE TYPE "AnalyticsEventType" AS ENUM ('video_view', 'video_progress', 'video_complete', 'product_click', 'add_to_cart_click', 'share_click', 'like_click', 'comment_create', 'widget_view', 'feed_open');
 
--- CreateEnum
-CREATE TYPE "CouponDuration" AS ENUM ('once', 'forever');
-
--- CreateTable
+-- CreateTable (merged auth.users + public.profiles)
 CREATE TABLE "users" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -65,27 +63,6 @@ CREATE TABLE "plans" (
 );
 
 -- CreateTable
-CREATE TABLE "discount_coupons" (
-    "id" TEXT NOT NULL,
-    "code" TEXT NOT NULL,
-    "name" TEXT,
-    "description" TEXT,
-    "percent_off" DECIMAL(65,30),
-    "amount_off" DECIMAL(65,30),
-    "duration" "CouponDuration" NOT NULL DEFAULT 'once',
-    "max_redemptions" INTEGER,
-    "redemption_count" INTEGER NOT NULL DEFAULT 0,
-    "starts_at" TIMESTAMPTZ(6),
-    "expires_at" TIMESTAMPTZ(6),
-    "is_active" BOOLEAN NOT NULL DEFAULT true,
-    "metadata" JSONB NOT NULL DEFAULT '{}',
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ(6) NOT NULL,
-
-    CONSTRAINT "discount_coupons_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "stores" (
     "id" TEXT NOT NULL,
     "owner_id" TEXT NOT NULL,
@@ -100,8 +77,6 @@ CREATE TABLE "stores" (
     "button_color" TEXT NOT NULL DEFAULT '#006BFF',
     "status" "StoreStatus" NOT NULL DEFAULT 'active',
     "plan_id" TEXT NOT NULL DEFAULT 'start',
-    "trial_started_at" TIMESTAMPTZ(6),
-    "trial_ends_at" TIMESTAMPTZ(6),
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL,
 
@@ -140,32 +115,6 @@ CREATE TABLE "products" (
 );
 
 -- CreateTable
-CREATE TABLE "product_variants" (
-    "id" TEXT NOT NULL,
-    "store_id" TEXT NOT NULL,
-    "product_id" TEXT NOT NULL,
-    "platform" TEXT NOT NULL DEFAULT 'upzero',
-    "external_id" TEXT NOT NULL,
-    "sku" TEXT,
-    "color_name" TEXT,
-    "color_code" TEXT,
-    "color_hex" TEXT,
-    "size_name" TEXT,
-    "size_code" TEXT,
-    "price" DECIMAL(65,30),
-    "compare_at_price" DECIMAL(65,30),
-    "stock_qty" INTEGER,
-    "image_url" TEXT,
-    "asset_id" TEXT,
-    "status" "ProductStatus" NOT NULL DEFAULT 'active',
-    "metadata" JSONB NOT NULL DEFAULT '{}',
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ(6) NOT NULL,
-
-    CONSTRAINT "product_variants_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "videos" (
     "id" TEXT NOT NULL,
     "store_id" TEXT NOT NULL,
@@ -186,12 +135,6 @@ CREATE TABLE "videos" (
     "allow_sharing" BOOLEAN NOT NULL DEFAULT true,
     "is_featured" BOOLEAN NOT NULL DEFAULT false,
     "sort_order" INTEGER NOT NULL DEFAULT 0,
-    "product_visibility_scope" "ProductVisibilityScope" NOT NULL DEFAULT 'product',
-    "product_visibility_url" TEXT,
-    "provider_video_id" TEXT,
-    "playback_url" TEXT,
-    "processing_status" "VideoProcessingStatus" NOT NULL DEFAULT 'ready',
-    "file_size" BIGINT,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL,
 
@@ -303,43 +246,10 @@ CREATE TABLE "integrations" (
     "status" TEXT NOT NULL DEFAULT 'available',
     "credentials" JSONB NOT NULL DEFAULT '{}',
     "settings" JSONB NOT NULL DEFAULT '{}',
-    "external_store_id" TEXT,
-    "connected_at" TIMESTAMPTZ(6),
-    "last_sync_at" TIMESTAMPTZ(6),
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL,
 
     CONSTRAINT "integrations_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "integration_secrets" (
-    "integration_id" TEXT NOT NULL,
-    "provider" TEXT NOT NULL,
-    "external_store_id" TEXT NOT NULL,
-    "access_token" TEXT NOT NULL,
-    "token_type" TEXT,
-    "scope" TEXT,
-    "metadata" JSONB NOT NULL DEFAULT '{}',
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ(6) NOT NULL,
-
-    CONSTRAINT "integration_secrets_pkey" PRIMARY KEY ("integration_id")
-);
-
--- CreateTable
-CREATE TABLE "integration_webhook_events" (
-    "id" TEXT NOT NULL,
-    "provider" TEXT NOT NULL,
-    "external_store_id" TEXT,
-    "event" TEXT NOT NULL,
-    "payload" JSONB NOT NULL DEFAULT '{}',
-    "status" TEXT NOT NULL DEFAULT 'received',
-    "error" TEXT,
-    "processed_at" TIMESTAMPTZ(6),
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "integration_webhook_events_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -353,15 +263,6 @@ CREATE TABLE "subscriptions" (
     "provider" TEXT,
     "provider_customer_id" TEXT,
     "provider_subscription_id" TEXT,
-    "provider_checkout_id" TEXT,
-    "provider_checkout_url" TEXT,
-    "provider_payment_id" TEXT,
-    "provider_status" TEXT,
-    "metadata" JSONB NOT NULL DEFAULT '{}',
-    "discount_coupon_id" TEXT,
-    "discount_code" TEXT,
-    "discount_percent" DECIMAL(65,30),
-    "discount_amount" DECIMAL(65,30),
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL,
 
@@ -381,25 +282,8 @@ CREATE TABLE "feed_settings" (
     CONSTRAINT "feed_settings_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "master_console_audit_logs" (
-    "id" TEXT NOT NULL,
-    "admin_user_id" TEXT,
-    "admin_email" TEXT,
-    "action" TEXT NOT NULL,
-    "target_store_id" TEXT,
-    "payload" JSONB NOT NULL DEFAULT '{}',
-    "result" JSONB NOT NULL DEFAULT '{}',
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "master_console_audit_logs_pkey" PRIMARY KEY ("id")
-);
-
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
-
--- CreateIndex
-CREATE UNIQUE INDEX "discount_coupons_code_key" ON "discount_coupons"("code");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "stores_slug_key" ON "stores"("slug");
@@ -411,25 +295,7 @@ CREATE UNIQUE INDEX "store_members_store_id_user_id_key" ON "store_members"("sto
 CREATE INDEX "products_store_id_idx" ON "products"("store_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "products_store_id_platform_external_id_key" ON "products"("store_id", "platform", "external_id");
-
--- CreateIndex
-CREATE INDEX "product_variants_store_id_idx" ON "product_variants"("store_id");
-
--- CreateIndex
-CREATE INDEX "product_variants_product_id_idx" ON "product_variants"("product_id");
-
--- CreateIndex
-CREATE INDEX "product_variants_platform_external_id_idx" ON "product_variants"("platform", "external_id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "product_variants_store_id_platform_external_id_key" ON "product_variants"("store_id", "platform", "external_id");
-
--- CreateIndex
 CREATE INDEX "videos_store_id_status_idx" ON "videos"("store_id", "status");
-
--- CreateIndex
-CREATE INDEX "videos_provider_provider_video_id_idx" ON "videos"("provider", "provider_video_id");
 
 -- CreateIndex
 CREATE INDEX "video_products_video_id_idx" ON "video_products"("video_id");
@@ -462,43 +328,10 @@ CREATE INDEX "analytics_events_store_id_created_at_idx" ON "analytics_events"("s
 CREATE INDEX "analytics_events_video_id_idx" ON "analytics_events"("video_id");
 
 -- CreateIndex
-CREATE INDEX "analytics_events_store_id_event_type_created_at_idx" ON "analytics_events"("store_id", "event_type", "created_at" DESC);
-
--- CreateIndex
 CREATE UNIQUE INDEX "integrations_store_id_provider_key" ON "integrations"("store_id", "provider");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "integrations_provider_external_store_id_key" ON "integrations"("provider", "external_store_id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "integration_secrets_provider_external_store_id_key" ON "integration_secrets"("provider", "external_store_id");
-
--- CreateIndex
-CREATE INDEX "integration_webhook_events_provider_external_store_id_creat_idx" ON "integration_webhook_events"("provider", "external_store_id", "created_at" DESC);
-
--- CreateIndex
-CREATE INDEX "integration_webhook_events_event_created_at_idx" ON "integration_webhook_events"("event", "created_at" DESC);
-
--- CreateIndex
-CREATE INDEX "subscriptions_provider_checkout_id_idx" ON "subscriptions"("provider_checkout_id");
-
--- CreateIndex
-CREATE INDEX "subscriptions_provider_payment_id_idx" ON "subscriptions"("provider_payment_id");
-
--- CreateIndex
-CREATE INDEX "subscriptions_provider_subscription_id_idx" ON "subscriptions"("provider_subscription_id");
-
--- CreateIndex
-CREATE INDEX "subscriptions_discount_coupon_id_idx" ON "subscriptions"("discount_coupon_id");
-
--- CreateIndex
 CREATE UNIQUE INDEX "feed_settings_store_id_key" ON "feed_settings"("store_id");
-
--- CreateIndex
-CREATE INDEX "master_console_audit_logs_created_at_idx" ON "master_console_audit_logs"("created_at" DESC);
-
--- CreateIndex
-CREATE INDEX "master_console_audit_logs_target_store_id_idx" ON "master_console_audit_logs"("target_store_id");
 
 -- AddForeignKey
 ALTER TABLE "stores" ADD CONSTRAINT "stores_owner_id_fkey" FOREIGN KEY ("owner_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -511,12 +344,6 @@ ALTER TABLE "store_members" ADD CONSTRAINT "store_members_user_id_fkey" FOREIGN 
 
 -- AddForeignKey
 ALTER TABLE "products" ADD CONSTRAINT "products_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "product_variants" ADD CONSTRAINT "product_variants_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "product_variants" ADD CONSTRAINT "product_variants_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "videos" ADD CONSTRAINT "videos_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -564,22 +391,25 @@ ALTER TABLE "analytics_events" ADD CONSTRAINT "analytics_events_product_id_fkey"
 ALTER TABLE "integrations" ADD CONSTRAINT "integrations_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "integration_secrets" ADD CONSTRAINT "integration_secrets_integration_id_fkey" FOREIGN KEY ("integration_id") REFERENCES "integrations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_plan_id_fkey" FOREIGN KEY ("plan_id") REFERENCES "plans"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_discount_coupon_id_fkey" FOREIGN KEY ("discount_coupon_id") REFERENCES "discount_coupons"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "feed_settings" ADD CONSTRAINT "feed_settings_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- AddForeignKey
-ALTER TABLE "master_console_audit_logs" ADD CONSTRAINT "master_console_audit_logs_admin_user_id_fkey" FOREIGN KEY ("admin_user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "master_console_audit_logs" ADD CONSTRAINT "master_console_audit_logs_target_store_id_fkey" FOREIGN KEY ("target_store_id") REFERENCES "stores"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+-- Seed default plans (idempotent; prisma/seed.ts upserts the same rows)
+INSERT INTO "plans" ("id", "name", "price_monthly", "video_limit", "view_limit", "widget_limit", "features")
+VALUES
+  ('start', 'Start', 149, 30, 5000, 1, '["30 vídeos", "5k views/mês", "1 widget ativo"]'::jsonb),
+  ('growth', 'Growth', 199, 80, 20000, 5, '["80 vídeos", "20k views/mês", "5 widgets ativos"]'::jsonb),
+  ('pro', 'Pro', 299, 200, 60000, 999, '["200 vídeos", "60k views/mês", "comentários moderados", "analytics avançado"]'::jsonb),
+  ('scale', 'Scale', 499, 500, 150000, 999, '["500 vídeos", "150k views/mês", "multiusuário", "suporte prioritário"]'::jsonb)
+ON CONFLICT ("id") DO UPDATE SET
+  "name" = EXCLUDED."name",
+  "price_monthly" = EXCLUDED."price_monthly",
+  "video_limit" = EXCLUDED."video_limit",
+  "view_limit" = EXCLUDED."view_limit",
+  "widget_limit" = EXCLUDED."widget_limit",
+  "features" = EXCLUDED."features";

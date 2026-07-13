@@ -1,0 +1,3 @@
+-- No-op. The Supabase migration created the "videos" storage bucket and
+-- storage.objects policies. Video files are stored via Bunny on this server;
+-- Supabase Storage does not exist on plain Postgres.

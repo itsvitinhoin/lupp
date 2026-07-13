@@ -1,0 +1,3 @@
+-- No-op. The Supabase migration created private.handle_new_user_profile() and
+-- a trigger on auth.users to auto-create profiles. This server owns auth and
+-- merged profiles into "users" (see 20260615131513), so there is nothing to do.

@@ -1,0 +1,3 @@
+-- No-op. The Supabase migration only adjusted RLS policies so anonymous
+-- visitors could read product-page videos. Public read access is enforced by
+-- the API layer on this server; there is no RLS on plain Postgres.

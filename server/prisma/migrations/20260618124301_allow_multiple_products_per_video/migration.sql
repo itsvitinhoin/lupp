@@ -1,0 +1,4 @@
+-- No-op. The Supabase migration defensively dropped stray video_id-only unique
+-- constraints/indexes and re-added unique (video_id, product_id). In this
+-- history those strays never existed and the composite unique index
+-- "video_products_video_id_product_id_key" already exists since 20260615131513.
