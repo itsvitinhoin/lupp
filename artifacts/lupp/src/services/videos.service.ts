@@ -1,3 +1,4 @@
+import { apiPost } from "@/lib/api";
 import { requireSupabase } from "@/lib/supabase";
 import type { VideoStatus } from "@/types/database";
 import type { CreateVideoPayload, UpdateVideoPayload } from "@/types/video";
@@ -396,12 +397,17 @@ export const videosService = {
     }
 
     if (video.provider === "bunny") {
-      const { error } = await supabase.functions.invoke("bunny-delete-video", {
-        body: { store_id: storeId, video_id: videoId },
-      });
-      if (error) {
+      try {
+        await apiPost<{ ok: boolean }>("/api/videos/delete", {
+          store_id: storeId,
+          video_id: videoId,
+        });
+      } catch (error) {
         throw toError(error, "Não foi possível excluir o vídeo na Bunny.");
       }
+      // The server already removed the video_products links and the videos
+      // row (with the same soft-delete fallback), so skip the local cleanup.
+      return;
     } else {
       const videoPath =
         storagePathFromPublicUrl(video.video_url, "videos") ||

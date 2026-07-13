@@ -1,3 +1,4 @@
+import { apiPost, type Humanizer } from "@/lib/api";
 import { countBillableWidgets, PLAN_LIMITS } from "@/lib/constants";
 import { requireSupabase } from "@/lib/supabase";
 import type {
@@ -90,6 +91,11 @@ export type AppliedDiscount = {
   finalPrice: number;
   percentOff?: number | null;
 };
+
+// Billing pages match on the raw snake_case error codes (e.g. trial_expired),
+// so surface payload.error verbatim instead of the humanized default.
+const rawBillingErrorCode: Humanizer = (payload) =>
+  typeof payload?.error === "string" ? payload.error : null;
 
 function startOfDay(date: Date) {
   const result = new Date(date);
@@ -358,28 +364,17 @@ export const billingService = {
     planId: PlanId;
     storeId: string;
   }): Promise<LuupSubscriptionResponse> {
-    const client = requireSupabase();
-    const { data, error } =
-      await client.functions.invoke<LuupSubscriptionResponse>(
-        "asaas-create-subscription",
-        {
-          body: {
-            card,
-            coupon_code: couponCode || undefined,
-            customer,
-            plan_id: planId,
-            store_id: storeId,
-          },
-        },
-      );
-
-    if (error) {
-      if ("context" in error && error.context instanceof Response) {
-        const details = await error.context.json().catch(() => null);
-        if (details?.error) throw new Error(String(details.error));
-      }
-      throw error;
-    }
+    const data = await apiPost<LuupSubscriptionResponse>(
+      "/api/billing/subscriptions",
+      {
+        card,
+        coupon_code: couponCode || undefined,
+        customer,
+        plan_id: planId,
+        store_id: storeId,
+      },
+      { humanize: rawBillingErrorCode },
+    );
 
     if (!data?.subscription_id) {
       throw new Error("Não foi possível criar a assinatura.");
@@ -395,25 +390,14 @@ export const billingService = {
     planId: PlanId;
     storeId: string;
   }): Promise<LuupPlanChangeResponse> {
-    const client = requireSupabase();
-    const { data, error } =
-      await client.functions.invoke<LuupPlanChangeResponse>(
-        "lupp-change-trial-plan",
-        {
-          body: {
-            plan_id: planId,
-            store_id: storeId,
-          },
-        },
-      );
-
-    if (error) {
-      if ("context" in error && error.context instanceof Response) {
-        const details = await error.context.json().catch(() => null);
-        if (details?.error) throw new Error(String(details.error));
-      }
-      throw error;
-    }
+    const data = await apiPost<LuupPlanChangeResponse>(
+      "/api/billing/trial-plan",
+      {
+        plan_id: planId,
+        store_id: storeId,
+      },
+      { humanize: rawBillingErrorCode },
+    );
 
     if (!data?.subscription_id) {
       throw new Error("Não foi possível liberar o plano no trial.");
@@ -429,25 +413,14 @@ export const billingService = {
     planId: PlanId;
     storeId: string;
   }): Promise<LuupPlanChangeResponse> {
-    const client = requireSupabase();
-    const { data, error } =
-      await client.functions.invoke<LuupPlanChangeResponse>(
-        "asaas-change-plan",
-        {
-          body: {
-            plan_id: planId,
-            store_id: storeId,
-          },
-        },
-      );
-
-    if (error) {
-      if ("context" in error && error.context instanceof Response) {
-        const details = await error.context.json().catch(() => null);
-        if (details?.error) throw new Error(String(details.error));
-      }
-      throw error;
-    }
+    const data = await apiPost<LuupPlanChangeResponse>(
+      "/api/billing/change-plan",
+      {
+        plan_id: planId,
+        store_id: storeId,
+      },
+      { humanize: rawBillingErrorCode },
+    );
 
     if (!data?.subscription_id) {
       throw new Error("Não foi possível alterar o plano.");
@@ -461,24 +434,13 @@ export const billingService = {
   }: {
     storeId: string;
   }): Promise<LuupCancelSubscriptionResponse> {
-    const client = requireSupabase();
-    const { data, error } =
-      await client.functions.invoke<LuupCancelSubscriptionResponse>(
-        "asaas-cancel-subscription",
-        {
-          body: {
-            store_id: storeId,
-          },
-        },
-      );
-
-    if (error) {
-      if ("context" in error && error.context instanceof Response) {
-        const details = await error.context.json().catch(() => null);
-        if (details?.error) throw new Error(String(details.error));
-      }
-      throw error;
-    }
+    const data = await apiPost<LuupCancelSubscriptionResponse>(
+      "/api/billing/cancel-subscription",
+      {
+        store_id: storeId,
+      },
+      { humanize: rawBillingErrorCode },
+    );
 
     if (!data?.subscription_id) {
       throw new Error("Não foi possível cancelar a assinatura.");

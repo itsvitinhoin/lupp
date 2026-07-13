@@ -1,6 +1,7 @@
 export interface PublicEnv {
   supabaseUrl: string;
   supabaseAnonKey: string;
+  apiUrl: string;
   appUrl: string;
   widgetCdnUrl: string;
   videoProvider: "supabase" | "bunny" | "cloudflare";
@@ -27,6 +28,7 @@ function normalizeEnvValue(value: unknown) {
 }
 
 const viteEnv: Record<string, unknown> = {
+  VITE_API_URL: import.meta.env.VITE_API_URL,
   VITE_APP_URL: import.meta.env.VITE_APP_URL,
   VITE_BUNNY_CDN_HOSTNAME: import.meta.env.VITE_BUNNY_CDN_HOSTNAME,
   VITE_BUNNY_LIBRARY_ID: import.meta.env.VITE_BUNNY_LIBRARY_ID,
@@ -62,6 +64,17 @@ function resolveWidgetCdnUrl() {
   return "https://www.playluup.com.br/widget.js";
 }
 
+function resolveApiUrl() {
+  const configuredUrl = read("VITE_API_URL");
+  if (configuredUrl) return configuredUrl.replace(/\/$/, "");
+
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/i.test(window.location.hostname)) {
+    return "http://localhost:3333";
+  }
+
+  return "";
+}
+
 function resolveAppUrl() {
   const configuredUrl = read("VITE_APP_URL");
   const isHttpsApp = window.location.protocol === "https:";
@@ -74,6 +87,7 @@ function resolveAppUrl() {
 export const env: PublicEnv = {
   supabaseUrl: read("VITE_SUPABASE_URL"),
   supabaseAnonKey: read("VITE_SUPABASE_ANON_KEY"),
+  apiUrl: resolveApiUrl(),
   appUrl: resolveAppUrl(),
   widgetCdnUrl: resolveWidgetCdnUrl(),
   videoProvider: (read("VITE_VIDEO_PROVIDER") || "supabase") as PublicEnv["videoProvider"],

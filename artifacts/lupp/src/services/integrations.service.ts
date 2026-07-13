@@ -1,5 +1,5 @@
+import { apiPost } from "@/lib/api";
 import { TRACKING_PROVIDERS } from "@/lib/constants";
-import { getShopifySessionToken } from "@/lib/shopify-embedded";
 import { requireSupabase } from "@/lib/supabase";
 import type { EcommerceIntegration } from "@/types/integration";
 import type { LuppProduct } from "@/types/product";
@@ -74,6 +74,18 @@ function humanizeFunctionError(details: unknown) {
   return error ? `${error.replace(/_/g, " ")}${nestedMessage && nestedMessage !== error ? `: ${nestedMessage}` : ""}` : null;
 }
 
+async function requireSession(expiredMessage: string) {
+  const client = requireSupabase();
+  const {
+    data: { session },
+    error: sessionError,
+  } = await client.auth.getSession();
+
+  if (sessionError) throw sessionError;
+  if (!session) throw new Error(expiredMessage);
+  return session;
+}
+
 export const integrationsService = {
   async listIntegrations(storeId: string) {
     const { data, error } = await requireSupabase().from("integrations").select("*").eq("store_id", storeId).order("provider");
@@ -82,145 +94,58 @@ export const integrationsService = {
   },
 
   async createNuvemshopAuthorizeUrl(storeId: string) {
-    const client = requireSupabase();
-    const {
-      data: { session },
-      error: sessionError,
-    } = await client.auth.getSession();
+    await requireSession("Sua sessão expirou. Entre novamente para conectar a Nuvemshop.");
 
-    if (sessionError) throw sessionError;
-    if (!session) {
-      throw new Error("Sua sessão expirou. Entre novamente para conectar a Nuvemshop.");
-    }
-
-    const { data, error } = await client.functions.invoke<{ authorize_url: string }>("nuvemshop-oauth-start", {
-      body: {
+    const data = await apiPost<{ authorize_url: string }>(
+      "/api/integrations/nuvemshop/oauth/start",
+      {
         return_to: `${window.location.origin}/app/integrations`,
         store_id: storeId,
       },
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-    });
-    if (error) {
-      if ("context" in error && error.context instanceof Response) {
-        const details = await error.context.json().catch(() => null);
-        const message = humanizeFunctionError(details);
-        if (message) throw new Error(message);
-        if (details && typeof details.error === "string") {
-          throw new Error(details.error.replace(/_/g, " "));
-        }
-      }
-      throw error;
-    }
+      { humanize: humanizeFunctionError },
+    );
+
     if (!data?.authorize_url) throw new Error("Não foi possível iniciar a conexão com a Nuvemshop.");
     return data.authorize_url;
   },
 
   async createShopifyAuthorizeUrl(storeId: string, shop?: string) {
-    const client = requireSupabase();
-    const {
-      data: { session },
-      error: sessionError,
-    } = await client.auth.getSession();
+    await requireSession("Sua sessão expirou. Entre novamente para conectar a Shopify.");
 
-    if (sessionError) throw sessionError;
-    if (!session) {
-      throw new Error("Sua sessão expirou. Entre novamente para conectar a Shopify.");
-    }
-
-    const shopifySessionToken = await getShopifySessionToken();
-    const { data, error } = await client.functions.invoke<{ authorize_url: string }>("shopify-oauth-start", {
-      body: {
+    const data = await apiPost<{ authorize_url: string; shop?: string }>(
+      "/api/integrations/shopify/oauth/start",
+      {
         return_to: `${window.location.origin}/app/integrations`,
         shop,
         store_id: storeId,
       },
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        ...(shopifySessionToken ? { "X-Shopify-Session-Token": shopifySessionToken } : {}),
-      },
-    });
-    if (error) {
-      if ("context" in error && error.context instanceof Response) {
-        const details = await error.context.json().catch(() => null);
-        const message = humanizeFunctionError(details);
-        if (message) throw new Error(message);
-        if (details && typeof details.error === "string") {
-          throw new Error(details.error.replace(/_/g, " "));
-        }
-      }
-      throw error;
-    }
+      { humanize: humanizeFunctionError },
+    );
+
     if (!data?.authorize_url) throw new Error("Não foi possível iniciar a conexão com a Shopify.");
     return data.authorize_url;
   },
 
   async syncNuvemshopProducts(storeId: string) {
-    const client = requireSupabase();
-    const {
-      data: { session },
-      error: sessionError,
-    } = await client.auth.getSession();
+    await requireSession("Sua sessão expirou. Entre novamente para sincronizar produtos.");
 
-    if (sessionError) throw sessionError;
-    if (!session) {
-      throw new Error("Sua sessão expirou. Entre novamente para sincronizar produtos.");
-    }
-
-    const { data, error } = await client.functions.invoke<{ count: number; ok: boolean; pages: number }>("nuvemshop-sync-products", {
-      body: { store_id: storeId },
-    });
-
-    if (error) {
-      if ("context" in error && error.context instanceof Response) {
-        const details = await error.context.json().catch(() => null);
-        const message = humanizeFunctionError(details);
-        if (message) throw new Error(message);
-        if (details && typeof details.error === "string") {
-          throw new Error(details.error.replace(/_/g, " "));
-        }
-      }
-      throw error;
-    }
+    const data = await apiPost<{ count: number; ok: boolean; pages: number }>(
+      "/api/integrations/nuvemshop/sync-products",
+      { store_id: storeId },
+      { humanize: humanizeFunctionError },
+    );
 
     return data ?? { count: 0, ok: true, pages: 0 };
   },
 
   async syncShopifyProducts(storeId: string) {
-    const client = requireSupabase();
-    const {
-      data: { session },
-      error: sessionError,
-    } = await client.auth.getSession();
+    await requireSession("Sua sessão expirou. Entre novamente para sincronizar produtos.");
 
-    if (sessionError) throw sessionError;
-    if (!session) {
-      throw new Error("Sua sessão expirou. Entre novamente para sincronizar produtos.");
-    }
-
-    const shopifySessionToken = await getShopifySessionToken();
-    const { data, error } = await client.functions.invoke<{ count: number; ok: boolean; pages: number; variants_count?: number }>(
-      "shopify-sync-products",
-      {
-        body: { store_id: storeId },
-        headers: {
-          ...(shopifySessionToken ? { "X-Shopify-Session-Token": shopifySessionToken } : {}),
-        },
-      },
+    const data = await apiPost<{ count: number; ok: boolean; pages: number; variants_count?: number }>(
+      "/api/integrations/shopify/sync-products",
+      { store_id: storeId },
+      { humanize: humanizeFunctionError },
     );
-
-    if (error) {
-      if ("context" in error && error.context instanceof Response) {
-        const details = await error.context.json().catch(() => null);
-        const message = humanizeFunctionError(details);
-        if (message) throw new Error(message);
-        if (details && typeof details.error === "string") {
-          throw new Error(details.error.replace(/_/g, " "));
-        }
-      }
-      throw error;
-    }
 
     return data ?? { count: 0, ok: true, pages: 0 };
   },
@@ -234,95 +159,45 @@ export const integrationsService = {
       shop: string;
     },
   ) {
-    const client = requireSupabase();
-    const {
-      data: { session },
-      error: sessionError,
-    } = await client.auth.getSession();
+    await requireSession("Sua sessão expirou. Entre novamente para conectar a Shopify.");
 
-    if (sessionError) throw sessionError;
-    if (!session) {
-      throw new Error("Sua sessão expirou. Entre novamente para conectar a Shopify.");
-    }
-
-    const { data, error } = await client.functions.invoke<{
+    const data = await apiPost<{
       integration_id: string;
       ok: boolean;
       shop_domain: string;
       shop_name?: string;
-    }>("shopify-connect-custom-app", {
-      body: {
+    }>(
+      "/api/integrations/shopify/connect-custom-app",
+      {
         access_token: payload.accessToken || "",
         client_id: payload.clientId || "",
         client_secret: payload.clientSecret || "",
         shop: payload.shop,
         store_id: storeId,
       },
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-    });
-
-    if (error) {
-      if ("context" in error && error.context instanceof Response) {
-        const details = await error.context.json().catch(() => null);
-        const message = humanizeFunctionError(details);
-        if (message) throw new Error(message);
-        if (details && typeof details.error === "string") {
-          throw new Error(details.error.replace(/_/g, " "));
-        }
-      }
-      throw error;
-    }
+      { humanize: humanizeFunctionError },
+    );
 
     if (!data?.ok) throw new Error("Não foi possível salvar a conexão manual da Shopify.");
     return data;
   },
 
   async connectUpzero(storeId: string, payload: { apiKey: string; baseUrl?: string; integrationName?: string; storefrontUrl?: string; productUrlPattern?: string }) {
-    const client = requireSupabase();
-    const {
-      data: { session },
-      error: sessionError,
-    } = await client.auth.getSession();
+    await requireSession("Sua sessão expirou. Entre novamente para conectar a UP Zero.");
 
-    if (sessionError) throw sessionError;
-    if (!session) {
-      throw new Error("Sua sessão expirou. Entre novamente para conectar a UP Zero.");
-    }
-
-    const { data, error } = await client.functions.invoke<{ ok: boolean; products_previewed: number }>("upzero-connect", {
-      body: { store_id: storeId, ...payload },
-    });
-
-    if (error) {
-      if ("context" in error && error.context instanceof Response) {
-        const details = await error.context.json().catch(() => null);
-        const message = humanizeFunctionError(details);
-        if (message) throw new Error(message);
-        if (details && typeof details.error === "string") {
-          throw new Error(details.error.replace(/_/g, " "));
-        }
-      }
-      throw error;
-    }
+    const data = await apiPost<{ ok: boolean; products_previewed: number }>(
+      "/api/integrations/upzero/connect",
+      { store_id: storeId, ...payload },
+      { humanize: humanizeFunctionError },
+    );
 
     return data ?? { ok: true, products_previewed: 0 };
   },
 
   async syncUpzeroProducts(storeId: string) {
-    const client = requireSupabase();
-    const {
-      data: { session },
-      error: sessionError,
-    } = await client.auth.getSession();
+    await requireSession("Sua sessão expirou. Entre novamente para sincronizar produtos.");
 
-    if (sessionError) throw sessionError;
-    if (!session) {
-      throw new Error("Sua sessão expirou. Entre novamente para sincronizar produtos.");
-    }
-
-    const { data, error } = await client.functions.invoke<{
+    const data = await apiPost<{
       count: number;
       detail_enriched?: number;
       images_found?: number;
@@ -332,19 +207,11 @@ export const integrationsService = {
       variants?: number;
       variants_with_attributes?: number;
       variants_with_images?: number;
-    }>("upzero-sync-products", {
-      body: { store_id: storeId },
-    });
-
-    if (error) {
-      if ("context" in error && error.context instanceof Response) {
-        const details = await error.context.json().catch(() => null);
-        const message = humanizeFunctionError(details);
-        if (message) throw new Error(message);
-        if (details && typeof details.error === "string") throw new Error(details.error.replace(/_/g, " "));
-      }
-      throw error;
-    }
+    }>(
+      "/api/integrations/upzero/sync-products",
+      { store_id: storeId },
+      { humanize: humanizeFunctionError },
+    );
 
     return data ?? { count: 0, ok: true, pages: 0, source: "storefront" };
   },

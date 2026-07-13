@@ -178,8 +178,10 @@ export async function fetchShopifyEmbeddedSession(): Promise<ShopifyEmbeddedSess
   }
 
   const launchParams = getPersistedLaunchParams();
+  // Plain fetch on purpose: the bearer here is a Shopify SESSION token, not
+  // the Supabase JWT the shared API client would attach.
   const response = await fetch(
-    `${env.supabaseUrl}/functions/v1/shopify-embedded-session`,
+    `${env.apiUrl}/api/integrations/shopify/embedded-session`,
     {
       body: JSON.stringify(launchParams),
       headers: {
@@ -223,12 +225,11 @@ async function pingShopifySessionToken(token: string) {
   if (!token || typeof window === "undefined") return;
   if (window.sessionStorage.getItem(PINGED_TOKEN_KEY) === token) return;
 
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  if (!supabaseUrl) return;
+  if (!env.apiUrl) return;
 
   try {
     const response = await fetch(
-      `${supabaseUrl}/functions/v1/shopify-session-token-ping`,
+      `${env.apiUrl}/api/integrations/shopify/session-token-ping`,
       {
         body: "{}",
         headers: {
@@ -288,7 +289,7 @@ async function resolveShopifyPublicApiKey() {
 
   try {
     const response = await fetch(
-      `${env.supabaseUrl}/functions/v1/shopify-app-config`,
+      `${env.apiUrl}/api/integrations/shopify/app-config`,
       {
         body: JSON.stringify({ shop }),
         headers: { "Content-Type": "application/json" },

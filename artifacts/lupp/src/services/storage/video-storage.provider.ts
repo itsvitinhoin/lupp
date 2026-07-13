@@ -77,7 +77,6 @@ async function postBunnyUploadAction<T>(
     body: JSON.stringify(payload),
     headers: {
       Authorization: `Bearer ${token}`,
-      apikey: env.supabaseAnonKey,
       "content-type": "application/json",
       "x-store-id": String(payload.store_id || ""),
     },
@@ -220,7 +219,7 @@ export class BunnyStreamProvider implements VideoStorageProvider {
       throw new Error("Sessão expirada. Faça login novamente para enviar vídeos.");
     }
 
-    const uploadUrl = `${env.supabaseUrl.replace(/\/$/, "")}/functions/v1/bunny-upload-video`;
+    const uploadUrl = `${env.apiUrl}/api/videos/upload`;
     onProgress?.({ bytesTotal: file.size, bytesUploaded: 0, phase: "preparing", progress: 1 });
 
     let session: BunnyUploadSession | null = null;
@@ -304,20 +303,21 @@ export class BunnyStreamProvider implements VideoStorageProvider {
         }).catch(() => null);
 
         onProgress?.({ bytesTotal: file.size, bytesUploaded: 0, phase: "preparing", progress: 1 });
-        return this.uploadViaEdgeProxy(file, storeId, token, onProgress);
+        return this.uploadViaServerProxy(file, storeId, token, onProgress);
       }
 
       throw error;
     }
   }
 
-  private async uploadViaEdgeProxy(file: File, storeId: string, token: string, onProgress?: (progress: VideoUploadProgress) => void): Promise<UploadedVideo> {
-    const uploadUrl = `${env.supabaseUrl.replace(/\/$/, "")}/functions/v1/bunny-upload-video`;
+  // Streams the raw bytes to the API server, which buffers and forwards them
+  // to Bunny itself (fallback when the direct TUS upload cannot start).
+  private async uploadViaServerProxy(file: File, storeId: string, token: string, onProgress?: (progress: VideoUploadProgress) => void): Promise<UploadedVideo> {
+    const uploadUrl = `${env.apiUrl}/api/videos/upload`;
     const uploaded = await new Promise<UploadedVideo>((resolve, reject) => {
       const request = new XMLHttpRequest();
       request.open("POST", uploadUrl);
       request.setRequestHeader("Authorization", `Bearer ${token}`);
-      request.setRequestHeader("apikey", env.supabaseAnonKey);
       request.setRequestHeader("content-type", getVideoContentType(file));
       request.setRequestHeader("x-file-size", String(file.size));
       request.setRequestHeader("x-file-name", encodeURIComponent(file.name));

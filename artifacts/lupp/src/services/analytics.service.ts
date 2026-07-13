@@ -1,3 +1,4 @@
+import { apiPost } from "@/lib/api";
 import { requireSupabase } from "@/lib/supabase";
 import type {
   DashboardCapabilities,
@@ -141,22 +142,20 @@ export const analyticsService = {
   },
 
   async trackEvent(payload: TrackEventPayload, context?: TrackingContext) {
-    const { error } = await requireSupabase()
-      .from("analytics_events")
-      .insert({
-        ...payload,
-        visitor_id:
-          payload.visitor_id ?? context?.visitorId ?? getOrCreateVisitorId(),
-        session_id:
-          payload.session_id ?? context?.sessionId ?? getOrCreateSessionId(),
-        url: payload.url ?? context?.url ?? window.location.href,
-        referrer:
-          payload.referrer ?? context?.referrer ?? (document.referrer || null),
-        user_agent:
-          payload.user_agent ?? context?.userAgent ?? navigator.userAgent,
-        metadata: payload.metadata ?? {},
-      });
-    if (error) throw error;
+    // Public API route — works for anonymous storefront visitors too.
+    await apiPost<{ ok: boolean }>("/api/widget/events", {
+      ...payload,
+      visitor_id:
+        payload.visitor_id ?? context?.visitorId ?? getOrCreateVisitorId(),
+      session_id:
+        payload.session_id ?? context?.sessionId ?? getOrCreateSessionId(),
+      url: payload.url ?? context?.url ?? window.location.href,
+      referrer:
+        payload.referrer ?? context?.referrer ?? (document.referrer || null),
+      user_agent:
+        payload.user_agent ?? context?.userAgent ?? navigator.userAgent,
+      metadata: payload.metadata ?? {},
+    });
   },
 
   async getDashboardMetrics(storeId: string): Promise<DashboardMetrics> {

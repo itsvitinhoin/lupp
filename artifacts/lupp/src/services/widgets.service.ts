@@ -1,3 +1,4 @@
+import { apiPost } from "@/lib/api";
 import { env } from "@/lib/env";
 import { requireSupabase } from "@/lib/supabase";
 import type { TableUpdate } from "@/types/database";
@@ -166,23 +167,16 @@ export const widgetsService = {
         "Sua sessão expirou. Entre novamente para instalar o script.",
       );
 
-    const { data, error } = await client.functions.invoke<NuvemshopScriptInstallResult>("nuvemshop-install-script", {
-      body: { store_id: storeId },
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
+    const data = await apiPost<NuvemshopScriptInstallResult>(
+      "/api/integrations/nuvemshop/install-script",
+      { store_id: storeId },
+      {
+        humanize: (payload) => {
+          const message = errorText(payload);
+          return message ? message.replace(/_/g, " ") : null;
+        },
       },
-    });
-
-    if (error) {
-      if ("context" in error && error.context instanceof Response) {
-        const details = await error.context.json().catch(() => null);
-        const message = errorText(details);
-        if (message) {
-          throw new Error(message.replace(/_/g, " "));
-        }
-      }
-      throw error;
-    }
+    );
 
     return data ?? { installed: true, method: "POST", script_id: "" };
   },
@@ -205,7 +199,7 @@ export const widgetsService = {
     }
 
     const response = await fetch(
-      `${env.supabaseUrl}/functions/v1/lupp-widget-bootstrap?${query.toString()}`,
+      `${env.apiUrl}/api/widget/bootstrap?${query.toString()}`,
     );
     const payload = asRecord(await response.json().catch(() => null));
     const carousel = asRecord(asRecord(asRecord(payload.widget).settings).carousel);
