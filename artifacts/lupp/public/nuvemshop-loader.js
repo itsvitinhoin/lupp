@@ -1,7 +1,6 @@
 (function () {
   var currentScript = document.currentScript;
   var fallbackAppUrl = "https://www.playluup.com.br";
-  var fallbackSupabaseUrl = "https://duktrvqfbvpfajuajhci.supabase.co";
 
   function getSearchParams() {
     try {
@@ -69,8 +68,7 @@
     setData(widgetScript, "store", params.get("lupp_store") || params.get("store"));
     setData(widgetScript, "widget", params.get("lupp_widget") || params.get("widget") || "floating_launcher");
     setData(widgetScript, "external-store-id", externalStoreId);
-    setData(widgetScript, "supabase-url", params.get("lupp_supabase_url") || params.get("supabase_url") || fallbackSupabaseUrl);
-    setData(widgetScript, "supabase-key", params.get("lupp_supabase_key") || params.get("supabase_key"));
+    setData(widgetScript, "api-url", params.get("lupp_api_url") || params.get("api_url"));
     setData(widgetScript, "lupp-url", appUrl);
     setData(widgetScript, "require-active", params.get("lupp_require_active") || "true");
 

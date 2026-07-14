@@ -4,6 +4,10 @@
   var script = document.currentScript;
   if (!script) return;
 
+  // Lupp REST API host used when data-api-url is absent on a non-localhost
+  // page. CONFIRM this hostname before deploying the widget.
+  var PROD_API_URL = "https://api.playluup.com.br";
+
   // Opt-in diagnostics: set window.__LUUP_DEBUG__ = true before the widget
   // loads to trace config resolution, bootstrap calls and abort reasons.
   function debugLog() {
@@ -312,10 +316,10 @@
     ],
     "",
   );
-  var supabaseUrl = readScriptValue(
-    "data-supabase-url",
-    ["lupp_supabase_url", "supabase_url"],
-    window.LUPP_SUPABASE_URL || "https://duktrvqfbvpfajuajhci.supabase.co",
+  var apiUrl = readScriptValue(
+    "data-api-url",
+    ["lupp_api_url", "api_url"],
+    window.LUPP_API_URL || "",
   );
   var luppBaseUrl = readScriptValue(
     "data-lupp-url",
@@ -400,15 +404,6 @@
     return "";
   }
 
-  if (
-    !supabaseUrl &&
-    /apps-scripts\.tiendanube\.com/i.test(
-      getUrlHostname(script.src || window.location.href),
-    )
-  ) {
-    supabaseUrl = "https://duktrvqfbvpfajuajhci.supabase.co";
-  }
-
   if (!externalStoreId) {
     externalStoreId = inferNuvemshopStoreId();
   }
@@ -431,6 +426,16 @@
   ) {
     luppBaseUrl = "https://www.playluup.com.br";
   }
+
+  // The API host is distinct from data-lupp-url (the SPA host): explicit
+  // attribute wins, localhost dev talks to the local API, production falls
+  // back to the PROD constant.
+  if (!apiUrl) {
+    apiUrl = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(luppBaseUrl)
+      ? "http://localhost:3333"
+      : PROD_API_URL;
+  }
+  apiUrl = apiUrl.replace(/\/$/, "");
 
   var launcherConfig = {
     position: readScriptValue(
@@ -554,7 +559,8 @@
     widgetType === "floating_video" ||
     isCarouselWidget() ||
     Boolean(externalStoreId) ||
-    Boolean(storeDomain);
+    Boolean(storeDomain) ||
+    Boolean(storeSlug);
 
   debugLog("config", {
     canUseBootstrap: canUseBootstrap,
@@ -564,20 +570,18 @@
     storeDomain: storeDomain,
     storeId: storeId,
     storeSlug: storeSlug,
-    supabaseUrl: supabaseUrl,
+    apiUrl: apiUrl,
     widgetType: widgetType,
   });
 
   if (
     (!storeId && !storeSlug && !externalStoreId && !storeDomain) ||
-    !supabaseUrl ||
     !canUseBootstrap
   ) {
     debugLog("abort: initial gate", {
       hasStoreIdentity: Boolean(
         storeId || storeSlug || externalStoreId || storeDomain,
       ),
-      hasSupabaseUrl: Boolean(supabaseUrl),
       keylessBootstrapAllowed: canUseBootstrap,
     });
     emitWidgetAborted("initial_gate");
@@ -587,10 +591,9 @@
     return;
   }
 
-  var bootstrapBase =
-    supabaseUrl.replace(/\/$/, "") + "/functions/v1/lupp-widget-bootstrap";
-  var upzeroProxyBase =
-    supabaseUrl.replace(/\/$/, "") + "/functions/v1/upzero-storefront-proxy";
+  var bootstrapBase = apiUrl + "/api/widget/bootstrap";
+  var eventsBase = apiUrl + "/api/widget/events";
+  var upzeroProxyBase = apiUrl + "/api/widget/upzero-proxy";
 
   function ensureVisitorId() {
     var key = "lupp_visitor_id";
@@ -624,15 +627,6 @@
         "'": "&#039;",
       }[char];
     });
-  }
-
-  function fetchJson(path) {
-    return fetch(apiBase + path, { headers: headers }).then(
-      function (response) {
-        if (!response.ok) throw new Error("Luup API error: " + response.status);
-        return response.json();
-      },
-    );
   }
 
   function fetchBootstrap(mode) {
@@ -3208,19 +3202,6 @@
     return widgetType;
   }
 
-  function fetchWidgetConfig(storeId) {
-    var type = mappedWidgetType();
-    return fetchJson(
-      "/widgets?store_id=eq." +
-        encodeURIComponent(storeId) +
-        "&type=eq." +
-        encodeURIComponent(type) +
-        "&status=eq.active&select=*",
-    ).then(function (widgets) {
-      return widgets[0] || null;
-    });
-  }
-
   function applyWidgetSettings(widget) {
     var settings =
       widget && widget.settings && typeof widget.settings === "object"
@@ -3548,7 +3529,7 @@
       ),
     };
 
-    fetch(bootstrapBase, {
+    fetch(eventsBase, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -5076,59 +5057,9 @@
       return;
     }
 
-    fetchJson(
-      "/stores?slug=eq." +
-        encodeURIComponent(storeSlug) +
-        "&status=eq.active&select=*",
-    )
-      .then(function (stores) {
-        var store = stores[0] || {
-          id: null,
-          slug: storeSlug,
-          button_color: launcherConfig.accentColor,
-        };
-
-        var widgetConfigPromise = fetchWidgetConfig(store.id).catch(function () {
-          return null;
-        });
-
-        return widgetConfigPromise.then(function (widgetConfig) {
-          if (!widgetConfig && requireActiveWidget) {
-            debugLog("abort: no active widget config with require-active");
-            emitWidgetAborted("no_active_widget");
-            root.remove();
-            return null;
-          }
-
-          applyWidgetSettings(widgetConfig);
-          if (!shouldDisplayOnCurrentUrl(displayConfig)) {
-            debugLog("abort: display rules exclude current URL", {
-              path: currentPath(),
-            });
-            emitWidgetAborted("display_rules", { path: currentPath() });
-            root.remove();
-            return null;
-          }
-
-          track(store.id, "widget_view");
-          activeStore = store;
-          activeVideos = [];
-          hasLoadedVideoList = false;
-          detectUpzeroCustomerStatus(store, { forceRefresh: true }).catch(function () {});
-          renderForCurrentUrl(root);
-          return null;
-        });
-      })
-      .catch(function (error) {
-        debugLog("degraded render after fetch error", error.message);
-        console.warn("[Luup]", error.message);
-        renderLauncher(
-          root,
-          { id: null, slug: storeSlug, button_color: launcherConfig.accentColor },
-          [],
-        );
-        emitWidgetRendered({ degraded: true, widgetType: widgetType });
-      });
+    // Unreachable: the initial gate requires canUseBootstrap, so the
+    // bootstrap path above always runs. The legacy PostgREST branch was
+    // removed with the Supabase migration.
   }
 
   runAfterPageReady(startWidget);

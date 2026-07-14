@@ -188,6 +188,7 @@
     setAttribute(widgetScript, "data-store", readConfig("lupp_store", ""));
     setAttribute(widgetScript, "data-widget", readConfig("lupp_widget", "floating_launcher"));
     setAttribute(widgetScript, "data-lupp-url", appUrl);
+    setAttribute(widgetScript, "data-api-url", readConfig("lupp_api_url", ""));
     setAttribute(widgetScript, "data-require-active", readConfig("lupp_require_active", "true"));
     setAttribute(widgetScript, "data-load-strategy", readConfig("lupp_load_strategy", "balanced"));
     setAttribute(widgetScript, "data-preview-mode", readConfig("lupp_preview_mode", "balanced"));

@@ -138,7 +138,7 @@ function bootstrapPayloadWithoutCarousel({ mode, videoCount = 3 }) {
 function mockBootstrapFetch(window, { matchDomain }) {
   window.fetch = (url) => {
     const parsed = new URL(String(url));
-    if (!parsed.pathname.includes("lupp-widget-bootstrap")) {
+    if (!parsed.pathname.includes("/api/widget/bootstrap")) {
       return Promise.resolve(new Response("{}", { status: 200 }));
     }
     const domain = parsed.searchParams.get("store_domain") || "";
@@ -196,6 +196,10 @@ async function scenarioNuvemshopRendersByDomain() {
     "injected tag exposes NO supabase key",
     !injected?.getAttribute("data-supabase-key"),
   );
+  check(
+    "injected tag exposes NO supabase url",
+    !injected?.getAttribute("data-supabase-url"),
+  );
 
   runAs(window, injected, widgetSource);
   await sleep(2500);
@@ -252,7 +256,7 @@ async function scenarioCarouselFollowsDbConfig() {
     const window = makeWindow({
       html: `<!doctype html><html><body><main>
         <script id="w" data-store="demo" data-widget="carousel"
-          data-supabase-url="https://example.supabase.co"
+          data-api-url="https://api.example.test"
           data-lupp-url="https://www.playluup.com.br"></script>
         </main></body></html>`,
       url: "https://demo.com.br/",
@@ -285,7 +289,7 @@ async function scenarioLegacyCarouselDefaultsOn() {
   const window = makeWindow({
     html: `<!doctype html><html><body><main>
       <script id="w" data-store="demo" data-widget="floating_launcher"
-        data-supabase-url="https://example.supabase.co"
+        data-api-url="https://api.example.test"
         data-lupp-url="https://www.playluup.com.br"></script>
       </main></body></html>`,
     url: "https://demo.com.br/",
@@ -320,7 +324,7 @@ async function scenarioUpzeroCarouselUsesBenefitsAnchor() {
         <a href="/produtos/ref1280-vestido-ref-1280/azul-marinho">Vestido Ref: 1280</a>
       </div>
       <script id="w" data-store="demo" data-widget="floating_launcher"
-        data-supabase-url="https://example.supabase.co"
+        data-api-url="https://api.example.test"
         data-lupp-url="https://www.playluup.com.br"></script>
       </main></body></html>`,
     url: "https://revendedorphize.com.br/",
@@ -364,7 +368,7 @@ async function scenarioUpzeroCarouselFallsBackToProductShowcase() {
         <a href="/produtos/ref1280-vestido-ref-1280/azul-marinho">Vestido Ref: 1280</a>
       </div>
       <script id="w" data-store="demo" data-widget="floating_launcher"
-        data-supabase-url="https://example.supabase.co"
+        data-api-url="https://api.example.test"
         data-lupp-url="https://www.playluup.com.br"></script>
       </main></body></html>`,
     url: "https://useceleb.com.br/",
@@ -404,7 +408,7 @@ async function scenarioUpzeroDevelopmentHomePathRendersCarousel() {
       <div id="hero">Banner principal</div>
       <div id="benefits">ENTREGA PARA TODO O BRASIL EXCLUSIVO COMPRA SEM PEDIDO MÍNIMO PAGAMENTO EM ATÉ 6X PAGAMENTO NO PIX</div>
       <script id="w" data-store-id="store-1" data-store="mx-fashion" data-widget="floating_launcher"
-        data-supabase-url="https://example.supabase.co"
+        data-api-url="https://api.example.test"
         data-lupp-url="https://www.playluup.com.br"></script>
       </main></body></html>`,
     url: "https://vitrine-plus.upzero.com.br/38",
@@ -436,7 +440,7 @@ async function scenarioUpzeroDevelopmentProductPathDoesNotRenderCarousel() {
     html: `<!doctype html><html><body><main>
       <div id="hero">Produto</div>
       <script id="w" data-store-id="store-1" data-store="mx-fashion" data-widget="floating_launcher"
-        data-supabase-url="https://example.supabase.co"
+        data-api-url="https://api.example.test"
         data-lupp-url="https://www.playluup.com.br"></script>
       </main></body></html>`,
     url: "https://vitrine-plus.upzero.com.br/38/produtos/ref1280-vestido-ref-1280/azul-marinho",

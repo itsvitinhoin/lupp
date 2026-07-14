@@ -299,6 +299,7 @@ function getManualSnippet(store: LuppStore | null) {
   s.setAttribute('data-store-url', ${jsStringLiteral(storeUrl)});
   s.setAttribute('data-widget', 'floating_launcher');
   s.setAttribute('data-lupp-url', ${jsStringLiteral(env.appUrl)});
+  s.setAttribute('data-api-url', ${jsStringLiteral(env.apiUrl)});
   s.setAttribute('data-require-active', 'true');
 
   var firstScript = document.getElementsByTagName('script')[0];

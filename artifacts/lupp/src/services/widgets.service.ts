@@ -149,6 +149,7 @@ export const widgetsService = {
   s.setAttribute('data-store', ${slug});
   s.setAttribute('data-widget', ${type});
   s.setAttribute('data-lupp-url', ${JSON.stringify(env.appUrl).replace(/<\/script/gi, "<\\/script")});
+  s.setAttribute('data-api-url', ${JSON.stringify(env.apiUrl).replace(/<\/script/gi, "<\\/script")});
 
   var firstScript = document.getElementsByTagName('script')[0];
   firstScript.parentNode.insertBefore(s, firstScript);

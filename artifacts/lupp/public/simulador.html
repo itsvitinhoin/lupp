@@ -229,8 +229,8 @@
               <input type="text" id="lupp_url" placeholder="http://localhost:5173" />
             </div>
             <div class="field">
-              <label for="supabase_url">Supabase URL (data-supabase-url, opcional)</label>
-              <input type="text" id="supabase_url" placeholder="https://….supabase.co" />
+              <label for="api_url">API URL (data-api-url, opcional)</label>
+              <input type="text" id="api_url" placeholder="http://localhost:3333" />
             </div>
             <div class="field">
               <label for="carousel_widget">Tipo do carrossel (data-widget)</label>
@@ -292,7 +292,7 @@
           "store_name",
           "store_url",
           "lupp_url",
-          "supabase_url",
+          "api_url",
           "carousel_widget",
         ];
         var BOOL_FIELDS = ["launcher", "carousel", "require_active"];
@@ -312,7 +312,7 @@
             store_name: "",
             store_url: "",
             lupp_url: location.origin,
-            supabase_url: "",
+            api_url: "",
             carousel_widget: "carousel",
             launcher: true,
             carousel: true,
@@ -382,7 +382,7 @@
           if (widgetType !== "floating_launcher") {
             attrs.push(["data-home-carousel-enabled", "true"]);
           }
-          if (values.supabase_url) attrs.push(["data-supabase-url", values.supabase_url]);
+          if (values.api_url) attrs.push(["data-api-url", values.api_url]);
           if (values.lupp_url) attrs.push(["data-lupp-url", values.lupp_url]);
           if (values.require_active) attrs.push(["data-require-active", "true"]);
           return attrs

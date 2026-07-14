@@ -99,7 +99,6 @@ function loadLuupLoader(nube, attempt = 0) {
       lupp_ofi: "true",
       lupp_require_active: "true",
       lupp_store_domain: storeDomain || "",
-      lupp_supabase_url: LUUP_SUPABASE_URL,
       lupp_url: LUUP_APP_URL,
       lupp_widget: "floating_launcher",
     },
