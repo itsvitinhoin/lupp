@@ -30,3 +30,9 @@ export const errorSchemas = {
   409: z.object({ message: z.string() }).describe("Conflict, record already exists"),
   500: z.object({ message: z.string() }).describe("Server internal unhandled error"),
 }
+
+// Only rate-limited routes (the auth surface) respond with 429 — spread this
+// into their response schemas alongside errorSchemas.
+export const rateLimitErrorSchema = {
+  429: z.object({ message: z.string() }).describe("Too many requests (rate limited)."),
+}

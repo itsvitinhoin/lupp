@@ -125,20 +125,44 @@ enum CouponDuration {
 // ---------------------------------------------------------------------------
 
 model User {
-  id            String   @id @default(uuid(7))
-  name          String
-  email         String   @unique
-  password_hash String
-  role          String   @default("agent")
-  avatar_url    String?
-  created_at    DateTime @default(now()) @db.Timestamptz(6)
-  updated_at    DateTime @updatedAt @db.Timestamptz(6)
+  id                 String    @id @default(uuid(7))
+  name               String
+  email              String    @unique
+  password_hash      String
+  role               String    @default("agent")
+  avatar_url         String?
+  email_confirmed_at DateTime? @db.Timestamptz(6)
+  created_at         DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime  @updatedAt @db.Timestamptz(6)
 
   stores      Store[]
   memberships StoreMember[]
   audit_logs  MasterConsoleAuditLog[]
+  auth_tokens AuthToken[]
 
   @@map("users")
+}
+
+enum AuthTokenPurpose {
+  email_confirmation
+  password_reset
+}
+
+// Single-use, hashed-at-rest tokens for the email confirmation and password
+// reset flows. The raw token only ever travels inside the emailed link.
+model AuthToken {
+  id          String           @id @default(uuid(7))
+  user_id     String
+  purpose     AuthTokenPurpose
+  token_hash  String           @unique
+  expires_at  DateTime         @db.Timestamptz(6)
+  consumed_at DateTime?        @db.Timestamptz(6)
+  created_at  DateTime         @default(now()) @db.Timestamptz(6)
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, purpose])
+  @@map("auth_tokens")
 }
 
 // ---------------------------------------------------------------------------

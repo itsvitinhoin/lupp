@@ -21,6 +21,14 @@ const envSchema = z
     DATABASE_STATEMENT_TIMEOUT_MS: z.coerce.number().default(30_000),
     // Public base URL of the SPA (OAuth redirects, billing callback URLs).
     LUPP_APP_URL: z.url().default("http://localhost:5173"),
+    // Public base URL of this API — email confirmation links point here.
+    LUPP_API_URL: z.url().default("http://localhost:3333"),
+    // MAILER (auth confirmation/reset emails). "log" prints messages to the
+    // server log instead of sending; swap for a real driver in production.
+    MAIL_DRIVER: z.enum(["log"]).default("log"),
+    MAIL_FROM: z.string().default("Luup <no-reply@playluup.com.br>"),
+    // Max sign-in attempts per IP per minute (the brute-force surface).
+    RATE_LIMIT_LOGIN_MAX: z.coerce.number().default(10),
     // ASAAS BILLING (integration off when the API key is unset)
     ASAAS_API_KEY: z.string().optional(),
     ASAAS_ENVIRONMENT: z.enum(["sandbox", "production"]).default("sandbox"),

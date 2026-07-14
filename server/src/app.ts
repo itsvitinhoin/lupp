@@ -1,6 +1,7 @@
 import { fastify } from "fastify"
 import fastifyJwt from "@fastify/jwt"
 import fastifyCookie from "@fastify/cookie"
+import fastifyRateLimit from "@fastify/rate-limit"
 import { fastifyCors } from "@fastify/cors"
 import fastifySwagger from "@fastify/swagger"
 import {
@@ -12,7 +13,7 @@ import { fastifySwaggerUi } from "@fastify/swagger-ui"
 import { env } from "./env"
 import { loggerHandlers } from "./logger"
 import { registerRoutes } from "./routes"
-import { setErrorHandlers } from "@/errors"
+import { setErrorHandlers, TooManyRequestsError } from "@/errors"
 
 const isProduction = env.NODE_ENV === "production"
 
@@ -75,6 +76,9 @@ export const app = fastify({
         }),
   },
   disableRequestLogging: true, // Disable Fastify's default request logs
+  // Behind one reverse-proxy hop request.ip follows X-Forwarded-For, which the
+  // rate limiter keys on (and the rate-limit spec relies on to forge clients).
+  trustProxy: 1,
 })
 
 loggerHandlers(app)
@@ -132,5 +136,18 @@ app.register(fastifyJwt, {
 })
 
 app.register(fastifyCookie)
+
+// Not global: only routes that declare config.rateLimit (the auth surface —
+// the brute-force target) are throttled. Loopback is exempt in tests so
+// ordinary supertest traffic never trips a limit; the rate-limit spec forges
+// X-Forwarded-For to opt back in.
+const LOOPBACK_IPS = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"])
+app.register(fastifyRateLimit, {
+  global: false,
+  allowList: (request) => env.NODE_ENV === "test" && LOOPBACK_IPS.has(request.ip),
+  // Thrown by the plugin and mapped to 429 by setErrorHandlers.
+  errorResponseBuilder: () => new TooManyRequestsError(),
+})
+
 registerRoutes(app)
 setErrorHandlers(app)

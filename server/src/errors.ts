@@ -50,6 +50,14 @@ export class UserForbiddenError extends Error {
   }
 }
 
+// Returned by @fastify/rate-limit's errorResponseBuilder (src/app.ts). Needs
+// its own handler branch: the generic Error branch would surface it as 400.
+export class TooManyRequestsError extends Error {
+  constructor() {
+    super("Too many requests. Try again in a minute.")
+  }
+}
+
 type FormattedIssue = {
   path: string;
   code: string;
@@ -202,6 +210,15 @@ export function setErrorHandlers(app: FastifyTypedInstance) {
         `Prisma Engine Error (${request.method}) ROUTE: ${request.url} | ${error.message}`,
       );
       return reply.status(500).send({ message: "Internal database error." });
+    }
+
+    // RATE LIMITED
+    if (error instanceof TooManyRequestsError) {
+      request.log.warn(
+        { url: request.url, method: request.method, ip: request.ip },
+        `Rate Limited (${request.method}) ROUTE: ${request.url}`,
+      );
+      return reply.status(429).send({ message: error.message });
     }
 
     // General Error handling
