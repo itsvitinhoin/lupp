@@ -26,7 +26,7 @@ export default function Simulator() {
   }, [store]);
 
   return (
-    <AppLayout title="Simulador">
+    <AppLayout title="Simulador" fullWidth>
       <iframe
         key={src}
         src={src}

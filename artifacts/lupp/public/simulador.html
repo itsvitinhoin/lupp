@@ -14,7 +14,7 @@
         min-height: 100vh;
         color: #0f172a;
       }
-      main { max-width: 1280px; margin: 0 auto; padding: 24px 20px 40px; }
+      main { width: 100%; margin: 0 auto; padding: 24px 20px 40px; }
       h1 { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
       p.lead { margin-top: 4px; font-size: 13px; color: #64748b; }
 
@@ -41,6 +41,25 @@
         color: #475569;
         margin-bottom: 12px;
       }
+      .panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .panel-head h2 { margin-bottom: 0; }
+      button.toggle {
+        background: #fff;
+        color: #4f46e5;
+        border: 1px solid #c7d2fe;
+        border-radius: 999px;
+        padding: 4px 12px;
+        font-size: 11px;
+        font-weight: 700;
+      }
+      button.toggle:hover { background: #eef2ff; }
+      #form-body { margin-top: 12px; }
+      #form-body.hidden { display: none; }
 
       .field { margin-bottom: 12px; }
       .field label {
@@ -126,15 +145,42 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
         margin-bottom: 10px;
       }
       .preview-head span { font-size: 12px; color: #64748b; }
+      .view-toggle {
+        display: inline-flex;
+        background: #fff;
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        padding: 2px;
+        gap: 2px;
+      }
+      .view-toggle button {
+        background: transparent;
+        color: #64748b;
+        border-radius: 999px;
+        padding: 5px 14px;
+        font-size: 12px;
+      }
+      .view-toggle button.active { background: #4f46e5; color: #fff; }
       iframe#preview {
         width: 100%;
-        height: 640px;
+        height: min(76vh, 820px);
         border: 1px solid #e2e8f0;
         border-radius: 16px;
         background: #fff;
+      }
+      /* Visão mobile: viewport de celular centralizado com moldura */
+      #preview-wrap.mobile { display: flex; justify-content: center; }
+      #preview-wrap.mobile iframe#preview {
+        width: 390px;
+        max-width: 100%;
+        height: min(76vh, 820px);
+        border: 10px solid #0f172a;
+        border-radius: 32px;
       }
     </style>
   </head>
@@ -150,8 +196,12 @@
       <div class="layout">
         <div>
           <section class="panel">
-            <h2>Dados da simulação</h2>
+            <div class="panel-head">
+              <h2>Dados da simulação</h2>
+              <button class="toggle" id="toggle-form" aria-expanded="true" aria-controls="form-body">Ocultar</button>
+            </div>
 
+            <div id="form-body">
             <div class="field">
               <label for="widget_src">URL do widget.js</label>
               <input type="text" id="widget_src" placeholder="http://localhost:5173/widget.js" />
@@ -193,6 +243,7 @@
               <label><input type="checkbox" id="carousel" checked /> Carrossel</label>
               <label><input type="checkbox" id="require_active" checked /> require-active</label>
             </div>
+            </div>
           </section>
 
           <section class="panel" style="margin-top: 16px;">
@@ -211,9 +262,15 @@
         <section>
           <div class="preview-head">
             <h2 style="margin-bottom: 0; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #475569;">Loja simulada</h2>
+            <div class="view-toggle" role="group" aria-label="Modo de visualização">
+              <button type="button" id="view-desktop" class="active">Desktop</button>
+              <button type="button" id="view-mobile">Mobile</button>
+            </div>
             <span id="status"></span>
           </div>
-          <iframe id="preview" title="Loja simulada com o widget Luup" allow="autoplay; fullscreen; clipboard-write"></iframe>
+          <div id="preview-wrap">
+            <iframe id="preview" title="Loja simulada com o widget Luup" allow="autoplay; fullscreen; clipboard-write"></iframe>
+          </div>
         </section>
       </div>
     </main>
@@ -223,6 +280,8 @@
         var FORM_KEY = "lupp_simulador_form";
         var SCRIPT_KEY = "lupp_simulador_script";
         var MANUAL_KEY = "lupp_simulador_manual";
+        var VIEW_KEY = "lupp_simulador_view";
+        var FORM_OPEN_KEY = "lupp_simulador_form_open";
 
         var TEXT_FIELDS = [
           "widget_src",
@@ -443,7 +502,32 @@
         document.getElementById("regenerate").addEventListener("click", regenerate);
         document.getElementById("run").addEventListener("click", run);
 
+        // Alterna a visão da loja simulada entre desktop e um viewport mobile.
+        function setView(view) {
+          document.getElementById("preview-wrap").className = view === "mobile" ? "mobile" : "";
+          document.getElementById("view-desktop").className = view === "mobile" ? "" : "active";
+          document.getElementById("view-mobile").className = view === "mobile" ? "active" : "";
+          try { localStorage.setItem(VIEW_KEY, view); } catch (_) { /* sem persistência */ }
+        }
+        document.getElementById("view-desktop").addEventListener("click", function () { setView("desktop"); });
+        document.getElementById("view-mobile").addEventListener("click", function () { setView("mobile"); });
+
+        // Mostra/oculta o painel "Dados da simulação".
+        function setFormOpen(open) {
+          var body = document.getElementById("form-body");
+          var button = document.getElementById("toggle-form");
+          body.className = open ? "" : "hidden";
+          button.textContent = open ? "Ocultar" : "Mostrar";
+          button.setAttribute("aria-expanded", open ? "true" : "false");
+          try { localStorage.setItem(FORM_OPEN_KEY, open ? "1" : "0"); } catch (_) { /* sem persistência */ }
+        }
+        document.getElementById("toggle-form").addEventListener("click", function () {
+          setFormOpen(document.getElementById("form-body").className === "hidden");
+        });
+
         loadState();
+        setView(localStorage.getItem(VIEW_KEY) === "mobile" ? "mobile" : "desktop");
+        setFormOpen(localStorage.getItem(FORM_OPEN_KEY) !== "0");
         if (manualEdit) badge.style.display = "inline-block";
         else textarea.value = buildScript(readForm());
         run();

@@ -11,6 +11,8 @@ import { useCurrentStore } from '@/hooks/useStore';
 interface AppLayoutProps {
   children: React.ReactNode;
   title: string;
+  /** Lets the page span the full content width instead of the max-w-7xl column. */
+  fullWidth?: boolean;
 }
 
 function TrialBanner() {
@@ -77,7 +79,7 @@ function TrialBanner() {
   );
 }
 
-export function AppLayout({ children, title }: AppLayoutProps) {
+export function AppLayout({ children, title, fullWidth = false }: AppLayoutProps) {
   return (
     <div className="min-h-[100dvh] bg-[#f6f8fb] text-slate-950">
       <Sidebar />
@@ -85,7 +87,7 @@ export function AppLayout({ children, title }: AppLayoutProps) {
         <Header title={title} />
         <TrialBanner />
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
-          <div className="mx-auto max-w-7xl">
+          <div className={fullWidth ? "w-full" : "mx-auto max-w-7xl"}>
             {children}
           </div>
         </main>
