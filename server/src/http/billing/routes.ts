@@ -6,8 +6,29 @@ import { createCheckoutHandler, CreateCheckoutSchema } from "./create-checkout";
 import { changePlanHandler, ChangePlanSchema } from "./change-plan";
 import { cancelSubscriptionHandler, CancelSubscriptionSchema } from "./cancel-subscription";
 import { asaasWebhookHandler, AsaasWebhookSchema } from "./asaas-webhook";
+import { getSubscriptionHandler, GetSubscriptionSchema } from "./get-subscription";
+import { getUsageHandler, GetUsageSchema } from "./get-usage";
+import { getCouponHandler, GetCouponSchema } from "./get-coupon";
 
 export async function BillingRoutes(app: FastifyTypedInstance) {
+  app.get(
+    "/api/billing/subscription",
+    { schema: GetSubscriptionSchema.schema, preHandler: [verifyJwt] },
+    getSubscriptionHandler,
+  );
+
+  app.get(
+    "/api/billing/usage",
+    { schema: GetUsageSchema.schema, preHandler: [verifyJwt] },
+    getUsageHandler,
+  );
+
+  app.get(
+    "/api/billing/coupons/:code",
+    { schema: GetCouponSchema.schema, preHandler: [verifyJwt] },
+    getCouponHandler,
+  );
+
   app.post(
     "/api/billing/trial-plan",
     { schema: ChangeTrialPlanSchema.schema, preHandler: [verifyJwt] },

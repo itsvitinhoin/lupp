@@ -37,4 +37,5 @@ export const IntegrationRowSchema = z
 
 export const CouponRowSchema = z.object({ id: z.string(), code: z.string() }).loose();
 
-export const AnalyticsEventRowSchema = z.object({ event_type: z.string() }).loose();
+// Projection presets vary (full/trend/feedbacks), so no key is required.
+export const AnalyticsEventRowSchema = z.object({}).loose();
