@@ -37,6 +37,13 @@ const envSchema = z
     BUNNY_STREAM_LIBRARY_ID: z.string().optional(),
     BUNNY_STREAM_API_KEY: z.string().optional(),
     BUNNY_STREAM_CDN_HOSTNAME: z.string().optional(),
+    // BUNNY STORAGE ZONE (image assets: store logos, thumbnails; off when unset)
+    BUNNY_STORAGE_ZONE_NAME: z.string().optional(),
+    BUNNY_STORAGE_API_KEY: z.string().optional(),
+    BUNNY_STORAGE_HOSTNAME: z.string().default("storage.bunnycdn.com"),
+    BUNNY_STORAGE_CDN_HOSTNAME: z.string().optional(),
+    // Max public writes (comments) per IP per minute.
+    RATE_LIMIT_PUBLIC_WRITE_MAX: z.coerce.number().default(10),
     // NUVEMSHOP / TIENDANUBE
     NUVEMSHOP_APP_ID: z.string().default("34355"),
     NUVEMSHOP_CLIENT_ID: z.string().optional(),

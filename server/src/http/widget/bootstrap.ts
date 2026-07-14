@@ -3,6 +3,7 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "@/lib/prisma";
 import { storeHasBillingAccess } from "@/lib/billing-access";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
+import { serializeVideo, VARIANT_SELECT, VIDEO_PRODUCTS_INCLUDE, type VideoRow } from "@/lib/serialize";
 import { Prisma, WidgetType } from "../../../generated/prisma/client";
 import { clean, findStore, WidgetStore } from "./resolve-store";
 
@@ -122,25 +123,6 @@ function enforceWidgetPlanLimits(widget: WidgetRow | null, store: WidgetStore) {
   };
 }
 
-// Same variant field list the original's nested select used (both modes).
-const VARIANT_SELECT = {
-  id: true,
-  external_id: true,
-  sku: true,
-  color_name: true,
-  color_code: true,
-  color_hex: true,
-  size_name: true,
-  size_code: true,
-  price: true,
-  compare_at_price: true,
-  stock_qty: true,
-  image_url: true,
-  asset_id: true,
-  status: true,
-  metadata: true,
-} satisfies Prisma.ProductVariantSelect;
-
 function videosWhere(storeId: string): Prisma.VideoWhereInput {
   return {
     store_id: storeId,
@@ -155,50 +137,6 @@ const VIDEOS_ORDER: Prisma.VideoOrderByWithRelationInput[] = [
   { sort_order: "asc" },
   { created_at: "desc" },
 ];
-
-function decimalToNumber(value: unknown) {
-  return value === null || value === undefined ? null : Number(value);
-}
-
-type VariantRow = Record<string, unknown> & { price: unknown; compare_at_price: unknown };
-type ProductRow = Record<string, unknown> & {
-  price: unknown;
-  compare_at_price: unknown;
-  variants: VariantRow[];
-};
-type VideoProductRow = { is_primary: boolean; product: ProductRow };
-type VideoRow = Record<string, unknown> & { video_products: VideoProductRow[] };
-
-// Maps the Prisma relation names back to the PostgREST nesting the widget
-// script consumes: video_products[].products.product_variants[].
-function serializeVideo(video: VideoRow) {
-  const { video_products, ...videoFields } = video;
-  return {
-    ...videoFields,
-    ...("file_size" in videoFields
-      ? {
-          file_size:
-            videoFields.file_size === null ? null : Number(videoFields.file_size as bigint),
-        }
-      : {}),
-    video_products: video_products.map(({ is_primary, product }) => {
-      const { variants, ...productFields } = product;
-      return {
-        is_primary,
-        products: {
-          ...productFields,
-          price: decimalToNumber(productFields.price),
-          compare_at_price: decimalToNumber(productFields.compare_at_price),
-          product_variants: variants.map((variant) => ({
-            ...variant,
-            price: decimalToNumber(variant.price),
-            compare_at_price: decimalToNumber(variant.compare_at_price),
-          })),
-        },
-      };
-    }),
-  };
-}
 
 async function loadVideos(storeId: string, mode: string): Promise<unknown[]> {
   if (mode === "preview") {
@@ -248,14 +186,7 @@ async function loadVideos(storeId: string, mode: string): Promise<unknown[]> {
   const rows = await prisma.video.findMany({
     where: videosWhere(storeId),
     orderBy: VIDEOS_ORDER,
-    include: {
-      video_products: {
-        select: {
-          is_primary: true,
-          product: { include: { variants: { select: VARIANT_SELECT } } },
-        },
-      },
-    },
+    include: VIDEO_PRODUCTS_INCLUDE,
   });
   return rows.map((row) => serializeVideo(row as unknown as VideoRow));
 }
