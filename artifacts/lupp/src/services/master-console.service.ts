@@ -1,5 +1,4 @@
 import { apiPost } from "@/lib/api";
-import { requireSupabase } from "@/lib/supabase";
 import type {
   MasterConsoleAction,
   MasterConsoleSnapshot,
@@ -15,17 +14,6 @@ type MasterConsoleActionPayload = {
 async function invokeMasterConsole<T>(
   body: Record<string, unknown>,
 ): Promise<T> {
-  const client = requireSupabase();
-  const {
-    data: { session },
-    error: sessionError,
-  } = await client.auth.getSession();
-
-  if (sessionError) throw sessionError;
-  if (!session) {
-    throw new Error("Faça login novamente para acessar o Master Console.");
-  }
-
   const data = await apiPost<T>("/api/master-console", body);
 
   if (!data) throw new Error("Master Console não retornou dados.");

@@ -1,4 +1,4 @@
-import { requireSupabase } from "@/lib/supabase";
+import { apiGet } from "@/lib/api";
 
 function asRecord(value: unknown): Record<string, any> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -18,16 +18,17 @@ export type VideoFeedback = {
 
 export const feedbacksService = {
   async listFeedbacks(storeId: string): Promise<VideoFeedback[]> {
-    const { data, error } = await requireSupabase()
-      .from("analytics_events")
-      .select("id, video_id, metadata, created_at, videos(title)")
-      .eq("store_id", storeId)
-      .eq("event_type", "widget_view")
-      .order("created_at", { ascending: false });
+    const params = new URLSearchParams({
+      store_id: storeId,
+      // Feedbacks are widget_view events with metadata.action=feedback_submit;
+      // the API caps the window at 92 days back.
+      since: new Date(0).toISOString(),
+      event_types: "widget_view",
+      fields: "feedbacks",
+    });
+    const data = await apiGet<{ events: any[] }>(`/api/analytics/events?${params}`);
 
-    if (error) throw error;
-
-    return (data ?? [])
+    return (data.events ?? [])
       .map((event: any) => {
         const metadata = asRecord(event.metadata);
         if (metadata.action !== "feedback_submit") return null;

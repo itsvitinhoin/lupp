@@ -1,30 +1,19 @@
-import { requireSupabase } from "@/lib/supabase";
-import type { CommentStatus, TableUpdate } from "@/types/database";
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
+import type { TableUpdate } from "@/types/database";
 
 export const commentsService = {
   async listComments(storeId: string, status = "all") {
-    let query = requireSupabase()
-      .from("comments")
-      .select("*, videos(title, video_products(products(name)))")
-      .eq("store_id", storeId)
-      .neq("status", "deleted")
-      .order("created_at", { ascending: false });
-    if (status !== "all") query = query.eq("status", status as CommentStatus);
+    const params = new URLSearchParams({ store_id: storeId });
+    if (status !== "all") params.set("status", status);
 
-    const { data, error } = await query;
-    if (error) throw error;
-    return data ?? [];
+    const data = await apiGet<{ comments: any[] }>(`/api/comments?${params}`);
+    return data.comments ?? [];
   },
 
   async listApprovedByVideo(videoId: string) {
-    const { data, error } = await requireSupabase()
-      .from("comments")
-      .select("id, author_name, body, created_at")
-      .eq("video_id", videoId)
-      .eq("status", "approved")
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    return data ?? [];
+    const params = new URLSearchParams({ video_id: videoId });
+    const data = await apiGet<{ comments: any[] }>(`/api/comments/public?${params}`);
+    return data.comments ?? [];
   },
 
   async createPublicComment(payload: {
@@ -34,35 +23,24 @@ export const commentsService = {
     authorEmail?: string;
     body: string;
   }) {
-    const { error } = await requireSupabase()
-      .from("comments")
-      .insert({
-        store_id: payload.storeId,
-        video_id: payload.videoId,
-        author_name: payload.authorName,
-        author_email: payload.authorEmail || null,
-        body: payload.body,
-        status: "pending",
-      });
-    if (error) throw error;
+    await apiPost("/api/comments/public", {
+      store_id: payload.storeId,
+      video_id: payload.videoId,
+      author_name: payload.authorName,
+      author_email: payload.authorEmail || null,
+      body: payload.body,
+    });
   },
 
   async updateComment(commentId: string, updates: TableUpdate<"comments">) {
-    const { data, error } = await requireSupabase()
-      .from("comments")
-      .update(updates)
-      .eq("id", commentId)
-      .select("*")
-      .single();
-    if (error) throw error;
-    return data;
+    const data = await apiPatch<{ comment: any }>(
+      `/api/comments/${commentId}`,
+      updates as Record<string, unknown>,
+    );
+    return data.comment;
   },
 
   async deleteComment(commentId: string) {
-    const { error } = await requireSupabase()
-      .from("comments")
-      .delete()
-      .eq("id", commentId);
-    if (error) throw error;
+    await apiDelete(`/api/comments/${commentId}`);
   },
 };

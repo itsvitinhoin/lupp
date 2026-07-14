@@ -34,9 +34,13 @@ function extractPayload(error: ApiError): EdgeErrorPayload {
     : null;
 }
 
+type ApiMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+
+type ApiOptions = { headers?: Record<string, string>; humanize?: Humanizer };
+
 async function apiRequest<T>(
   path: string,
-  init: { method: "GET" | "POST"; body?: string; headers?: Record<string, string> },
+  init: { method: ApiMethod; body?: BodyInit; headers?: Record<string, string> },
   humanize?: Humanizer,
 ): Promise<T> {
   try {
@@ -55,14 +59,67 @@ async function apiRequest<T>(
   }
 }
 
+export async function apiGet<T>(path: string, options?: ApiOptions): Promise<T> {
+  return apiRequest<T>(path, { method: "GET", headers: options?.headers }, options?.humanize);
+}
+
 export async function apiPost<T>(
   path: string,
   body: Record<string, unknown>,
-  options?: { headers?: Record<string, string>; humanize?: Humanizer },
+  options?: ApiOptions,
 ): Promise<T> {
   return apiRequest<T>(
     path,
     { method: "POST", body: JSON.stringify(body), headers: options?.headers },
+    options?.humanize,
+  );
+}
+
+export async function apiPatch<T>(
+  path: string,
+  body: Record<string, unknown>,
+  options?: ApiOptions,
+): Promise<T> {
+  return apiRequest<T>(
+    path,
+    { method: "PATCH", body: JSON.stringify(body), headers: options?.headers },
+    options?.humanize,
+  );
+}
+
+export async function apiPut<T>(
+  path: string,
+  body: Record<string, unknown>,
+  options?: ApiOptions,
+): Promise<T> {
+  return apiRequest<T>(
+    path,
+    { method: "PUT", body: JSON.stringify(body), headers: options?.headers },
+    options?.humanize,
+  );
+}
+
+export async function apiDelete<T>(path: string, options?: ApiOptions): Promise<T> {
+  return apiRequest<T>(path, { method: "DELETE", headers: options?.headers }, options?.humanize);
+}
+
+/**
+ * Raw-bytes upload (store logos, thumbnails): the file body goes straight to
+ * the API with its content type; the server reads x-file-name for the
+ * extension whitelist.
+ */
+export async function apiUpload<T>(path: string, file: Blob & { name?: string }, options?: ApiOptions): Promise<T> {
+  return apiRequest<T>(
+    path,
+    {
+      method: "POST",
+      body: file,
+      headers: {
+        "content-type": file.type || "application/octet-stream",
+        "x-file-name": file.name ?? "",
+        ...options?.headers,
+      },
+    },
     options?.humanize,
   );
 }

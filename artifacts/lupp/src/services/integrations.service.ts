@@ -1,6 +1,5 @@
-import { apiPost } from "@/lib/api";
+import { apiGet, apiPost, apiPut } from "@/lib/api";
 import { TRACKING_PROVIDERS } from "@/lib/constants";
-import { requireSupabase } from "@/lib/supabase";
 import type { EcommerceIntegration } from "@/types/integration";
 import type { LuppProduct } from "@/types/product";
 
@@ -74,28 +73,14 @@ function humanizeFunctionError(details: unknown) {
   return error ? `${error.replace(/_/g, " ")}${nestedMessage && nestedMessage !== error ? `: ${nestedMessage}` : ""}` : null;
 }
 
-async function requireSession(expiredMessage: string) {
-  const client = requireSupabase();
-  const {
-    data: { session },
-    error: sessionError,
-  } = await client.auth.getSession();
-
-  if (sessionError) throw sessionError;
-  if (!session) throw new Error(expiredMessage);
-  return session;
-}
-
 export const integrationsService = {
   async listIntegrations(storeId: string) {
-    const { data, error } = await requireSupabase().from("integrations").select("*").eq("store_id", storeId).order("provider");
-    if (error) throw error;
-    return data ?? [];
+    const params = new URLSearchParams({ store_id: storeId });
+    const data = await apiGet<{ integrations: any[] }>(`/api/integrations?${params}`);
+    return data.integrations ?? [];
   },
 
   async createNuvemshopAuthorizeUrl(storeId: string) {
-    await requireSession("Sua sessão expirou. Entre novamente para conectar a Nuvemshop.");
-
     const data = await apiPost<{ authorize_url: string }>(
       "/api/integrations/nuvemshop/oauth/start",
       {
@@ -110,8 +95,6 @@ export const integrationsService = {
   },
 
   async createShopifyAuthorizeUrl(storeId: string, shop?: string) {
-    await requireSession("Sua sessão expirou. Entre novamente para conectar a Shopify.");
-
     const data = await apiPost<{ authorize_url: string; shop?: string }>(
       "/api/integrations/shopify/oauth/start",
       {
@@ -127,8 +110,6 @@ export const integrationsService = {
   },
 
   async syncNuvemshopProducts(storeId: string) {
-    await requireSession("Sua sessão expirou. Entre novamente para sincronizar produtos.");
-
     const data = await apiPost<{ count: number; ok: boolean; pages: number }>(
       "/api/integrations/nuvemshop/sync-products",
       { store_id: storeId },
@@ -139,8 +120,6 @@ export const integrationsService = {
   },
 
   async syncShopifyProducts(storeId: string) {
-    await requireSession("Sua sessão expirou. Entre novamente para sincronizar produtos.");
-
     const data = await apiPost<{ count: number; ok: boolean; pages: number; variants_count?: number }>(
       "/api/integrations/shopify/sync-products",
       { store_id: storeId },
@@ -159,8 +138,6 @@ export const integrationsService = {
       shop: string;
     },
   ) {
-    await requireSession("Sua sessão expirou. Entre novamente para conectar a Shopify.");
-
     const data = await apiPost<{
       integration_id: string;
       ok: boolean;
@@ -183,8 +160,6 @@ export const integrationsService = {
   },
 
   async connectUpzero(storeId: string, payload: { apiKey: string; baseUrl?: string; integrationName?: string; storefrontUrl?: string; productUrlPattern?: string }) {
-    await requireSession("Sua sessão expirou. Entre novamente para conectar a UP Zero.");
-
     const data = await apiPost<{ ok: boolean; products_previewed: number }>(
       "/api/integrations/upzero/connect",
       { store_id: storeId, ...payload },
@@ -195,8 +170,6 @@ export const integrationsService = {
   },
 
   async syncUpzeroProducts(storeId: string) {
-    await requireSession("Sua sessão expirou. Entre novamente para sincronizar produtos.");
-
     const data = await apiPost<{
       count: number;
       detail_enriched?: number;
@@ -217,20 +190,12 @@ export const integrationsService = {
   },
 
   async upsertTrackingSettings(storeId: string, provider: (typeof TRACKING_PROVIDERS)[number], settings: Record<string, string>) {
-    const { data, error } = await requireSupabase()
-      .from("integrations")
-      .upsert(
-        {
-          store_id: storeId,
-          provider,
-          status: settings.enabled ? "active" : "available",
-          settings,
-        },
-        { onConflict: "store_id,provider" },
-      )
-      .select("*")
-      .single();
-    if (error) throw error;
-    return data;
+    // Status derives from settings.enabled server-side.
+    const data = await apiPut<{ integration: any }>("/api/integrations/tracking", {
+      store_id: storeId,
+      provider,
+      settings,
+    });
+    return data.integration;
   },
 };

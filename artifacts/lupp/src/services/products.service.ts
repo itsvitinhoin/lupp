@@ -1,53 +1,38 @@
-import { requireSupabase } from "@/lib/supabase";
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { integrationsService } from "./integrations.service";
+import type { TableRow } from "@/types/database";
 import type {
   CreateProductPayload,
   UpdateProductPayload,
 } from "@/types/product";
 
+type ProductRow = TableRow<"products">;
+
 export const productsService = {
   async listProducts(storeId: string, search = "", status = "all") {
-    let query = requireSupabase()
-      .from("products")
-      .select("*")
-      .eq("store_id", storeId)
-      .order("created_at", { ascending: false });
+    const params = new URLSearchParams({ store_id: storeId });
+    if (search) params.set("search", search);
+    if (status !== "all") params.set("status", status);
 
-    if (search) query = query.ilike("name", `%${search}%`);
-    if (status !== "all") query = query.eq("status", status);
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return data ?? [];
+    const data = await apiGet<{ products: ProductRow[] }>(`/api/products?${params}`);
+    return data.products ?? [];
   },
 
   async createProduct(payload: CreateProductPayload) {
-    const { data, error } = await requireSupabase()
-      .from("products")
-      .insert(payload)
-      .select("*")
-      .single();
-    if (error) throw error;
-    return data;
+    const data = await apiPost<{ product: ProductRow }>("/api/products", payload);
+    return data.product;
   },
 
   async updateProduct(productId: string, payload: UpdateProductPayload) {
-    const { data, error } = await requireSupabase()
-      .from("products")
-      .update(payload)
-      .eq("id", productId)
-      .select("*")
-      .single();
-    if (error) throw error;
-    return data;
+    const data = await apiPatch<{ product: ProductRow }>(
+      `/api/products/${productId}`,
+      payload,
+    );
+    return data.product;
   },
 
   async deleteProduct(productId: string) {
-    const { error } = await requireSupabase()
-      .from("products")
-      .delete()
-      .eq("id", productId);
-    if (error) throw error;
+    await apiDelete(`/api/products/${productId}`);
   },
 
   async syncNuvemshopProducts(storeId: string) {
