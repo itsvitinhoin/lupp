@@ -1,5 +1,5 @@
-import type { User } from "@supabase/supabase-js";
 import { env } from "@/lib/env";
+import type { AuthUser } from "@/types/auth";
 import type { TableRow } from "@/types/database";
 
 type ShopifyGlobal = {
@@ -52,7 +52,7 @@ export type ShopifyEmbeddedSession = {
   profile: TableRow<"profiles"> | null;
   shop: string;
   store: TableRow<"stores">;
-  user: User;
+  user: AuthUser;
 };
 
 function decodeShopifyTokenShop(token: string) {

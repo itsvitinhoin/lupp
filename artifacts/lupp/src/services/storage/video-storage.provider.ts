@@ -2,6 +2,7 @@ import * as tus from "tus-js-client";
 import { extensionFromName, getVideoContentType, isAcceptedVideoFile, MAX_VIDEO_UPLOAD_BYTES, MAX_VIDEO_UPLOAD_MB } from "@/lib/constants";
 import { env } from "@/lib/env";
 import { requireSupabase } from "@/lib/supabase";
+import { authService } from "@/services/auth.service";
 import type { UploadedVideo, VideoStorageProvider, VideoUploadProgress } from "@/types/video";
 
 function extensionFromFile(file: File) {
@@ -212,9 +213,7 @@ export class BunnyStreamProvider implements VideoStorageProvider {
       throw new Error(`O vídeo excede o limite configurado de ${MAX_VIDEO_UPLOAD_MB}MB.`);
     }
 
-    const supabase = requireSupabase();
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
+    const token = await authService.getValidAccessToken();
     if (!token) {
       throw new Error("Sessão expirada. Faça login novamente para enviar vídeos.");
     }

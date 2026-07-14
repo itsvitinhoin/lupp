@@ -6,22 +6,18 @@ import {
 } from "@workspace/api-client-react";
 
 import { env } from "@/lib/env";
-import { supabase } from "@/lib/supabase";
+import { authService } from "@/services/auth.service";
 
 /**
  * Points the shared REST client at the Lupp API server and teaches it to
- * attach the current Supabase session token as the bearer credential (the
- * server verifies Supabase-signed JWTs; user ids match users.id).
+ * attach the Lupp session token as the bearer credential. The getter
+ * auto-refreshes the access token through the httpOnly refresh cookie.
  *
  * Must run before any service call — main.tsx invokes it at module scope.
  */
 export function configureApiClient() {
   setBaseUrl(env.apiUrl || null);
-  setAuthTokenGetter(async () => {
-    if (!supabase) return null;
-    const { data } = await supabase.auth.getSession();
-    return data.session?.access_token ?? null;
-  });
+  setAuthTokenGetter(() => authService.getValidAccessToken());
 }
 
 export type EdgeErrorPayload = Record<string, unknown> | null;

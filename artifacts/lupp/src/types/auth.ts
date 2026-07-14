@@ -1,9 +1,28 @@
-import type { User, Session } from "@supabase/supabase-js";
 import type { TableRow } from "./database";
 
+/**
+ * Account shape returned by the Lupp API (`GET /api/auth/me`, sign-in/up).
+ * Fields are optional-loose so the Shopify embedded session's synthesized
+ * user (which lacks some of them) is assignable too.
+ */
+export interface AuthUser {
+  id: string;
+  email?: string | null;
+  name?: string | null;
+  role?: string | null;
+  avatar_url?: string | null;
+  email_confirmed_at?: string | null;
+  created_at?: string;
+}
+
+export interface AuthSession {
+  access_token: string;
+  user: AuthUser;
+}
+
 export interface AuthState {
-  user: User | null;
-  session: Session | null;
+  user: AuthUser | null;
+  session: AuthSession | null;
   profile: TableRow<"profiles"> | null;
   embeddedStore?: TableRow<"stores"> | null;
   isShopifyEmbedded?: boolean;

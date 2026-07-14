@@ -1,9 +1,8 @@
 import React from "react";
-import type { AuthState } from "@/types/auth";
+import type { AuthState, AuthUser } from "@/types/auth";
+import type { TableRow } from "@/types/database";
 import { authService } from "@/services/auth.service";
-import { isSupabaseConfigured } from "@/lib/env";
 import { fetchShopifyEmbeddedSession, isShopifyEmbeddedSession } from "@/lib/shopify-embedded";
-import { supabase } from "@/lib/supabase";
 
 interface AuthContextValue extends AuthState {
   refresh(): Promise<void>;
@@ -12,21 +11,29 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
 
+// Profiles were merged into the API's user record — derive the legacy profile
+// shape consumers still read (billing prefill etc.) from the session user.
+function profileFromUser(user: AuthUser): TableRow<"profiles"> {
+  return {
+    id: user.id,
+    name: user.name ?? null,
+    email: user.email ?? null,
+    avatar_url: user.avatar_url ?? null,
+    created_at: user.created_at ?? "",
+    updated_at: user.created_at ?? "",
+  };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<AuthState>({
     user: null,
     session: null,
     profile: null,
-    loading: isSupabaseConfigured,
+    loading: true,
     error: null,
   });
 
   const refresh = React.useCallback(async () => {
-    if (!isSupabaseConfigured || !supabase) {
-      setState((current) => ({ ...current, loading: false }));
-      return;
-    }
-
     try {
       setState((current) => ({ ...current, loading: !current.session, error: null }));
 
@@ -46,13 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const session = await authService.getSession();
       const user = session?.user ?? null;
-      let profile = null;
-
-      if (user) {
-        const { data, error } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
-        if (error) throw error;
-        profile = data;
-      }
+      const profile = user ? profileFromUser(user) : null;
 
       setState({ embeddedStore: null, isShopifyEmbedded: false, session, user, profile, loading: false, error: null });
     } catch (error) {
@@ -66,19 +67,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     void refresh();
-
-    if (!supabase) return;
-    const { data } = supabase.auth.onAuthStateChange(() => {
+    return authService.onAuthChange(() => {
       void refresh();
     });
-
-    return () => data.subscription.unsubscribe();
   }, [refresh]);
 
   const signOut = React.useCallback(async () => {
-    if (isSupabaseConfigured) {
-      await authService.signOut();
-    }
+    await authService.signOut();
     setState({ user: null, session: null, profile: null, embeddedStore: null, isShopifyEmbedded: false, loading: false, error: null });
   }, []);
 

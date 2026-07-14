@@ -90,7 +90,7 @@ export default function Login() {
         setUnconfirmedEmail(targetEmail);
         toast({
           title: 'Confirme seu e-mail para entrar',
-          description: 'Sua conta já foi criada, mas ainda falta clicar no link de confirmação enviado pela Supabase.',
+          description: 'Sua conta já foi criada, mas ainda falta clicar no link de confirmação enviado por e-mail.',
         });
         return;
       }
