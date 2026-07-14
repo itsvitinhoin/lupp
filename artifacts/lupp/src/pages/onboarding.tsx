@@ -90,7 +90,6 @@ export default function Onboarding() {
     try {
       setIsSubmitting(true);
       await storesService.createStoreWithDefaults({
-        ownerId: user.id,
         name: storeName.trim(),
         url: normalizeUrl(storeUrl) || undefined,
         platform,

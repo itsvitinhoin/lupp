@@ -1,5 +1,4 @@
-import { apiPost } from "@/lib/api";
-import { requireSupabase } from "@/lib/supabase";
+import { apiGet, apiPost } from "@/lib/api";
 import type {
   DashboardCapabilities,
   DashboardChartPoint,
@@ -130,15 +129,12 @@ function rankingRate(addToCart: number, views: number) {
 
 export const analyticsService = {
   async likeVideo(storeId: string, videoId: string) {
-    const { error } = await requireSupabase().from("video_likes").upsert(
-      {
-        store_id: storeId,
-        video_id: videoId,
-        visitor_id: getOrCreateVisitorId(),
-      },
-      { ignoreDuplicates: true, onConflict: "video_id,visitor_id" },
-    );
-    if (error) throw error;
+    // Public API route — idempotent per (video, visitor) server-side.
+    await apiPost("/api/widget/likes", {
+      store_id: storeId,
+      video_id: videoId,
+      visitor_id: getOrCreateVisitorId(),
+    });
   },
 
   async trackEvent(payload: TrackEventPayload, context?: TrackingContext) {
@@ -159,80 +155,40 @@ export const analyticsService = {
   },
 
   async getDashboardMetrics(storeId: string): Promise<DashboardMetrics> {
-    const supabase = requireSupabase();
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
     thirtyDaysAgo.setHours(0, 0, 0, 0);
 
-    const [
-      { count: activeVideos },
-      { count: totalLikes },
-      { count: pendingComments },
-      storeResult,
-      integrationsResult,
-      eventsResult,
-      videosResult,
-      productsResult,
-    ] = await Promise.all([
-      supabase
-        .from("videos")
-        .select("id", { count: "exact", head: true })
-        .eq("store_id", storeId)
-        .eq("status", "active"),
-      supabase
-        .from("video_likes")
-        .select("id", { count: "exact", head: true })
-        .eq("store_id", storeId),
-      supabase
-        .from("comments")
-        .select("id", { count: "exact", head: true })
-        .eq("store_id", storeId)
-        .eq("status", "pending"),
-      supabase
-        .from("stores")
-        .select("id, platform")
-        .eq("id", storeId)
-        .maybeSingle(),
-      supabase
-        .from("integrations")
-        .select("provider, status")
-        .eq("store_id", storeId),
-      supabase
-        .from("analytics_events")
-        .select(
-          "created_at, event_type, metadata, product_id, session_id, video_id, visitor_id",
-        )
-        .eq("store_id", storeId)
-        .gte("created_at", thirtyDaysAgo.toISOString()),
-      supabase
-        .from("videos")
-        .select(
-          "id, title, thumbnail_url, video_products(is_primary, products(name))",
-        )
-        .eq("store_id", storeId)
-        .neq("status", "deleted"),
-      supabase
-        .from("products")
-        .select("id, name, image_url")
-        .eq("store_id", storeId),
-    ]);
+    const storeParams = new URLSearchParams({ store_id: storeId });
+    const eventParams = new URLSearchParams({
+      store_id: storeId,
+      since: thirtyDaysAgo.toISOString(),
+      fields: "full",
+    });
 
-    if (storeResult.error) throw storeResult.error;
-    if (integrationsResult.error) throw integrationsResult.error;
-    if (eventsResult.error) throw eventsResult.error;
-    if (videosResult.error) throw videosResult.error;
-    if (productsResult.error) throw productsResult.error;
+    const [counts, storeResult, integrationsResult, eventsResult, videosResult, productsResult] =
+      await Promise.all([
+        apiGet<{ active_videos: number; total_likes: number; pending_comments: number }>(
+          `/api/analytics/dashboard-counts?${storeParams}`,
+        ),
+        apiGet<{ store: { id: string; platform?: string | null } }>(`/api/stores/${storeId}`),
+        apiGet<{ integrations: any[] }>(`/api/integrations?${storeParams}`),
+        apiGet<{ events: any[] }>(`/api/analytics/events?${eventParams}`),
+        apiGet<{ videos: any[] }>(`/api/videos?${storeParams}`),
+        apiGet<{ products: any[] }>(`/api/products?${storeParams}`),
+      ]);
 
-    const events = eventsResult.data ?? [];
-    const activeProviders = (integrationsResult.data ?? [])
+    const activeVideos = counts.active_videos;
+    const totalLikes = counts.total_likes;
+    const pendingComments = counts.pending_comments;
+
+    const events = eventsResult.events ?? [];
+    const activeProviders = (integrationsResult.integrations ?? [])
       .filter((integration) => integration.status === "active")
       .map((integration) => String(integration.provider || "").toLowerCase());
     const provider =
       activeProviders[0] ||
-      String(storeResult.data?.platform || "").toLowerCase() ||
+      String(storeResult.store?.platform || "").toLowerCase() ||
       "manual";
     const capabilities = dashboardCapabilities(provider);
 
@@ -319,7 +275,7 @@ export const analyticsService = {
     const chartData = Array.from(chartByDay.values());
 
     const videoMap = new Map<string, DashboardRankingItem>();
-    for (const video of (videosResult.data ?? []) as any[]) {
+    for (const video of (videosResult.videos ?? []) as any[]) {
       const links = Array.isArray((video as any).video_products)
         ? (video as any).video_products
         : [];
@@ -341,7 +297,7 @@ export const analyticsService = {
     }
 
     const productMap = new Map<string, DashboardRankingItem>();
-    for (const product of (productsResult.data ?? []) as any[]) {
+    for (const product of (productsResult.products ?? []) as any[]) {
       productMap.set(product.id, {
         addToCart: 0,
         clicks: 0,
@@ -459,7 +415,7 @@ export const analyticsService = {
       ctr: views > 0 ? productClicks / views : 0,
       addToCart,
       attributedRevenue,
-      activeVideos: activeVideos ?? 0,
+      activeVideos,
       attributedPurchases,
       averageFeedbackRating,
       averageFeedSessionSeconds,
@@ -481,8 +437,8 @@ export const analyticsService = {
       sessions: uniqueCount(events.map((event) => event.session_id)),
       topProducts,
       topVideos,
-      totalLikes: totalLikes ?? 0,
-      pendingComments: pendingComments ?? 0,
+      totalLikes,
+      pendingComments,
       uniqueVisitors: uniqueCount(events.map((event) => event.visitor_id)),
       widgetImpressions,
     };

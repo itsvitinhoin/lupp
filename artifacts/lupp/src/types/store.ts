@@ -8,5 +8,4 @@ export interface CreateStorePayload {
   url?: string;
   platform: string;
   segment: string;
-  ownerId: string;
 }

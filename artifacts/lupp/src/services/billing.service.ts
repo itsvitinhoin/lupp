@@ -1,6 +1,5 @@
-import { apiPost, type Humanizer } from "@/lib/api";
+import { apiGet, apiPost, type Humanizer } from "@/lib/api";
 import { countBillableWidgets, PLAN_LIMITS } from "@/lib/constants";
-import { requireSupabase } from "@/lib/supabase";
 import type {
   BillingEventSummary,
   BillingUsageTrendPoint,
@@ -18,38 +17,6 @@ const TRACKED_EVENT_TYPES = [
 ] as const;
 
 type TrackedEventType = (typeof TRACKED_EVENT_TYPES)[number];
-
-type MonthlyUsageRpcRow = {
-  active_videos?: number | null;
-  active_widgets?: number | null;
-  month_views?: number | null;
-};
-
-type MonthlyUsageRpcClient = {
-  rpc: (
-    functionName: "get_store_monthly_usage",
-    args: { check_store_id: string },
-  ) => {
-    maybeSingle: () => Promise<{
-      data: MonthlyUsageRpcRow | null;
-      error: unknown | null;
-    }>;
-  };
-};
-
-async function getActiveWidgetUsage(
-  supabase: ReturnType<typeof requireSupabase>,
-  storeId: string,
-) {
-  const { data, error } = await supabase
-    .from("widgets")
-    .select("type,status,settings")
-    .eq("store_id", storeId)
-    .eq("status", "active");
-
-  if (error) throw error;
-  return countBillableWidgets(data ?? []);
-}
 
 export type LuupCheckoutCustomer = {
   address: string;
@@ -140,64 +107,33 @@ export const billingService = {
   async getCurrentSubscription(
     storeId: string,
   ): Promise<LuppSubscription | null> {
-    const { data, error } = await requireSupabase()
-      .from("subscriptions")
-      .select("*")
-      .eq("store_id", storeId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (error) throw error;
-    return data;
+    const params = new URLSearchParams({ store_id: storeId });
+    const data = await apiGet<{ subscription: LuppSubscription | null }>(
+      `/api/billing/subscription?${params}`,
+    );
+    return data.subscription;
   },
 
   async getUsage(storeId: string): Promise<UsageSnapshot> {
-    const supabase = requireSupabase();
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
+    const params = new URLSearchParams({ store_id: storeId });
+    const usage = await apiGet<{
+      active_videos: number;
+      month_views: number;
+      active_widgets: number;
+    }>(`/api/billing/usage?${params}`);
 
-    const { data: monthlyUsage, error: monthlyUsageError } = await (
-      supabase as unknown as MonthlyUsageRpcClient
+    // The API counts every active widget; the billable count collapses the
+    // floating/home-carousel pair, so refine from the raw widget rows.
+    const activeWidgets = await apiGet<{ widgets: any[] }>(
+      `/api/widgets?${new URLSearchParams({ store_id: storeId, status: "active" })}`,
     )
-      .rpc("get_store_monthly_usage", { check_store_id: storeId })
-      .maybeSingle();
-
-    if (!monthlyUsageError && monthlyUsage) {
-      const activeWidgets = await getActiveWidgetUsage(supabase, storeId).catch(
-        () => Number(monthlyUsage.active_widgets ?? 0),
-      );
-
-      return {
-        activeVideos: Number(monthlyUsage.active_videos ?? 0),
-        monthViews: Number(monthlyUsage.month_views ?? 0),
-        activeWidgets,
-      };
-    }
-
-    const [activeVideos, monthViews, activeWidgets] = await Promise.all([
-      supabase
-        .from("videos")
-        .select("id", { count: "exact", head: true })
-        .eq("store_id", storeId)
-        .eq("status", "active"),
-      supabase
-        .from("analytics_events")
-        .select("id", { count: "exact", head: true })
-        .eq("store_id", storeId)
-        .eq("event_type", "video_view")
-        .gte("created_at", monthStart.toISOString()),
-      supabase
-        .from("widgets")
-        .select("type,status,settings")
-        .eq("store_id", storeId)
-        .eq("status", "active"),
-    ]);
+      .then((data) => countBillableWidgets(data.widgets ?? []))
+      .catch(() => usage.active_widgets);
 
     return {
-      activeVideos: activeVideos.count ?? 0,
-      monthViews: monthViews.count ?? 0,
-      activeWidgets: countBillableWidgets(activeWidgets.data ?? []),
+      activeVideos: usage.active_videos,
+      monthViews: usage.month_views,
+      activeWidgets,
     };
   },
 
@@ -212,17 +148,17 @@ export const billingService = {
     since.setDate(since.getDate() - (safeDays - 1));
     since.setHours(0, 0, 0, 0);
 
-    const { data, error } = await requireSupabase()
-      .from("analytics_events")
-      .select("event_type, created_at")
-      .eq("store_id", storeId)
-      .in("event_type", [...TRACKED_EVENT_TYPES])
-      .gte("created_at", since.toISOString())
-      .order("created_at", { ascending: true });
+    const params = new URLSearchParams({
+      store_id: storeId,
+      since: since.toISOString(),
+      event_types: TRACKED_EVENT_TYPES.join(","),
+      fields: "trend",
+    });
+    const data = await apiGet<{ events: { event_type: string; created_at: string }[] }>(
+      `/api/analytics/events?${params}`,
+    );
 
-    if (error) throw error;
-
-    for (const event of data ?? []) {
+    for (const event of data.events ?? []) {
       const eventType = event.event_type as TrackedEventType;
       if (!TRACKED_EVENT_TYPES.includes(eventType)) continue;
       const key = dateKey(new Date(event.created_at));
@@ -238,14 +174,15 @@ export const billingService = {
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
 
-    const { data, error } = await requireSupabase()
-      .from("analytics_events")
-      .select("event_type")
-      .eq("store_id", storeId)
-      .in("event_type", [...TRACKED_EVENT_TYPES])
-      .gte("created_at", monthStart.toISOString());
-
-    if (error) throw error;
+    const params = new URLSearchParams({
+      store_id: storeId,
+      since: monthStart.toISOString(),
+      event_types: TRACKED_EVENT_TYPES.join(","),
+      fields: "trend",
+    });
+    const data = await apiGet<{ events: { event_type: string }[] }>(
+      `/api/analytics/events?${params}`,
+    );
 
     const summary: BillingEventSummary = {
       addToCart: 0,
@@ -254,7 +191,7 @@ export const billingService = {
       views: 0,
     };
 
-    for (const event of data ?? []) {
+    for (const event of data.events ?? []) {
       const eventType = event.event_type as TrackedEventType;
       if (eventType === "video_view") summary.views += 1;
       if (eventType === "product_click") summary.productClicks += 1;
@@ -311,14 +248,9 @@ export const billingService = {
     const normalizedCode = code.trim().toUpperCase();
     if (!normalizedCode) return null;
 
-    const { data, error } = await requireSupabase()
-      .from("discount_coupons")
-      .select("*")
-      .ilike("code", normalizedCode)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (error) throw error;
+    const { coupon: data } = await apiGet<{ coupon: DiscountCoupon | null }>(
+      `/api/billing/coupons/${encodeURIComponent(normalizedCode)}`,
+    );
     if (!data) return null;
 
     const now = Date.now();

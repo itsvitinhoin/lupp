@@ -761,7 +761,6 @@ export default function Integrations() {
       if (!targetStore) {
         const storefrontUrl = normalizeUrl(upzeroStorefrontUrl.trim());
         targetStore = await storesService.createStoreWithDefaults({
-          ownerId: session.user.id,
           name: inferStoreNameFromUrl(storefrontUrl),
           url: storefrontUrl || undefined,
           platform: "upzero",
