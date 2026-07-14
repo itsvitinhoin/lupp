@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useCurrentStore } from "@/hooks/useStore";
 import { useVideos } from "@/hooks/useVideos";
 import { widgetsService } from "@/services/widgets.service";
-import { isSupabaseConfigured } from "@/lib/env";
+import { isApiConfigured } from "@/lib/env";
 import { cn } from "@/lib/utils";
 
 type FeedOptions = {
@@ -84,7 +84,7 @@ export default function FeedConfig() {
   const widgetsQuery = useQuery({
     queryKey: ["widgets", store?.id],
     queryFn: () => widgetsService.listWidgets(store!.id),
-    enabled: isSupabaseConfigured && Boolean(store),
+    enabled: isApiConfigured && Boolean(store),
   });
   const publicFeedPath = store ? `/s/${store.slug}/feed` : "/preview/feed";
   const publicFeedUrl = `${window.location.origin}${publicFeedPath}`;

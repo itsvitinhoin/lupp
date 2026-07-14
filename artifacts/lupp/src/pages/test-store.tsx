@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { env, isSupabaseConfigured } from '@/lib/env';
+import { env, isApiConfigured } from '@/lib/env';
 import { LuppLogo } from '@/components/shared/LuppLogo';
 import { ArrowLeft, ShoppingCart, Star } from 'lucide-react';
 import { Link, useRoute } from 'wouter';
@@ -15,7 +15,7 @@ export default function TestStore() {
   const widgetType = searchParams.get('widget') || 'floating_launcher';
 
   React.useEffect(() => {
-    if (!widgetHostRef.current || !storeSlug || !isSupabaseConfigured) return;
+    if (!widgetHostRef.current || !storeSlug || !isApiConfigured) return;
 
     widgetHostRef.current.innerHTML = '';
     const script = document.createElement('script');
@@ -29,8 +29,7 @@ export default function TestStore() {
     script.dataset.backgroundColor = '#0b0b0f';
     script.dataset.textColor = '#ffffff';
     script.dataset.bubbleSize = '74';
-    script.dataset.supabaseUrl = env.supabaseUrl;
-    script.dataset.supabaseKey = env.supabaseAnonKey;
+    script.dataset.apiUrl = env.apiUrl;
     script.dataset.luppUrl = env.appUrl;
     script.dataset.productUrl = `${window.location.origin}/test-store/${storeSlug}/produto-demo`;
     widgetHostRef.current.appendChild(script);
@@ -91,8 +90,8 @@ export default function TestStore() {
                 <span className="text-sm font-medium text-white/80">Widget instalado via script</span>
               </div>
               <div ref={widgetHostRef} />
-              {!isSupabaseConfigured && (
-                <p className="text-sm text-slate-500">Configure Supabase para carregar o widget real.</p>
+              {!isApiConfigured && (
+                <p className="text-sm text-slate-500">Configure a API (VITE_API_URL) para carregar o widget real.</p>
               )}
             </CardContent>
           </Card>
@@ -106,7 +105,7 @@ export default function TestStore() {
                 'O widget aparece nesta página',
                 'Clique no vídeo abre o feed vertical',
                 'O feed reproduz vídeos reais',
-                'Eventos aparecem no Supabase em analytics_events',
+                'Eventos aparecem na API em analytics_events',
               ].map((item) => (
                 <div key={item} className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600">
                   {item}

@@ -75,7 +75,6 @@
     "zod": "catalog:"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.108.1",
     "hls.js": "^1.6.16",
     "tus-js-client": "^4.3.1"
   }

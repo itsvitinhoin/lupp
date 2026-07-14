@@ -1,10 +1,8 @@
 export interface PublicEnv {
-  supabaseUrl: string;
-  supabaseAnonKey: string;
   apiUrl: string;
   appUrl: string;
   widgetCdnUrl: string;
-  videoProvider: "supabase" | "bunny" | "cloudflare";
+  videoProvider: "bunny";
   bunnyLibraryId: string;
   bunnyCdnHostname: string;
   cloudflareAccountId: string;
@@ -37,8 +35,6 @@ const viteEnv: Record<string, unknown> = {
   VITE_MERCADOPAGO_PUBLIC_KEY: import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY,
   VITE_META_PIXEL_ID: import.meta.env.VITE_META_PIXEL_ID,
   VITE_STRIPE_PUBLIC_KEY: import.meta.env.VITE_STRIPE_PUBLIC_KEY,
-  VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
-  VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
   VITE_TIKTOK_PIXEL_ID: import.meta.env.VITE_TIKTOK_PIXEL_ID,
   VITE_VIDEO_PROVIDER: import.meta.env.VITE_VIDEO_PROVIDER,
   VITE_WIDGET_CDN_URL: import.meta.env.VITE_WIDGET_CDN_URL,
@@ -85,12 +81,10 @@ function resolveAppUrl() {
 }
 
 export const env: PublicEnv = {
-  supabaseUrl: read("VITE_SUPABASE_URL"),
-  supabaseAnonKey: read("VITE_SUPABASE_ANON_KEY"),
   apiUrl: resolveApiUrl(),
   appUrl: resolveAppUrl(),
   widgetCdnUrl: resolveWidgetCdnUrl(),
-  videoProvider: (read("VITE_VIDEO_PROVIDER") || "supabase") as PublicEnv["videoProvider"],
+  videoProvider: "bunny",
   bunnyLibraryId: read("VITE_BUNNY_LIBRARY_ID"),
   bunnyCdnHostname: read("VITE_BUNNY_CDN_HOSTNAME"),
   cloudflareAccountId: read("VITE_CLOUDFLARE_ACCOUNT_ID"),
@@ -101,11 +95,12 @@ export const env: PublicEnv = {
   tiktokPixelId: read("VITE_TIKTOK_PIXEL_ID"),
 };
 
-export const isSupabaseConfigured = Boolean(env.supabaseUrl && env.supabaseAnonKey);
+// The API base resolves to localhost:3333 on localhost, so dev is always on;
+// production needs VITE_API_URL.
+export const isApiConfigured = Boolean(env.apiUrl);
 
 export function getMissingRequiredEnv() {
   const missing: string[] = [];
-  if (!env.supabaseUrl) missing.push("VITE_SUPABASE_URL");
-  if (!env.supabaseAnonKey) missing.push("VITE_SUPABASE_ANON_KEY");
+  if (!env.apiUrl) missing.push("VITE_API_URL");
   return missing;
 }

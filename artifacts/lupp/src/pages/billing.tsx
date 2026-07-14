@@ -26,7 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PLAN_LIMITS } from "@/lib/constants";
-import { isSupabaseConfigured } from "@/lib/env";
+import { isApiConfigured } from "@/lib/env";
 import { billingService } from "@/services/billing.service";
 import { useCurrentStore } from "@/hooks/useStore";
 import { useAuth } from "@/hooks/useAuth";
@@ -203,22 +203,22 @@ export default function Billing() {
   const subscriptionQuery = useQuery({
     queryKey: ["billing-subscription", store?.id],
     queryFn: () => billingService.getCurrentSubscription(store!.id),
-    enabled: isSupabaseConfigured && Boolean(store?.id),
+    enabled: isApiConfigured && Boolean(store?.id),
   });
   const usageQuery = useQuery({
     queryKey: ["billing-usage", store?.id],
     queryFn: () => billingService.getUsage(store!.id),
-    enabled: isSupabaseConfigured && Boolean(store?.id),
+    enabled: isApiConfigured && Boolean(store?.id),
   });
   const trendQuery = useQuery({
     queryKey: ["billing-usage-trend", store?.id],
     queryFn: () => billingService.getUsageTrend(store!.id, 30),
-    enabled: isSupabaseConfigured && Boolean(store?.id),
+    enabled: isApiConfigured && Boolean(store?.id),
   });
   const summaryQuery = useQuery({
     queryKey: ["billing-event-summary", store?.id],
     queryFn: () => billingService.getEventSummary(store!.id),
-    enabled: isSupabaseConfigured && Boolean(store?.id),
+    enabled: isApiConfigured && Boolean(store?.id),
   });
 
   const subscription = subscriptionQuery.data;

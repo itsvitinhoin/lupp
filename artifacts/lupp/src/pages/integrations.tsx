@@ -538,7 +538,7 @@ export default function Integrations() {
       toast({
         title: "Faça login novamente",
         description:
-          "A conexão com a Nuvemshop precisa de uma sessão real do Supabase.",
+          "A conexão com a Nuvemshop precisa de uma sessão real.",
       });
       setLocation("/login");
       return;
@@ -611,7 +611,7 @@ export default function Integrations() {
       toast({
         title: "Faça login novamente",
         description:
-          "A conexão com a Shopify precisa de uma sessão real do Supabase.",
+          "A conexão com a Shopify precisa de uma sessão real.",
       });
       setLocation("/login");
       return;
@@ -660,7 +660,7 @@ export default function Integrations() {
       toast({
         title: "Faça login novamente",
         description:
-          "A conexão manual da Shopify precisa de uma sessão real do Supabase.",
+          "A conexão manual da Shopify precisa de uma sessão real.",
       });
       setLocation("/login");
       return;
@@ -729,7 +729,7 @@ export default function Integrations() {
       toast({
         title: "Faça login novamente",
         description:
-          "A conexão com a UP Zero precisa de uma sessão real do Supabase.",
+          "A conexão com a UP Zero precisa de uma sessão real.",
       });
       setLocation("/login");
       return;

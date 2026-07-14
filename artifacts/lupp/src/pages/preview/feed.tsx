@@ -33,7 +33,7 @@ import { Link, useRoute } from "wouter";
 import { videosService } from "@/services/videos.service";
 import { analyticsService } from "@/services/analytics.service";
 import { commentsService } from "@/services/comments.service";
-import { env, isSupabaseConfigured } from "@/lib/env";
+import { env, isApiConfigured } from "@/lib/env";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
@@ -819,7 +819,7 @@ export default function PreviewFeed() {
         sourceProductUrl,
       );
     },
-    enabled: isSupabaseConfigured && Boolean(storeSlug),
+    enabled: isApiConfigured && Boolean(storeSlug),
   });
 
   const store = feedQuery.data?.store;
@@ -1086,7 +1086,7 @@ export default function PreviewFeed() {
   }, []);
 
   React.useEffect(() => {
-    if (!store?.id || !isSupabaseConfigured) return;
+    if (!store?.id || !isApiConfigured) return;
     void analyticsService
       .trackEvent({ store_id: store.id, event_type: "feed_open" })
       .catch(() => {});
@@ -1121,7 +1121,7 @@ export default function PreviewFeed() {
     video: any,
     productId?: string | null,
   ) => {
-    if (!store?.id || !isSupabaseConfigured) return;
+    if (!store?.id || !isApiConfigured) return;
     void analyticsService
       .trackEvent({
         store_id: store.id,
@@ -1786,7 +1786,7 @@ export default function PreviewFeed() {
     ]);
 
   React.useEffect(() => {
-    if (!store?.id || !activeVideoId || !isSupabaseConfigured) return;
+    if (!store?.id || !activeVideoId || !isApiConfigured) return;
     if (viewedVideoIdsRef.current.has(activeVideoId)) return;
 
     const timer = window.setTimeout(() => {

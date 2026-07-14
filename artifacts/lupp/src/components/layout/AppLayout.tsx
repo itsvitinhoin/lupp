@@ -4,7 +4,7 @@ import { Header } from './Header';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { AlertTriangle, Clock3 } from 'lucide-react';
-import { isSupabaseConfigured } from '@/lib/env';
+import { isApiConfigured } from '@/lib/env';
 import { billingService } from '@/services/billing.service';
 import { useCurrentStore } from '@/hooks/useStore';
 
@@ -20,7 +20,7 @@ function TrialBanner() {
   const subscriptionQuery = useQuery({
     queryKey: ["billing-subscription", store?.id],
     queryFn: () => billingService.getCurrentSubscription(store!.id),
-    enabled: isSupabaseConfigured && Boolean(store?.id),
+    enabled: isApiConfigured && Boolean(store?.id),
   });
   const access = billingService.getAccessStatus(subscriptionQuery.data, store);
 

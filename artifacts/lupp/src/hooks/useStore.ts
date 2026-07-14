@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { storesService } from "@/services/stores.service";
-import { isSupabaseConfigured } from "@/lib/env";
+import { isApiConfigured } from "@/lib/env";
 import { useAuth } from "./useAuth";
 
 export function useStores() {
@@ -9,7 +9,7 @@ export function useStores() {
   return useQuery({
     queryKey: ["stores", user?.id],
     queryFn: () => storesService.listUserStores(),
-    enabled: isSupabaseConfigured && Boolean(user),
+    enabled: isApiConfigured && Boolean(user),
   });
 }
 

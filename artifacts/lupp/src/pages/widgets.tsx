@@ -16,7 +16,7 @@ import { CodeBlock } from "@/components/shared/CodeBlock";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrentStore } from "@/hooks/useStore";
 import { widgetsService } from "@/services/widgets.service";
-import { env, isSupabaseConfigured } from "@/lib/env";
+import { env, isApiConfigured } from "@/lib/env";
 import {
   PLAN_LIMITS,
   normalizeLuupPlanId,
@@ -166,7 +166,7 @@ export default function Widgets() {
   const widgetsQuery = useQuery({
     queryKey: ["widgets", store?.id],
     queryFn: () => widgetsService.listWidgets(store!.id),
-    enabled: isSupabaseConfigured && Boolean(store),
+    enabled: isApiConfigured && Boolean(store),
   });
   const floatingWidget =
     widgetsQuery.data?.find((widget) => widget.type === "floating_video") ??

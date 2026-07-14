@@ -15,7 +15,7 @@ export default function Simulator() {
     const params = new URLSearchParams();
     params.set("widget_src", `${env.appUrl}/widget.js`);
     params.set("lupp_url", env.appUrl);
-    if (env.supabaseUrl) params.set("supabase_url", env.supabaseUrl);
+    params.set("api_url", env.apiUrl);
     if (store) {
       params.set("store_id", store.id);
       params.set("store", store.slug);

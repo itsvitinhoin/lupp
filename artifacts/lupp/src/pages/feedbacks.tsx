@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { isSupabaseConfigured } from "@/lib/env";
+import { isApiConfigured } from "@/lib/env";
 import { useCurrentStore } from "@/hooks/useStore";
 import { feedbacksService } from "@/services/feedbacks.service";
 import { MessageSquareText, Star } from "lucide-react";
@@ -28,7 +28,7 @@ export default function Feedbacks() {
   const feedbacksQuery = useQuery({
     queryKey: ["video-feedbacks", store?.id],
     queryFn: () => feedbacksService.listFeedbacks(store!.id),
-    enabled: isSupabaseConfigured && Boolean(store?.id),
+    enabled: isApiConfigured && Boolean(store?.id),
   });
   const feedbacks = feedbacksQuery.data ?? [];
   const ratingAverage = average(feedbacks.map((feedback) => feedback.rating));
