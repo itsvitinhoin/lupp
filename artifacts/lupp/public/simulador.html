@@ -59,7 +59,9 @@
       }
       button.toggle:hover { background: #eef2ff; }
       #form-body { margin-top: 12px; }
-      #form-body.hidden { display: none; }
+      #form-body.hidden, #script-panel.hidden { display: none; }
+      /* Com os painéis recolhidos, a loja simulada ocupa toda a largura. */
+      .layout.collapsed { grid-template-columns: 1fr; }
 
       .field { margin-bottom: 12px; }
       .field label {
@@ -246,7 +248,7 @@
             </div>
           </section>
 
-          <section class="panel" style="margin-top: 16px;">
+          <section class="panel" id="script-panel" style="margin-top: 16px;">
             <div class="script-head">
               <h2 style="margin-bottom: 0;">Script em execução</h2>
               <span id="manual-badge">editado manualmente</span>
@@ -512,11 +514,14 @@
         document.getElementById("view-desktop").addEventListener("click", function () { setView("desktop"); });
         document.getElementById("view-mobile").addEventListener("click", function () { setView("mobile"); });
 
-        // Mostra/oculta o painel "Dados da simulação".
+        // Mostra/oculta os painéis "Dados da simulação" e "Script em execução";
+        // recolhidos, a coluna some e a loja simulada ganha a largura toda.
         function setFormOpen(open) {
           var body = document.getElementById("form-body");
           var button = document.getElementById("toggle-form");
           body.className = open ? "" : "hidden";
+          document.getElementById("script-panel").className = open ? "panel" : "panel hidden";
+          document.querySelector(".layout").className = open ? "layout" : "layout collapsed";
           button.textContent = open ? "Ocultar" : "Mostrar";
           button.setAttribute("aria-expanded", open ? "true" : "false");
           try { localStorage.setItem(FORM_OPEN_KEY, open ? "1" : "0"); } catch (_) { /* sem persistência */ }
