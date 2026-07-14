@@ -1,42 +1,8 @@
 import * as tus from "tus-js-client";
-import { extensionFromName, getVideoContentType, isAcceptedVideoFile, MAX_VIDEO_UPLOAD_BYTES, MAX_VIDEO_UPLOAD_MB } from "@/lib/constants";
+import { getVideoContentType, isAcceptedVideoFile, MAX_VIDEO_UPLOAD_BYTES, MAX_VIDEO_UPLOAD_MB } from "@/lib/constants";
 import { env } from "@/lib/env";
-import { requireSupabase } from "@/lib/supabase";
 import { authService } from "@/services/auth.service";
 import type { UploadedVideo, VideoStorageProvider, VideoUploadProgress } from "@/types/video";
-
-function extensionFromFile(file: File) {
-  return extensionFromName(file.name) || "mp4";
-}
-
-function getResumableUploadEndpoint() {
-  try {
-    const url = new URL(env.supabaseUrl);
-    const projectRef = url.hostname.endsWith(".supabase.co") ? url.hostname.split(".")[0] : "";
-
-    if (projectRef) {
-      return `${url.protocol}//${projectRef}.storage.supabase.co/storage/v1/upload/resumable`;
-    }
-
-    return `${url.origin}/storage/v1/upload/resumable`;
-  } catch {
-    return `${env.supabaseUrl.replace(/\/$/, "")}/storage/v1/upload/resumable`;
-  }
-}
-
-function formatTusError(error: Error | tus.DetailedError) {
-  if (error instanceof tus.DetailedError && error.originalResponse) {
-    const status = error.originalResponse.getStatus();
-    const body = error.originalResponse.getBody();
-    if (status === 413) {
-      return "O Supabase recusou o arquivo pelo limite global de Storage. Em projetos Pro, ajuste Storage > Settings > Global file size limit para pelo menos o tamanho do vídeo.";
-    }
-
-    return `Falha no upload resumível (${status}). ${body || error.message}`;
-  }
-
-  return error.message;
-}
 
 function formatBunnyTusError(error: Error | tus.DetailedError) {
   if (error instanceof tus.DetailedError && error.originalResponse) {
@@ -104,103 +70,6 @@ function bunnyUploadedVideoFromBody(body: BunnyUploadMetadata, file: File): Uplo
     thumbnail_url: body.thumbnail_url || null,
     url: String(body.video_url || body.playback_url || body.url || ""),
   };
-}
-
-export class SupabaseVideoProvider implements VideoStorageProvider {
-  async uploadVideo(file: File, storeId: string, onProgress?: (progress: VideoUploadProgress) => void): Promise<UploadedVideo> {
-    if (!isAcceptedVideoFile(file)) {
-      throw new Error("Formato inválido. Envie um vídeo MP4, MOV ou WebM.");
-    }
-
-    if (file.size > MAX_VIDEO_UPLOAD_BYTES) {
-      throw new Error(`O vídeo excede o limite configurado de ${MAX_VIDEO_UPLOAD_MB}MB.`);
-    }
-
-    const supabase = requireSupabase();
-    const path = `${storeId}/${crypto.randomUUID()}.${extensionFromFile(file)}`;
-    const contentType = getVideoContentType(file);
-    const { data } = await supabase.auth.getSession();
-
-    if (!data.session?.access_token) {
-      throw new Error("Sessão expirada. Faça login novamente para enviar vídeos.");
-    }
-
-    onProgress?.({ bytesTotal: file.size, bytesUploaded: 0, phase: "preparing", progress: 1 });
-
-    await new Promise<void>((resolve, reject) => {
-      const upload = new tus.Upload(file, {
-        endpoint: getResumableUploadEndpoint(),
-        retryDelays: [0, 3000, 5000, 10000, 20000],
-        headers: {
-          authorization: `Bearer ${data.session.access_token}`,
-          apikey: env.supabaseAnonKey,
-        },
-        metadata: {
-          bucketName: "videos",
-          objectName: path,
-          contentType,
-          cacheControl: "31536000",
-        },
-        chunkSize: 6 * 1024 * 1024,
-        uploadDataDuringCreation: false,
-        removeFingerprintOnSuccess: true,
-        onProgress: (bytesUploaded, bytesTotal) => {
-          const nextProgress = bytesTotal > 0 ? Math.min(99, Math.round((bytesUploaded / bytesTotal) * 100)) : 1;
-          onProgress?.({ bytesTotal, bytesUploaded, phase: "uploading", progress: nextProgress });
-        },
-        onError: (error) => {
-          reject(new Error(formatTusError(error)));
-        },
-        onSuccess: () => resolve(),
-      });
-
-      upload
-        .findPreviousUploads()
-        .then((previousUploads) => {
-          if (previousUploads.length > 0) {
-            upload.resumeFromPreviousUpload(previousUploads[0]);
-          }
-
-          upload.start();
-        })
-        .catch((error: Error) => reject(error));
-    });
-
-    onProgress?.({ bytesTotal: file.size, bytesUploaded: file.size, phase: "complete", progress: 100 });
-    const { data: publicUrlData } = supabase.storage.from("videos").getPublicUrl(path);
-    return {
-      path,
-      playback_url: publicUrlData.publicUrl,
-      processing_status: "ready",
-      provider: "supabase",
-      url: publicUrlData.publicUrl,
-    };
-  }
-
-  async uploadThumbnail(file: File, storeId: string): Promise<UploadedVideo> {
-    const supabase = requireSupabase();
-    const path = `${storeId}/${crypto.randomUUID()}.${extensionFromFile(file)}`;
-    const { error } = await supabase.storage.from("thumbnails").upload(path, file, {
-      cacheControl: "31536000",
-      upsert: false,
-      contentType: file.type || "image/jpeg",
-    });
-    if (error) throw error;
-
-    const { data } = supabase.storage.from("thumbnails").getPublicUrl(path);
-    return {
-      path,
-      playback_url: data.publicUrl,
-      processing_status: "ready",
-      provider: "supabase",
-      url: data.publicUrl,
-    };
-  }
-
-  async deleteVideo(path: string) {
-    const { error } = await requireSupabase().storage.from("videos").remove([path]);
-    if (error) throw error;
-  }
 }
 
 export class BunnyStreamProvider implements VideoStorageProvider {
@@ -376,19 +245,7 @@ export class BunnyStreamProvider implements VideoStorageProvider {
   }
 }
 
-export class CloudflareStreamProvider implements VideoStorageProvider {
-  async uploadVideo(): Promise<UploadedVideo> {
-    throw new Error("Cloudflare Stream ainda não está conectado. Configure as credenciais no backend antes de usar.");
-  }
-
-  async deleteVideo(): Promise<void> {
-    throw new Error("Cloudflare Stream ainda não está conectado.");
-  }
-}
-
-export const videoStorageProvider =
-  env.videoProvider === "bunny"
-    ? new BunnyStreamProvider()
-    : env.videoProvider === "cloudflare"
-      ? new CloudflareStreamProvider()
-      : new SupabaseVideoProvider();
+// Bunny é o único provedor de vídeo — os provedores Supabase/Cloudflare foram
+// removidos na migração para a API da Luup. Um upload manual de thumbnail
+// futuro deve usar POST /api/videos/thumbnail.
+export const videoStorageProvider = new BunnyStreamProvider();

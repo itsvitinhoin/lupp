@@ -60,14 +60,14 @@ function formatTikTokCount(value: unknown) {
 }
 
 async function refreshBunnyStatusForPublicFeed(storeSlug: string) {
-  if (!env.supabaseUrl) return;
+  if (!env.apiUrl) return;
   const params = new URLSearchParams({
     mode: "preview",
     store_slug: storeSlug,
     widget: "floating_launcher",
   });
   await fetch(
-    `${env.supabaseUrl.replace(/\/$/, "")}/functions/v1/lupp-widget-bootstrap?${params.toString()}`,
+    `${env.apiUrl.replace(/\/$/, "")}/api/widget/bootstrap?${params.toString()}`,
   ).catch(() => null);
 }
 

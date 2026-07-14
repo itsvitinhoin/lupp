@@ -10,7 +10,7 @@ export interface UploadedVideo {
   path: string;
   playback_url?: string | null;
   processing_status?: "uploading" | "processing" | "ready" | "failed" | "archived";
-  provider: "supabase" | "bunny" | "cloudflare";
+  provider: "bunny";
   provider_video_id?: string | null;
   thumbnail_url?: string | null;
   url: string;
@@ -25,6 +25,5 @@ export interface VideoUploadProgress {
 
 export interface VideoStorageProvider {
   uploadVideo(file: File, storeId: string, onProgress?: (progress: VideoUploadProgress) => void): Promise<UploadedVideo>;
-  uploadThumbnail?(file: File, storeId: string): Promise<UploadedVideo>;
   deleteVideo(path: string): Promise<void>;
 }

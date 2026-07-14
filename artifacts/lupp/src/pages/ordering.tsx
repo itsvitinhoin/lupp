@@ -139,6 +139,7 @@ export default function Ordering() {
     try {
       setIsSaving(true);
       await videosService.updateVideoOrdering(
+        store.id,
         orderedVideos.map((video, index) => ({
           id: video.id,
           is_featured: Boolean(video.is_featured),
