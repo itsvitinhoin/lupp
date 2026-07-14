@@ -8,7 +8,14 @@ import z from "zod";
 const edgeError = z.object({ error: z.string() });
 
 export const edgeErrorSchemas = {
-  400: edgeError.describe("Missing/invalid field (machine-readable code)."),
+  400: z
+    .union([
+      edgeError,
+      // Zod request-validation errors surface through the global handler
+      // with a {message, errors, context} body.
+      z.object({ message: z.string(), errors: z.any().optional(), context: z.any().optional() }),
+    ])
+    .describe("Missing/invalid field (machine-readable code or validation report)."),
   401: z
     .union([edgeError, z.object({ message: z.string() })])
     .describe("Missing or invalid session token."),
