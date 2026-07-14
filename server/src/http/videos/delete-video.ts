@@ -8,6 +8,10 @@ import {
   getBunnyStreamConfig,
   readBunnyError,
 } from "@/lib/bunny";
+import {
+  bunnyStoragePathFromPublicUrl,
+  deleteFromBunnyStorage,
+} from "@/lib/bunny-storage";
 
 // Ported from supabase/functions/bunny-delete-video. Field checks stay in the
 // handler so the machine-readable error codes the SPA switches on are kept.
@@ -38,12 +42,6 @@ export async function deleteVideoHandler(
   request: FastifyRequest,
   reply: FastifyReply,
 ) {
-  // The original only required libraryId + apiKey here (no CDN hostname).
-  const { libraryId, apiKey } = getBunnyStreamConfig();
-  if (!libraryId || !apiKey) {
-    return reply.status(500).send({ error: "missing_bunny_stream_config" });
-  }
-
   const body = BodySchema.parse(request.body ?? {});
   const storeId = (body.store_id ?? "").trim();
   const videoId = (body.video_id ?? "").trim();
@@ -56,12 +54,18 @@ export async function deleteVideoHandler(
 
   const video = await prisma.video.findFirst({
     where: { id: videoId, store_id: storeId },
-    select: { id: true, provider: true, provider_video_id: true },
+    select: { id: true, provider: true, provider_video_id: true, thumbnail_url: true },
   });
   if (!video) return reply.status(404).send({ error: "video_not_found" });
 
   const providerVideoId = (video.provider_video_id ?? "").trim();
   if (video.provider === "bunny" && providerVideoId) {
+    // Bunny Stream config is only required for bunny-hosted assets — legacy
+    // rows (provider supabase etc.) must stay deletable without it.
+    const { libraryId, apiKey } = getBunnyStreamConfig();
+    if (!libraryId || !apiKey) {
+      return reply.status(500).send({ error: "missing_bunny_stream_config" });
+    }
     const response = await bunnyStreamFetch({
       apiKey,
       libraryId,
@@ -71,6 +75,17 @@ export async function deleteVideoHandler(
     // A video already gone at Bunny (404) must not block the local delete.
     if (!response.ok && response.status !== 404) {
       return reply.status(502).send({ error: await readBunnyError(response) });
+    }
+  }
+
+  // Best-effort thumbnail cleanup — only for CDN-hosted (Bunny Storage)
+  // thumbnails; legacy Supabase URLs resolve to "" and are skipped.
+  const thumbnailPath = bunnyStoragePathFromPublicUrl(video.thumbnail_url);
+  if (thumbnailPath) {
+    try {
+      await deleteFromBunnyStorage(thumbnailPath);
+    } catch (error) {
+      request.log.warn({ err: error }, "thumbnail cleanup failed");
     }
   }
 
