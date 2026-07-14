@@ -11,6 +11,7 @@ import {
   Blocks,
   Link as LinkIcon,
   ListOrdered,
+  MonitorPlay,
   Star,
 } from "lucide-react";
 import { useCurrentStore } from "@/hooks/useStore";
@@ -20,6 +21,7 @@ const navItems = [
   { icon: Film, label: "Vídeos", href: "/app/videos" },
   { icon: Smartphone, label: "Feed Vertical", href: "/app/feed" },
   { icon: Blocks, label: "Widgets", href: "/app/widgets" },
+  { icon: MonitorPlay, label: "Simulador", href: "/app/simulator" },
   { icon: Package, label: "Produtos", href: "/app/products" },
   { icon: MessageSquare, label: "Comentários", href: "/app/comments" },
   { icon: Star, label: "Feedbacks", href: "/app/feedbacks" },

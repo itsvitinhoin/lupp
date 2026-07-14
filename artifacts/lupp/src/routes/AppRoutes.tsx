@@ -10,6 +10,7 @@ import VideosList from "@/pages/videos/index";
 import VideosNew from "@/pages/videos/new";
 import FeedConfig from "@/pages/feed";
 import Widgets from "@/pages/widgets";
+import Simulator from "@/pages/simulator";
 import CustomPages from "@/pages/custom-pages";
 import Products from "@/pages/products";
 import Comments from "@/pages/comments";
@@ -88,6 +89,11 @@ export function AppRoutes() {
       <Route path="/app/widgets">
         <ProtectedRoute>
           <Widgets />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/app/simulator">
+        <ProtectedRoute>
+          <Simulator />
         </ProtectedRoute>
       </Route>
       <Route path="/app/pages">
