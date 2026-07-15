@@ -2,7 +2,7 @@ kind = "web"
 previewPath = "/"
 title = "Lupp — Video Commerce"
 version = "1.0.0"
-id = "artifacts/lupp"
+id = "client"
 router = "path"
 
 [[integratedSkills]]
@@ -19,7 +19,7 @@ run = "pnpm --filter @workspace/lupp run dev"
 
 [services.production]
 build = [ "pnpm", "--filter", "@workspace/lupp", "run", "build" ]
-publicDir = "artifacts/lupp/dist/public"
+publicDir = "client/dist/public"
 serve = "static"
 
 [[services.production.rewrites]]

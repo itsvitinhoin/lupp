@@ -10,7 +10,7 @@ set -euo pipefail
 #
 # Run model:
 #   server         → node dist/server.js  (Fastify; 127.0.0.1:3333, systemd)
-#   artifacts/lupp → static Vite SPA served by nginx from dist/public
+#   client → static Vite SPA served by nginx from dist/public
 # Both live on one domain: nginx proxies /api/ (+ /health, /docs) to the API
 # and serves everything else as static SPA files with an index.html fallback.
 #
@@ -73,10 +73,10 @@ NODE_MAJOR="$("$NODE_BIN" -v | sed 's/^v//' | cut -d. -f1)"
 
 # Repo root = this script's dir. Sanity-check the two apps this script deploys.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-[[ -d "$ROOT_DIR/server" && -d "$ROOT_DIR/artifacts/lupp" ]] \
-  || err "expected server/ and artifacts/lupp/ under ${ROOT_DIR} — run this from the lupp repo root."
+[[ -d "$ROOT_DIR/server" && -d "$ROOT_DIR/client" ]] \
+  || err "expected server/ and client/ under ${ROOT_DIR} — run this from the lupp repo root."
 
-CLIENT_DIST="${ROOT_DIR}/artifacts/lupp/dist/public"
+CLIENT_DIST="${ROOT_DIR}/client/dist/public"
 
 # Run a command as the app user with their node/pnpm on PATH (we're root here).
 APP_PATH="$(dirname "$NODE_BIN"):$(dirname "$PNPM_BIN"):/usr/local/bin:/usr/bin:/bin"
@@ -315,7 +315,7 @@ log "Building server (@workspace/server → dist/server.js)"
 ( cd "$ROOT_DIR" && run_as_app "$PNPM_BIN" --filter @workspace/server build ) \
   || err "server build failed"
 
-log "Building client (@workspace/lupp → artifacts/lupp/dist/public)"
+log "Building client (@workspace/lupp → client/dist/public)"
 ( cd "$ROOT_DIR" && run_as_app env "VITE_API_URL=https://${DOMAIN}" "VITE_APP_URL=https://${DOMAIN}" \
     "$PNPM_BIN" --filter @workspace/lupp build ) \
   || err "client build failed"

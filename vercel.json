@@ -2,7 +2,7 @@
   "framework": "vite",
   "installCommand": "pnpm install",
   "buildCommand": "pnpm --filter @workspace/lupp run build",
-  "outputDirectory": "artifacts/lupp/dist/public",
+  "outputDirectory": "client/dist/public",
   "rewrites": [
     {
       "source": "/(.*)",
