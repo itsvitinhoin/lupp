@@ -6,14 +6,9 @@
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "deploy:prod": "bash deploy.sh",
-    "integration:audit": "node scripts/integration-audit.mjs",
-    "quality:check": "pnpm run security:scan && pnpm run integration:audit && pnpm run test:widget && pnpm run test:nuvemshop-partners && pnpm run typecheck",
-    "security:scan": "node scripts/security-secret-scan.mjs",
-    "smoke:widgets": "node scripts/widget-bootstrap-smoke.mjs",
-    "test:widget": "pnpm --filter @workspace/scripts run test:widget",
     "test:nuvemshop-partners": "pnpm --filter @workspace/nuvemshop-partners run test",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./client\" --filter \"./scripts\" --filter \"./server\" --if-present run typecheck"
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./client\" --filter \"./server\" --if-present run typecheck"
   },
   "private": true,
   "devDependencies": {

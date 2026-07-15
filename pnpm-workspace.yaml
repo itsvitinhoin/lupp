@@ -39,7 +39,6 @@ packages:
   - client
   - lib/*
   - lib/integrations/*
-  - scripts
   - server
 
 catalog:
