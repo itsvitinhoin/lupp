@@ -87,8 +87,9 @@ app.setValidatorCompiler(validatorCompiler)
 app.setSerializerCompiler(serializerCompiler)
 
 const corsOrigins: (string | RegExp)[] = [
-  // Production origins go here once the API is deployed, e.g.:
-  // "https://playluup.com.br",
+  "https://playluup.com.br",
+  "https://luup.dzns.com.br",
+  "https://luup.dzns.net",
 ]
 if (!isProduction) {
   corsOrigins.push(/^http:\/\/localhost:\d+$/)
