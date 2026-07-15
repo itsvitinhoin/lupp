@@ -18,6 +18,7 @@ node_modules
 .env.*.local
 !.env.example
 !**/.env.example
+backup.env
 
 # IDEs and editors
 /.idea
