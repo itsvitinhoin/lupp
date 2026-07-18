@@ -68,6 +68,46 @@ async function activeStoreById(storeId: string) {
   });
 }
 
+// "shop.example.com" also matches an indexed "example.com" (the old scan's
+// suffix semantics), so look up the hostname plus every parent domain down
+// to the registrable-ish two labels.
+function parentDomainCandidates(domain: string) {
+  const parts = domain.split(".").filter(Boolean);
+  const candidates: string[] = [];
+  for (let start = 0; start <= parts.length - 2; start += 1) {
+    candidates.push(parts.slice(start).join("."));
+  }
+  return candidates.length ? candidates : [domain];
+}
+
+async function storeFromDomainIndex(storeDomain: string) {
+  const rows = await prisma.storeDomain.findMany({
+    where: { domain: { in: parentDomainCandidates(storeDomain) } },
+    select: { domain: true, store_id: true },
+  });
+  rows.sort((left, right) => right.domain.length - left.domain.length);
+  for (const row of rows) {
+    const store = await activeStoreById(row.store_id);
+    if (store) return store;
+  }
+  return null;
+}
+
+// Best-effort self-heal: when only the legacy scan matched, persist the
+// queried domain so the next request is a single indexed read. Also repoints
+// stale mappings (e.g. a domain that moved to another store).
+async function persistDomainMapping(domain: string, storeId: string, source: string) {
+  try {
+    await prisma.storeDomain.upsert({
+      where: { domain },
+      create: { domain, store_id: storeId, source },
+      update: { store_id: storeId, source },
+    });
+  } catch {
+    // The resolution itself already succeeded; never fail it on a cache write.
+  }
+}
+
 export type StoreResolutionQuery = {
   store_id?: string;
   lupp_store_id?: string;
@@ -131,6 +171,12 @@ export async function findStore(query: StoreResolutionQuery): Promise<StoreResol
 
   if (storeDomain) {
     tried.push("store_domain");
+
+    // Fast path: indexed store_domains lookup (backfilled from stores.url,
+    // self-healed below). The legacy scans only run when the index misses.
+    const indexed = await storeFromDomainIndex(storeDomain);
+    if (indexed) return { resolvedBy: "store_domain", store: indexed, tried };
+
     const stores = await prisma.store.findMany({
       where: { status: "active" },
       select: STORE_SELECT,
@@ -140,7 +186,10 @@ export async function findStore(query: StoreResolutionQuery): Promise<StoreResol
     const matched = stores.find((store) =>
       domainsMatch(normalizedDomain(store.url), storeDomain),
     );
-    if (matched) return { resolvedBy: "store_domain", store: matched, tried };
+    if (matched) {
+      await persistDomainMapping(storeDomain, matched.id, "stores_url_scan");
+      return { resolvedBy: "store_domain", store: matched, tried };
+    }
 
     // Stores are often visited on a domain that differs from stores.url
     // (e.g. *.lojavirtualnuvem.com.br vs the custom domain). The OAuth
@@ -160,7 +209,10 @@ export async function findStore(query: StoreResolutionQuery): Promise<StoreResol
     );
     if (matchedIntegration?.store_id) {
       const store = await activeStoreById(matchedIntegration.store_id);
-      if (store) return { resolvedBy: "integration_domain", store, tried };
+      if (store) {
+        await persistDomainMapping(storeDomain, store.id, "integration_scan");
+        return { resolvedBy: "integration_domain", store, tried };
+      }
     }
   }
 

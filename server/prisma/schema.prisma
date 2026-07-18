@@ -245,8 +245,26 @@ model Store {
   subscriptions    Subscription[]
   feed_settings    FeedSetting?
   audit_logs       MasterConsoleAuditLog[]
+  store_domains    StoreDomain[]
 
   @@map("stores")
+}
+
+// Indexed storefront-domain -> store lookup for the public widget bootstrap.
+// Rows come from a stores.url backfill plus self-healing in resolve-store:
+// when the indexed lookup misses but the legacy scan still matches, the
+// queried domain is persisted here so the next request is one indexed read.
+model StoreDomain {
+  id         String   @id @default(uuid(7))
+  store_id   String
+  domain     String   @unique
+  source     String   @default("resolver")
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  store Store @relation(fields: [store_id], references: [id], onDelete: Cascade)
+
+  @@index([store_id])
+  @@map("store_domains")
 }
 
 model StoreMember {
