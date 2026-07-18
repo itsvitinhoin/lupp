@@ -71,15 +71,7 @@ export const UpzeroStorefrontProxySchema = {
   },
 };
 
-function clean(value: unknown) {
-  return String(value || "").trim();
-}
-
-function asRecord(value: unknown): JsonRecord {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as JsonRecord)
-    : {};
-}
+import { asRecord, clean } from "@/lib/text";
 
 function normalizedHostname(value: unknown) {
   const text = clean(value).toLowerCase();

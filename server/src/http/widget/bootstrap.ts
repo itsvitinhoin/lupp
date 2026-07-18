@@ -10,6 +10,7 @@ import {
   slimVideos,
   type SerializedVideo,
 } from "./context";
+import { asRecord } from "@/lib/text";
 import { storeHasBillingAccess } from "@/lib/billing-access";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
 import { serializeVideo, VARIANT_SELECT, VIDEO_PRODUCTS_INCLUDE, type VideoRow } from "@/lib/serialize";
@@ -57,7 +58,7 @@ const QuerySchema = z.object({
 // timestamps, etc.), and unknown keys must keep passing through — the typed
 // fields below are the ones widget.js actually reads and the generated API
 // client exposes.
-const WidgetStoreSchema = z
+export const WidgetStoreSchema = z
   .object({
     id: z.string(),
     slug: z.string(),
@@ -108,7 +109,8 @@ const WidgetProductSchema = z
 
 // serializeVideo maps Prisma relations back to the PostgREST nesting the
 // embed script consumes: video_products[].products.product_variants[].
-const WidgetVideoSchema = z
+// Exported: the public feed route returns the same serialized shape.
+export const WidgetVideoSchema = z
   .object({
     id: z.string(),
     title: z.string(),
@@ -211,12 +213,6 @@ export const WidgetBootstrapSchema = {
     },
   },
 };
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
 
 function mappedWidgetType(type: string) {
   if (

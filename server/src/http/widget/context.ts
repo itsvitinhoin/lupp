@@ -65,13 +65,7 @@ export type ResolvedWidgetConfig = {
   };
 };
 
-const text = (value: unknown) => String(value ?? "").trim();
-
-function record(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
+import { clean as text, asRecord as record } from "@/lib/text";
 
 // ---------------------------------------------------------------------------
 // URL / path helpers (widget.js: normalizePath, normalizeUrl, isHomePath,

@@ -1,4 +1,4 @@
-import { ApiError, customFetch } from "@workspace/api-client-react";
+import { ApiError, customFetch } from "@workspace/api-client";
 import { env } from "@/lib/env";
 import type { AuthSession, AuthUser, LoginPayload, SignupPayload } from "@/types/auth";
 

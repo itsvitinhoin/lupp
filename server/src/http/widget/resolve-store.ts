@@ -1,9 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "../../../generated/prisma/client";
 
-export function clean(value: unknown) {
-  return String(value || "").trim();
-}
+export { clean } from "@/lib/text";
+import { clean } from "@/lib/text";
 
 export function normalizedDomain(value: unknown) {
   const text = clean(value).toLowerCase();

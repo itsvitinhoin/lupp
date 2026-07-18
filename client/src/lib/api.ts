@@ -3,7 +3,7 @@ import {
   customFetch,
   setAuthTokenGetter,
   setBaseUrl,
-} from "@workspace/api-client-react";
+} from "@workspace/api-client";
 
 import { env } from "@/lib/env";
 import { authService } from "@/services/auth.service";

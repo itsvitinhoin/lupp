@@ -5,6 +5,7 @@ import { storeHasBillingAccess } from "@/lib/billing-access";
 import { attachVideoMetrics, getVideoMetrics } from "@/lib/video-metrics";
 import { serializeVideo, VIDEO_PRODUCTS_INCLUDE, type VideoRow } from "@/lib/serialize";
 import { edgeErrorSchemas, rateLimitErrorSchema } from "@/schemas/http-errors";
+import { WidgetStoreSchema, WidgetVideoSchema } from "@/http/widget/bootstrap";
 import { Prisma } from "../../../generated/prisma/client";
 
 const QuerySchema = z.object({
@@ -24,9 +25,9 @@ const FeedResponseSchema = z
   .object({
     active: z.boolean(),
     error: z.string().optional(),
-    feed_options: z.any(),
-    store: z.any().nullable(),
-    videos: z.array(z.any()),
+    feed_options: z.record(z.string(), z.unknown()),
+    store: WidgetStoreSchema.nullable(),
+    videos: z.array(WidgetVideoSchema),
   })
   .loose();
 
