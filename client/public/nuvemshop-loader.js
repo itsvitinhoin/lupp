@@ -1,6 +1,6 @@
 (function () {
   var currentScript = document.currentScript;
-  var fallbackAppUrl = "https://www.playluup.com.br";
+  var fallbackAppUrl = "https://luup.dzns.com.br";
 
   function getSearchParams() {
     try {

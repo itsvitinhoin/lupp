@@ -1,6 +1,6 @@
 name = "Luup"
 client_id = "422735bb080ecf76ae0d49bc415df1e3"
-application_url = "https://www.playluup.com.br"
+application_url = "https://luup.dzns.com.br"
 embedded = true
 
 [build]

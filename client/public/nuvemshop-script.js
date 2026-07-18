@@ -175,7 +175,7 @@
   }
 
   function buildWidgetScript(externalStoreId) {
-    var appUrl = readConfig("lupp_url", "https://www.playluup.com.br").replace(/\/$/, "");
+    var appUrl = readConfig("lupp_url", "https://luup.dzns.com.br").replace(/\/$/, "");
 
     var widgetScript = document.createElement("script");
     widgetScript.async = true;

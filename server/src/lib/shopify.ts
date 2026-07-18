@@ -210,7 +210,7 @@ export function resolveShopifyAppConfig(
 
 /** SPA base URL the OAuth flows redirect back to. */
 export function shopifyAppUrl() {
-  return env.SHOPIFY_APP_URL || env.LUPP_APP_URL || "https://www.playluup.com.br";
+  return env.SHOPIFY_APP_URL || env.LUPP_APP_URL || "https://luup.dzns.com.br";
 }
 
 /**

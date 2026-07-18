@@ -1,4 +1,4 @@
-const LUUP_APP_URL = "https://www.playluup.com.br";
+const LUUP_APP_URL = "https://luup.dzns.com.br";
 
 function cleanStoreId(value) {
   if (value === undefined || value === null) return "";
