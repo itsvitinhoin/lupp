@@ -10,7 +10,8 @@ set -euo pipefail
 #
 # Run model:
 #   server         → node dist/server.js  (Fastify; 127.0.0.1:3333, systemd)
-#   client → static Vite SPA served by nginx from dist/public
+#   client → static Vite SPA built to dist/public, published to /var/www
+#            and served by nginx from there (worker can't read /home/<user>)
 # Both live on one domain: nginx proxies /api/ (+ /health, /docs) to the API
 # and serves everything else as static SPA files with an index.html fallback.
 #
@@ -77,6 +78,13 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   || err "expected server/ and client/ under ${ROOT_DIR} — run this from the lupp repo root."
 
 CLIENT_DIST="${ROOT_DIR}/client/dist/public"
+
+# nginx serves the SPA from /var/www, NOT from the build dir: the worker
+# (www-data) cannot traverse /home/<user> (0750 on modern Ubuntu), which
+# surfaces as 403 Forbidden on every static file while the proxied /api
+# keeps working. Publishing to a root-owned, world-readable tree avoids
+# touching home-directory permissions.
+WEB_ROOT="/var/www/${SERVICE_NAME}"
 
 # Run a command as the app user with their node/pnpm on PATH (we're root here).
 APP_PATH="$(dirname "$NODE_BIN"):$(dirname "$PNPM_BIN"):/usr/local/bin:/usr/bin:/bin"
@@ -204,7 +212,7 @@ server {
     listen 80;
     server_name ${DOMAIN};
 
-    root ${CLIENT_DIST};
+    root ${WEB_ROOT};
     index index.html;
 
     location /api/ {
@@ -249,6 +257,21 @@ EOF
   else
     warn "certbot not installed — serving ${DOMAIN} over HTTP only"
   fi
+  return 0
+}
+
+# Copy the built SPA into WEB_ROOT (running as root here) and make sure the
+# whole tree is world-readable so the nginx worker can serve it.
+publish_client_dist() {
+  mkdir -p "$WEB_ROOT"
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --delete "${CLIENT_DIST}/" "${WEB_ROOT}/"
+  else
+    rm -rf "${WEB_ROOT:?}"/*
+    cp -a "${CLIENT_DIST}/." "${WEB_ROOT}/"
+  fi
+  chmod -R a+rX "$WEB_ROOT"
+  ok "client published to ${WEB_ROOT}"
   return 0
 }
 
@@ -326,9 +349,11 @@ write_ratelimit_conf
 write_gzip_conf
 write_geo_conf
 
-# Server first (migrations + API), then the vhost serving SPA + API proxy.
+# Server first (migrations + API), then publish the SPA where nginx can read
+# it, then the vhost serving SPA + API proxy.
 run_server_migrations
 deploy_server_service
+publish_client_dist
 setup_nginx_tls
 
 ok "Deploy complete (${SERVICE_NAME} API on :${SERVER_PORT} + static SPA at https://${DOMAIN})."
