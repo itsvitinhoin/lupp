@@ -19,8 +19,10 @@ export default function Simulator() {
     if (store) {
       params.set("store_id", store.id);
       params.set("store", store.slug);
-      params.set("store_name", store.name);
-      if (store.url) params.set("store_url", store.url);
+      // Pre-fill the simulated page with the storefront home so the widget's
+      // context bootstrap (data-product-url fallback in sandboxed iframes)
+      // resolves against the real store URL.
+      if (store.url) params.set("product_url", store.url);
     }
     return `${env.appUrl}/simulador.html?${params.toString()}`;
   }, [store]);

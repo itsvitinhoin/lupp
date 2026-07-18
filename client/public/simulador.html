@@ -213,16 +213,12 @@
               <input type="text" id="store_id" placeholder="c322b7b4-22ce-4ff2-…" />
             </div>
             <div class="field">
-              <label for="store">Slug da loja (data-store)</label>
+              <label for="store">Slug da loja (data-store, fallback quando não há Store ID)</label>
               <input type="text" id="store" placeholder="minha-loja" />
             </div>
             <div class="field">
-              <label for="store_name">Nome da loja (data-store-name)</label>
-              <input type="text" id="store_name" placeholder="Minha Loja" />
-            </div>
-            <div class="field">
-              <label for="store_url">URL da loja (data-store-url)</label>
-              <input type="text" id="store_url" placeholder="https://minhaloja.com.br/" />
+              <label for="product_url">Página simulada (data-product-url)</label>
+              <input type="text" id="product_url" placeholder="https://minhaloja.com.br/produtos/tenis" />
             </div>
             <div class="field">
               <label for="lupp_url">Luup URL (data-lupp-url)</label>
@@ -289,8 +285,7 @@
           "widget_src",
           "store_id",
           "store",
-          "store_name",
-          "store_url",
+          "product_url",
           "lupp_url",
           "api_url",
           "carousel_widget",
@@ -309,8 +304,7 @@
             widget_src: location.origin + "/widget.js",
             store_id: "",
             store: "",
-            store_name: "",
-            store_url: "",
+            product_url: "",
             lupp_url: location.origin,
             api_url: "",
             carousel_widget: "carousel",
@@ -372,11 +366,14 @@
         }
 
         function attrLines(values, widgetType, indent) {
+          // data-store-id alone identifies the store (single context
+          // bootstrap); the slug is only a fallback. data-product-url doubles
+          // as the simulated page for server-side context matching, since the
+          // sandboxed iframe has no usable origin of its own.
           var attrs = [
             ["data-store-id", values.store_id],
             ["data-store", values.store],
-            ["data-store-name", values.store_name],
-            ["data-store-url", values.store_url],
+            ["data-product-url", values.product_url],
             ["data-widget", widgetType],
           ];
           if (widgetType !== "floating_launcher") {
