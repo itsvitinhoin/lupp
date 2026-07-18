@@ -45,7 +45,7 @@ const envSchema = z
     // Max public writes (comments) per IP per minute.
     RATE_LIMIT_PUBLIC_WRITE_MAX: z.coerce.number().default(10),
     // NUVEMSHOP / TIENDANUBE
-    NUVEMSHOP_APP_ID: z.string().default("34355"),
+    NUVEMSHOP_APP_ID: z.string().default("36726"),
     NUVEMSHOP_CLIENT_ID: z.string().optional(),
     NUVEMSHOP_CLIENT_SECRET: z.string().optional(),
     NUVEMSHOP_STATE_SECRET: z.string().optional(),
