@@ -1,4 +1,5 @@
 import { ApiError, customFetch } from "@workspace/api-client-react";
+import { env } from "@/lib/env";
 import type { AuthSession, AuthUser, LoginPayload, SignupPayload } from "@/types/auth";
 
 /**
@@ -75,13 +76,30 @@ async function authRequest<T>(path: string, init: RequestInit): Promise<T> {
   }
 }
 
+/**
+ * The refresh call must NOT go through customFetch: the shared client asks
+ * authService for a bearer token before every request, so routing the refresh
+ * itself through it re-enters getValidAccessToken -> refreshSession while
+ * refreshInFlight is still unassigned, recursing synchronously until the
+ * stack overflows and then storming the endpoint on unwind. Raw fetch is
+ * safe — the endpoint's only credential is the httpOnly cookie.
+ */
+async function requestRefreshedToken(): Promise<string> {
+  const response = await fetch(`${env.apiUrl}/api/auth/sessions/refresh`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { accept: "application/json" },
+  });
+  if (!response.ok) throw new Error(`Refresh failed: HTTP ${response.status}`);
+  const { token } = (await response.json()) as { token?: string };
+  if (!token) throw new Error("Refresh response missing token.");
+  return token;
+}
+
 function refreshSession(): Promise<string | null> {
   refreshInFlight ??= (async () => {
     try {
-      const { token } = await authRequest<{ token: string }>(
-        "/api/auth/sessions/refresh",
-        { method: "PATCH" },
-      );
+      const token = await requestRefreshedToken();
       setAccessToken(token);
       return token;
     } catch {
