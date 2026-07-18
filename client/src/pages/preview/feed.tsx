@@ -861,6 +861,21 @@ export default function PreviewFeed() {
     ).length;
   }, [orderedVideos, sourceProductUrl]);
   const isProductSwipeHint = productRelatedVideoCount > 1;
+  const productViewsByVideoId = React.useMemo(() => {
+    const map = new Map<string, ReturnType<typeof getProductViews>>();
+    for (const video of orderedVideos as any[]) {
+      map.set(
+        video.id,
+        getProductViews(
+          video,
+          null,
+          video.id === requestedVideoId ? sourceProductUrl : null,
+          store?.url,
+        ),
+      );
+    }
+    return map;
+  }, [orderedVideos, requestedVideoId, sourceProductUrl, store?.url]);
   const [selectedProduct, setSelectedProduct] = React.useState<{
     video: any;
     product: NonNullable<ReturnType<typeof getProductView>>;
@@ -888,8 +903,6 @@ export default function PreviewFeed() {
   const [selectedCommentVideo, setSelectedCommentVideo] = React.useState<
     any | null
   >(null);
-  const [commentAuthor, setCommentAuthor] = React.useState("");
-  const [commentBody, setCommentBody] = React.useState("");
   const [isSubmittingComment, setIsSubmittingComment] = React.useState(false);
   const [localCommentCounts, setLocalCommentCounts] = React.useState<
     Record<string, number>
@@ -904,7 +917,6 @@ export default function PreviewFeed() {
   const [soundUnlocked, setSoundUnlocked] = React.useState(
     () => !effectiveAutoplayMuted,
   );
-  const [controlsVisible, setControlsVisible] = React.useState(false);
   const [speedVideoId, setSpeedVideoId] = React.useState<string | null>(null);
   const [showSwipeHint, setShowSwipeHint] = React.useState(false);
   const [showLuupSplash, setShowLuupSplash] = React.useState(true);
@@ -916,7 +928,13 @@ export default function PreviewFeed() {
   const longPressTimerRef = React.useRef<number | null>(null);
   const longPressActiveRef = React.useRef(false);
   const pointerStartRef = React.useRef<{ x: number; y: number } | null>(null);
-  const controlsTimerRef = React.useRef<number | null>(null);
+  const sectionObserverRef = React.useRef<IntersectionObserver | null>(null);
+  // Per-video "show controls" triggers registered by mounted FeedItems so the
+  // controls-visibility state can live inside each item instead of re-rendering
+  // the whole feed on every tap.
+  const controlsHandlesRef = React.useRef(
+    new Map<string, (keepVisible?: boolean) => void>(),
+  );
   const quickOrderRequestsRef = React.useRef(
     new Map<
       string,
@@ -1195,16 +1213,21 @@ export default function PreviewFeed() {
     );
   };
 
-  const handleSubmitComment = async () => {
-    if (!selectedCommentVideo || !store?.id || isSubmittingComment) return;
-    const body = commentBody.trim();
-    const authorName = commentAuthor.trim() || "Cliente";
+  const handleSubmitComment = async (
+    rawAuthor: string,
+    rawBody: string,
+  ): Promise<boolean> => {
+    if (!selectedCommentVideo || !store?.id || isSubmittingComment) {
+      return false;
+    }
+    const body = rawBody.trim();
+    const authorName = rawAuthor.trim() || "Cliente";
     if (!body) {
       toast({
         title: "Escreva um comentário",
         description: "Digite sua dúvida ou feedback antes de enviar.",
       });
-      return;
+      return false;
     }
 
     setIsSubmittingComment(true);
@@ -1226,13 +1249,12 @@ export default function PreviewFeed() {
         ...current,
         [selectedCommentVideo.id]: (current[selectedCommentVideo.id] ?? 0) + 1,
       }));
-      setCommentAuthor("");
-      setCommentBody("");
       setSelectedCommentVideo(null);
       toast({
         title: "Comentário enviado",
         description: "Ele entrou na fila de moderação da loja.",
       });
+      return true;
     } catch (error) {
       toast({
         title: "Não foi possível enviar",
@@ -1241,6 +1263,7 @@ export default function PreviewFeed() {
             ? error.message
             : "Tente novamente em instantes.",
       });
+      return false;
     } finally {
       setIsSubmittingComment(false);
     }
@@ -1588,33 +1611,40 @@ export default function PreviewFeed() {
     }
   };
 
-  const setVideoRef = (id: string) => (element: HTMLVideoElement | null) => {
-    if (element) videoRefs.current.set(id, element);
-    else videoRefs.current.delete(id);
+  const setVideoRef = React.useCallback(
+    (id: string) => (element: HTMLVideoElement | null) => {
+      if (element) videoRefs.current.set(id, element);
+      else videoRefs.current.delete(id);
+    },
+    [],
+  );
+
+  const setSectionRef = React.useCallback(
+    (id: string) => (element: HTMLElement | null) => {
+      if (element) {
+        sectionRefs.current.set(id, element);
+        // Windowed sections mount after the observer effect has run; observing
+        // on attach keeps active-video detection working (observe() is a no-op
+        // for already-observed targets).
+        sectionObserverRef.current?.observe(element);
+      } else {
+        const existing = sectionRefs.current.get(id);
+        if (existing) sectionObserverRef.current?.unobserve(existing);
+        sectionRefs.current.delete(id);
+      }
+    },
+    [],
+  );
+
+  const showControlsFor = (videoId: string, keepVisible = false) => {
+    controlsHandlesRef.current.get(videoId)?.(keepVisible);
   };
 
-  const setSectionRef = (id: string) => (element: HTMLElement | null) => {
-    if (element) sectionRefs.current.set(id, element);
-    else sectionRefs.current.delete(id);
-  };
-
-  const showControls = (keepVisible = false) => {
-    setControlsVisible(true);
-    if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
-    controlsTimerRef.current = null;
-
-    if (!keepVisible) {
-      controlsTimerRef.current = window.setTimeout(() => {
-        setControlsVisible(false);
-      }, 2200);
-    }
-  };
-
-  const toggleMute = (event?: React.MouseEvent) => {
+  const toggleMute = (video: any, event?: React.MouseEvent) => {
     event?.stopPropagation();
     setSoundUnlocked(true);
     setIsMuted((current) => !current);
-    showControls();
+    showControlsFor(video.id);
   };
 
   const togglePlay = (video: any, event?: React.MouseEvent) => {
@@ -1622,7 +1652,7 @@ export default function PreviewFeed() {
     setSoundUnlocked(true);
     setPausedMap((current) => {
       const nextPaused = !current[video.id];
-      showControls(nextPaused);
+      showControlsFor(video.id, nextPaused);
       return { ...current, [video.id]: nextPaused };
     });
   };
@@ -1748,8 +1778,12 @@ export default function PreviewFeed() {
       { threshold: [0.65, 0.8, 0.95] },
     );
 
+    sectionObserverRef.current = observer;
     sectionRefs.current.forEach((section) => observer.observe(section));
-    return () => observer.disconnect();
+    return () => {
+      sectionObserverRef.current = null;
+      observer.disconnect();
+    };
   }, [orderedVideos]);
 
   React.useEffect(() => {
@@ -1832,18 +1866,6 @@ export default function PreviewFeed() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  React.useEffect(() => {
-    if (activeVideoId && pausedMap[activeVideoId]) {
-      showControls(true);
-    } else {
-      setControlsVisible(false);
-    }
-    return () => {
-      if (controlsTimerRef.current)
-        window.clearTimeout(controlsTimerRef.current);
-    };
-  }, [activeVideoId]);
-
   const selectedProductRestricted = Boolean(
     selectedProduct &&
     isUpzeroCommerce(store, selectedProduct.product) &&
@@ -1865,6 +1887,60 @@ export default function PreviewFeed() {
       return customerApproved ? "Comprar" : customerAccessLabel;
     },
     [customerAccessLabel, customerApproved, store],
+  );
+
+  const latestFeedHandlersRef = React.useRef({
+    handleAddToCart,
+    handleLike,
+    handleMediaPointerDown,
+    handleMediaPointerUp,
+    handleShare,
+    openProductPage,
+    resetSpeed,
+    toggleMute,
+    togglePlay,
+  });
+  latestFeedHandlersRef.current = {
+    handleAddToCart,
+    handleLike,
+    handleMediaPointerDown,
+    handleMediaPointerUp,
+    handleShare,
+    openProductPage,
+    resetSpeed,
+    toggleMute,
+    togglePlay,
+  };
+
+  // Stable action identities so memoized FeedItems only re-render when their
+  // data props change; each call forwards to the latest handler closures.
+  const feedItemActions = React.useMemo<FeedItemActions>(
+    () => ({
+      onAddToCart: (video, product) =>
+        latestFeedHandlersRef.current.handleAddToCart(video, product),
+      onLike: (video) => void latestFeedHandlersRef.current.handleLike(video),
+      onOpenComments: (video) => setSelectedCommentVideo(video),
+      onOpenProductPage: (video, product) =>
+        latestFeedHandlersRef.current.openProductPage(video, product),
+      onPointerCancel: (video) =>
+        latestFeedHandlersRef.current.resetSpeed(video),
+      onPointerDown: (video, event) =>
+        latestFeedHandlersRef.current.handleMediaPointerDown(video, event),
+      onPointerLeave: (video) => {
+        if (longPressActiveRef.current) {
+          latestFeedHandlersRef.current.resetSpeed(video);
+        }
+      },
+      onPointerUp: (video, event) =>
+        latestFeedHandlersRef.current.handleMediaPointerUp(video, event),
+      onShare: (video, product) =>
+        void latestFeedHandlersRef.current.handleShare(video, product),
+      onToggleMute: (video, event) =>
+        latestFeedHandlersRef.current.toggleMute(video, event),
+      onTogglePlay: (video, event) =>
+        latestFeedHandlersRef.current.togglePlay(video, event),
+    }),
+    [],
   );
 
   return (
@@ -1941,286 +2017,51 @@ export default function PreviewFeed() {
           onScroll={() => setShowSwipeHint(false)}
         >
           {orderedVideos.map((video: any, index: number) => {
-            const productViews = getProductViews(
-              video,
-              null,
-              video.id === requestedVideoId ? sourceProductUrl : null,
-              store?.url,
-            );
-            const product = productViews[0] ?? null;
-            const visibleProducts = productViews
-              .map((item) => ({
-                product: item,
-                view: displayProductForAccess(
-                  {
-                    ...item,
-                    platform: item.platform ?? store?.platform ?? "e-commerce",
-                  },
-                  Boolean(isUpzeroCommerce(store, item) && !customerApproved),
-                ),
-              }))
-              .filter(
-                (item) =>
-                  item.view &&
-                  (item.product.productUrl || item.product.variants.length > 0),
-              ) as Array<{
-              product: NonNullable<ReturnType<typeof getProductView>>;
-              view: NonNullable<ReturnType<typeof displayProductForAccess>>;
-            }>;
-            const storedLikes = video.metrics?.likes ?? video.likes ?? 0;
-            const likes = likedMap[video.id] ? storedLikes + 1 : storedLikes;
-            const comments =
-              (video.metrics?.comments ?? video.comments_count ?? 0) +
-              (localCommentCounts[video.id] ?? 0);
-            const canLike = videoFeatureEnabled(video, "allow_likes");
-            const canComment = videoFeatureEnabled(video, "allow_comments");
-            const canShare = videoFeatureEnabled(video, "allow_sharing");
-            const hasRealVideo = Boolean(video.video_url);
             const isActiveVideo =
               activeVideoId === video.id || (!activeVideoId && index === 0);
-            const showVideoControls =
-              isActiveVideo && (controlsVisible || pausedMap[video.id]);
+            if (Math.abs(index - activeIndex) > 2 && !isActiveVideo) {
+              return (
+                <FeedItemPlaceholder
+                  key={video.id}
+                  setSectionRef={setSectionRef}
+                  video={video}
+                />
+              );
+            }
 
             return (
-              <section
+              <FeedItem
                 key={video.id}
-                ref={setSectionRef(video.id)}
-                data-video-id={video.id}
-                data-active={isActiveVideo ? "true" : "false"}
-                className="relative h-full w-full snap-start bg-black"
-              >
-                {hasRealVideo ? (
-                  <LazyVideoPlayer
-                    ref={setVideoRef(video.id)}
-                    src={video.video_url}
-                    poster={video.thumbnail_url ?? undefined}
-                    className="absolute inset-0 h-full w-full object-cover"
-                    active={isActiveVideo || Math.abs(index - activeIndex) <= 1}
-                    style={{
-                      backgroundColor: "#000",
-                      backgroundImage: video.thumbnail_url
-                        ? `url(${video.thumbnail_url})`
-                        : undefined,
-                      backgroundPosition: "center",
-                      backgroundSize: "cover",
-                    }}
-                    muted={isMuted || !soundUnlocked}
-                    hlsStartQuality="high"
-                    loop={loopVideo}
-                    autoPlay
-                    preload={preloadNext ? "auto" : "metadata"}
-                  />
-                ) : (
-                  <div
-                    className="absolute inset-0 bg-black bg-cover bg-center"
-                    style={{
-                      backgroundImage: video.thumbnail_url
-                        ? `url(${video.thumbnail_url})`
-                        : undefined,
-                    }}
-                  />
-                )}
-
-                <div
-                  className="absolute inset-0 z-10"
-                  style={{ touchAction: "pan-y" }}
-                  onPointerDown={(event) =>
-                    handleMediaPointerDown(video, event)
-                  }
-                  onPointerUp={(event) => handleMediaPointerUp(video, event)}
-                  onPointerCancel={() => resetSpeed(video)}
-                  onPointerLeave={() => {
-                    if (longPressActiveRef.current) resetSpeed(video);
-                  }}
-                />
-
-                <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-                  {showVideoControls && pausedMap[video.id] && (
-                    <button
-                      type="button"
-                      className="pointer-events-auto flex h-20 w-20 items-center justify-center rounded-full bg-black/35 text-white opacity-100 shadow-2xl backdrop-blur-md transition-opacity"
-                      onClick={(event) => togglePlay(video, event)}
-                      aria-label="Reproduzir vídeo"
-                    >
-                      <Play className="ml-1 h-10 w-10 fill-white" />
-                    </button>
-                  )}
-                  {showVideoControls && (
-                    <button
-                      type="button"
-                      className="pointer-events-auto absolute top-[38%] flex h-11 w-11 -translate-y-20 items-center justify-center rounded-full bg-black/35 text-white shadow-xl backdrop-blur-md transition-opacity"
-                      onClick={toggleMute}
-                      aria-label={isMuted ? "Ligar som" : "Mutar vídeo"}
-                    >
-                      {isMuted || !soundUnlocked ? (
-                        <VolumeX className="h-5 w-5" />
-                      ) : (
-                        <Volume2 className="h-5 w-5" />
-                      )}
-                    </button>
-                  )}
-                  {speedVideoId === video.id && (
-                    <div className="absolute top-24 rounded-full bg-white px-4 py-2 text-sm font-black text-black shadow-xl">
-                      2x
-                    </div>
-                  )}
-                </div>
-
-                <div className="absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black via-black/60 to-transparent p-4 pt-32">
-                  {(String(video.title || "").trim() ||
-                    (showDescription && String(video.description || "").trim())) && (
-                    <div className="mb-4 pr-16">
-                      {String(video.title || "").trim() && (
-                        <h3 className="mb-1 text-lg font-medium text-white">
-                          {video.title}
-                        </h3>
-                      )}
-                      {showDescription && String(video.description || "").trim() && (
-                        <p className="line-clamp-2 text-sm text-white/80">
-                          {video.description}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {visibleProducts.length > 0 &&
-                    (visibleProducts.length > 1 ? (
-                      <div className="-mx-4 flex gap-3 overflow-x-auto pl-4 pr-16 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                        {visibleProducts.map((item) => {
-                          const itemRestricted = Boolean(
-                            isUpzeroCommerce(store, item.product) &&
-                              !customerApproved,
-                          );
-                          return (
-                            <div
-                              key={item.product.id}
-                              className="w-[78%] shrink-0"
-                            >
-                              <CommerceProductCard
-                                product={item.view}
-                                singleAction
-                                showAction={showBuyButton}
-                                showName={showProductName}
-                                showPrice={showPrice}
-                                actionLabel={commerceActionLabel(item.product)}
-                                onDetails={() =>
-                                  itemRestricted
-                                    ? openProductPage(video, item.product)
-                                    : addToCartInline
-                                      ? handleAddToCart(video, item.product)
-                                      : openProductPage(video, item.product)
-                                }
-                                onAction={() =>
-                                  itemRestricted
-                                    ? openProductPage(video, item.product)
-                                    : addToCartInline
-                                      ? handleAddToCart(video, item.product)
-                                      : openProductPage(video, item.product)
-                                }
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <CommerceProductCard
-                        product={visibleProducts[0].view}
-                        singleAction
-                        showAction={showBuyButton}
-                        showName={showProductName}
-                        showPrice={showPrice}
-                        actionLabel={commerceActionLabel(
-                          visibleProducts[0].product,
-                        )}
-                        onDetails={() =>
-                          isUpzeroCommerce(store, visibleProducts[0].product) &&
-                          !customerApproved
-                            ? openProductPage(video, visibleProducts[0].product)
-                            : addToCartInline
-                              ? handleAddToCart(
-                                  video,
-                                  visibleProducts[0].product,
-                                )
-                              : openProductPage(
-                                  video,
-                                  visibleProducts[0].product,
-                                )
-                        }
-                        onAction={() =>
-                          isUpzeroCommerce(store, visibleProducts[0].product) &&
-                          !customerApproved
-                            ? openProductPage(video, visibleProducts[0].product)
-                            : addToCartInline
-                              ? handleAddToCart(
-                                  video,
-                                  visibleProducts[0].product,
-                                )
-                              : openProductPage(
-                                  video,
-                                  visibleProducts[0].product,
-                                )
-                        }
-                      />
-                    ))}
-                </div>
-
-                <div className="absolute bottom-[206px] right-2 z-40 flex flex-col items-center gap-3">
-                  {canLike && showLikes && (
-                    <button
-                      type="button"
-                      className="flex w-10 flex-col items-center gap-1 text-white"
-                      onClick={() => void handleLike(video)}
-                      aria-label="Curtir"
-                    >
-                      <Heart
-                        className="h-8 w-8 drop-shadow-[0_2px_7px_rgba(0,0,0,.45)] transition-all"
-                        fill={likedMap[video.id] ? "#fe2c55" : "white"}
-                        stroke={likedMap[video.id] ? "#fe2c55" : "white"}
-                        strokeWidth={2.3}
-                      />
-                      <span className="text-[11px] font-black leading-none text-white [text-shadow:0_1px_4px_rgba(0,0,0,.8)]">
-                        {formatTikTokCount(likes)}
-                      </span>
-                    </button>
-                  )}
-                  {canComment && showComments && (
-                    <button
-                      type="button"
-                      className="flex w-10 flex-col items-center gap-1 text-white"
-                      onClick={() => setSelectedCommentVideo(video)}
-                      aria-label="Comentários"
-                    >
-                      <MessageCircle
-                        className="h-8 w-8 drop-shadow-[0_2px_7px_rgba(0,0,0,.45)]"
-                        fill="white"
-                        stroke="white"
-                        strokeWidth={2.4}
-                      />
-                      <span className="text-[11px] font-black leading-none text-white [text-shadow:0_1px_4px_rgba(0,0,0,.8)]">
-                        {formatTikTokCount(comments)}
-                      </span>
-                    </button>
-                  )}
-                  {canShare && showShare && product && (
-                    <button
-                      type="button"
-                      className="flex w-10 flex-col items-center gap-1 text-white"
-                      onClick={() => void handleShare(video, product)}
-                      aria-label="Compartilhar"
-                    >
-                      <Share2
-                        className="h-8 w-8 drop-shadow-[0_2px_7px_rgba(0,0,0,.45)]"
-                        fill="white"
-                        stroke="white"
-                        strokeWidth={2.4}
-                      />
-                      <span className="text-[11px] font-black leading-none text-white [text-shadow:0_1px_4px_rgba(0,0,0,.8)]">
-                        Compart.
-                      </span>
-                    </button>
-                  )}
-                </div>
-              </section>
+                actions={feedItemActions}
+                addToCartInline={addToCartInline}
+                commerceActionLabel={commerceActionLabel}
+                controlsHandles={controlsHandlesRef.current}
+                customerApproved={customerApproved}
+                extraComments={localCommentCounts[video.id] ?? 0}
+                isActiveVideo={isActiveVideo}
+                isMuted={isMuted}
+                isPaused={Boolean(pausedMap[video.id])}
+                liked={Boolean(likedMap[video.id])}
+                loopVideo={loopVideo}
+                playerActive={
+                  isActiveVideo || Math.abs(index - activeIndex) <= 1
+                }
+                preloadNext={preloadNext}
+                productViews={productViewsByVideoId.get(video.id) ?? []}
+                setSectionRef={setSectionRef}
+                setVideoRef={setVideoRef}
+                showBuyButton={showBuyButton}
+                showComments={showComments}
+                showDescription={showDescription}
+                showLikes={showLikes}
+                showPrice={showPrice}
+                showProductName={showProductName}
+                showShare={showShare}
+                soundUnlocked={soundUnlocked}
+                speedActive={speedVideoId === video.id}
+                store={store}
+                video={video}
+              />
             );
           })}
         </div>
@@ -2885,54 +2726,505 @@ export default function PreviewFeed() {
           </div>
         )}
 
-        <Drawer
+        <CommentDrawer
           open={Boolean(selectedCommentVideo)}
-          onOpenChange={(open) => {
-            if (!open) setSelectedCommentVideo(null);
-          }}
-        >
-          <DrawerContent className="mx-auto max-w-[420px] border-white/10 bg-white text-slate-950">
-            <DrawerHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <DrawerTitle className="text-base">
-                  Enviar comentário
-                </DrawerTitle>
-                <button
-                  className="rounded-full p-1 text-slate-500 hover:bg-slate-100"
-                  onClick={() => setSelectedCommentVideo(null)}
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-            </DrawerHeader>
-            <div className="space-y-3 px-4 pb-4">
-              <Input
-                value={commentAuthor}
-                onChange={(event) => setCommentAuthor(event.target.value)}
-                placeholder="Seu nome"
-              />
-              <Textarea
-                value={commentBody}
-                onChange={(event) => setCommentBody(event.target.value)}
-                placeholder="Escreva seu comentário"
-                rows={4}
-              />
-              <p className="text-xs text-slate-500">
-                O comentário aparece no painel da loja como pendente.
-              </p>
-            </div>
-            <DrawerFooter className="border-t border-slate-100 bg-white">
-              <Button
-                className="h-12 bg-[#fe2c55] text-base font-black text-white hover:bg-[#e6294e]"
-                disabled={isSubmittingComment}
-                onClick={() => void handleSubmitComment()}
-              >
-                {isSubmittingComment ? "Enviando..." : "Enviar comentário"}
-              </Button>
-            </DrawerFooter>
-          </DrawerContent>
-        </Drawer>
+          isSubmitting={isSubmittingComment}
+          onClose={() => setSelectedCommentVideo(null)}
+          onSubmit={handleSubmitComment}
+        />
       </div>
     </div>
+  );
+}
+
+type ProductView = NonNullable<ReturnType<typeof productToView>>;
+
+type FeedItemActions = {
+  onAddToCart: (video: any, product: ProductView) => void;
+  onLike: (video: any) => void;
+  onOpenComments: (video: any) => void;
+  onOpenProductPage: (video: any, product: ProductView) => void;
+  onPointerCancel: (video: any) => void;
+  onPointerDown: (video: any, event: React.PointerEvent<HTMLElement>) => void;
+  onPointerLeave: (video: any) => void;
+  onPointerUp: (video: any, event: React.PointerEvent<HTMLElement>) => void;
+  onShare: (video: any, product: ProductView) => void;
+  onToggleMute: (video: any, event?: React.MouseEvent) => void;
+  onTogglePlay: (video: any, event?: React.MouseEvent) => void;
+};
+
+type SectionRefFactory = (id: string) => (element: HTMLElement | null) => void;
+
+// Lightweight stand-in for videos far from the active index: same height and
+// snap behavior so scrolling and active-video detection keep working, but no
+// player, overlays, or product DOM.
+const FeedItemPlaceholder = React.memo(function FeedItemPlaceholder({
+  setSectionRef,
+  video,
+}: {
+  setSectionRef: SectionRefFactory;
+  video: any;
+}) {
+  const sectionRefCb = React.useMemo(
+    () => setSectionRef(video.id),
+    [setSectionRef, video.id],
+  );
+
+  return (
+    <section
+      ref={sectionRefCb}
+      data-video-id={video.id}
+      data-active="false"
+      className="relative h-full w-full snap-start bg-black"
+    >
+      <div
+        className="absolute inset-0 bg-black bg-cover bg-center"
+        style={{
+          backgroundImage: video.thumbnail_url
+            ? `url(${video.thumbnail_url})`
+            : undefined,
+        }}
+      />
+    </section>
+  );
+});
+
+type FeedItemProps = {
+  actions: FeedItemActions;
+  addToCartInline: boolean;
+  commerceActionLabel: (product: any) => string;
+  controlsHandles: Map<string, (keepVisible?: boolean) => void>;
+  customerApproved: boolean;
+  extraComments: number;
+  isActiveVideo: boolean;
+  isMuted: boolean;
+  isPaused: boolean;
+  liked: boolean;
+  loopVideo: boolean;
+  playerActive: boolean;
+  preloadNext: boolean;
+  productViews: ProductView[];
+  setSectionRef: SectionRefFactory;
+  setVideoRef: (id: string) => (element: HTMLVideoElement | null) => void;
+  showBuyButton: boolean;
+  showComments: boolean;
+  showDescription: boolean;
+  showLikes: boolean;
+  showPrice: boolean;
+  showProductName: boolean;
+  showShare: boolean;
+  soundUnlocked: boolean;
+  speedActive: boolean;
+  store: any;
+  video: any;
+};
+
+const FeedItem = React.memo(function FeedItem({
+  actions,
+  addToCartInline,
+  commerceActionLabel,
+  controlsHandles,
+  customerApproved,
+  extraComments,
+  isActiveVideo,
+  isMuted,
+  isPaused,
+  liked,
+  loopVideo,
+  playerActive,
+  preloadNext,
+  productViews,
+  setSectionRef,
+  setVideoRef,
+  showBuyButton,
+  showComments,
+  showDescription,
+  showLikes,
+  showPrice,
+  showProductName,
+  showShare,
+  soundUnlocked,
+  speedActive,
+  store,
+  video,
+}: FeedItemProps) {
+  const sectionRefCb = React.useMemo(
+    () => setSectionRef(video.id),
+    [setSectionRef, video.id],
+  );
+  const videoRefCb = React.useMemo(
+    () => setVideoRef(video.id),
+    [setVideoRef, video.id],
+  );
+
+  const [controlsVisible, setControlsVisible] = React.useState(false);
+  const controlsTimerRef = React.useRef<number | null>(null);
+
+  const showControls = React.useCallback((keepVisible = false) => {
+    setControlsVisible(true);
+    if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
+    controlsTimerRef.current = null;
+
+    if (!keepVisible) {
+      controlsTimerRef.current = window.setTimeout(() => {
+        setControlsVisible(false);
+      }, 2200);
+    }
+  }, []);
+
+  const hideControls = React.useCallback(() => {
+    if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
+    controlsTimerRef.current = null;
+    setControlsVisible(false);
+  }, []);
+
+  React.useEffect(() => {
+    controlsHandles.set(video.id, showControls);
+    return () => {
+      controlsHandles.delete(video.id);
+      if (controlsTimerRef.current) {
+        window.clearTimeout(controlsTimerRef.current);
+      }
+    };
+  }, [controlsHandles, showControls, video.id]);
+
+  const isPausedRef = React.useRef(isPaused);
+  isPausedRef.current = isPaused;
+  // Mirrors the previous page-level [activeVideoId] effect: becoming the
+  // active video while paused keeps controls visible; leaving hides them.
+  React.useEffect(() => {
+    if (isActiveVideo && isPausedRef.current) showControls(true);
+    else hideControls();
+  }, [hideControls, isActiveVideo, showControls]);
+
+  const product = productViews[0] ?? null;
+  const visibleProducts = productViews
+    .map((item) => ({
+      product: item,
+      view: displayProductForAccess(
+        {
+          ...item,
+          platform: item.platform ?? store?.platform ?? "e-commerce",
+        },
+        Boolean(isUpzeroCommerce(store, item) && !customerApproved),
+      ),
+    }))
+    .filter(
+      (item) =>
+        item.view &&
+        (item.product.productUrl || item.product.variants.length > 0),
+    ) as Array<{
+    product: NonNullable<ReturnType<typeof getProductView>>;
+    view: NonNullable<ReturnType<typeof displayProductForAccess>>;
+  }>;
+  const storedLikes = video.metrics?.likes ?? video.likes ?? 0;
+  const likes = liked ? storedLikes + 1 : storedLikes;
+  const comments =
+    (video.metrics?.comments ?? video.comments_count ?? 0) + extraComments;
+  const canLike = videoFeatureEnabled(video, "allow_likes");
+  const canComment = videoFeatureEnabled(video, "allow_comments");
+  const canShare = videoFeatureEnabled(video, "allow_sharing");
+  const hasRealVideo = Boolean(video.video_url);
+  const showVideoControls = isActiveVideo && (controlsVisible || isPaused);
+
+  return (
+    <section
+      ref={sectionRefCb}
+      data-video-id={video.id}
+      data-active={isActiveVideo ? "true" : "false"}
+      className="relative h-full w-full snap-start bg-black"
+    >
+      {hasRealVideo ? (
+        <LazyVideoPlayer
+          ref={videoRefCb}
+          src={video.video_url}
+          poster={video.thumbnail_url ?? undefined}
+          className="absolute inset-0 h-full w-full object-cover"
+          active={playerActive}
+          style={{
+            backgroundColor: "#000",
+            backgroundImage: video.thumbnail_url
+              ? `url(${video.thumbnail_url})`
+              : undefined,
+            backgroundPosition: "center",
+            backgroundSize: "cover",
+          }}
+          muted={isMuted || !soundUnlocked}
+          hlsStartQuality="high"
+          loop={loopVideo}
+          autoPlay
+          preload={preloadNext ? "auto" : "metadata"}
+        />
+      ) : (
+        <div
+          className="absolute inset-0 bg-black bg-cover bg-center"
+          style={{
+            backgroundImage: video.thumbnail_url
+              ? `url(${video.thumbnail_url})`
+              : undefined,
+          }}
+        />
+      )}
+
+      <div
+        className="absolute inset-0 z-10"
+        style={{ touchAction: "pan-y" }}
+        onPointerDown={(event) => actions.onPointerDown(video, event)}
+        onPointerUp={(event) => actions.onPointerUp(video, event)}
+        onPointerCancel={() => actions.onPointerCancel(video)}
+        onPointerLeave={() => actions.onPointerLeave(video)}
+      />
+
+      <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+        {showVideoControls && isPaused && (
+          <button
+            type="button"
+            className="pointer-events-auto flex h-20 w-20 items-center justify-center rounded-full bg-black/35 text-white opacity-100 shadow-2xl backdrop-blur-md transition-opacity"
+            onClick={(event) => actions.onTogglePlay(video, event)}
+            aria-label="Reproduzir vídeo"
+          >
+            <Play className="ml-1 h-10 w-10 fill-white" />
+          </button>
+        )}
+        {showVideoControls && (
+          <button
+            type="button"
+            className="pointer-events-auto absolute top-[38%] flex h-11 w-11 -translate-y-20 items-center justify-center rounded-full bg-black/35 text-white shadow-xl backdrop-blur-md transition-opacity"
+            onClick={(event) => actions.onToggleMute(video, event)}
+            aria-label={isMuted ? "Ligar som" : "Mutar vídeo"}
+          >
+            {isMuted || !soundUnlocked ? (
+              <VolumeX className="h-5 w-5" />
+            ) : (
+              <Volume2 className="h-5 w-5" />
+            )}
+          </button>
+        )}
+        {speedActive && (
+          <div className="absolute top-24 rounded-full bg-white px-4 py-2 text-sm font-black text-black shadow-xl">
+            2x
+          </div>
+        )}
+      </div>
+
+      <div className="absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black via-black/60 to-transparent p-4 pt-32">
+        {(String(video.title || "").trim() ||
+          (showDescription && String(video.description || "").trim())) && (
+          <div className="mb-4 pr-16">
+            {String(video.title || "").trim() && (
+              <h3 className="mb-1 text-lg font-medium text-white">
+                {video.title}
+              </h3>
+            )}
+            {showDescription && String(video.description || "").trim() && (
+              <p className="line-clamp-2 text-sm text-white/80">
+                {video.description}
+              </p>
+            )}
+          </div>
+        )}
+
+        {visibleProducts.length > 0 &&
+          (visibleProducts.length > 1 ? (
+            <div className="-mx-4 flex gap-3 overflow-x-auto pl-4 pr-16 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {visibleProducts.map((item) => {
+                const itemRestricted = Boolean(
+                  isUpzeroCommerce(store, item.product) && !customerApproved,
+                );
+                return (
+                  <div key={item.product.id} className="w-[78%] shrink-0">
+                    <CommerceProductCard
+                      product={item.view}
+                      singleAction
+                      showAction={showBuyButton}
+                      showName={showProductName}
+                      showPrice={showPrice}
+                      actionLabel={commerceActionLabel(item.product)}
+                      onDetails={() =>
+                        itemRestricted
+                          ? actions.onOpenProductPage(video, item.product)
+                          : addToCartInline
+                            ? actions.onAddToCart(video, item.product)
+                            : actions.onOpenProductPage(video, item.product)
+                      }
+                      onAction={() =>
+                        itemRestricted
+                          ? actions.onOpenProductPage(video, item.product)
+                          : addToCartInline
+                            ? actions.onAddToCart(video, item.product)
+                            : actions.onOpenProductPage(video, item.product)
+                      }
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <CommerceProductCard
+              product={visibleProducts[0].view}
+              singleAction
+              showAction={showBuyButton}
+              showName={showProductName}
+              showPrice={showPrice}
+              actionLabel={commerceActionLabel(visibleProducts[0].product)}
+              onDetails={() =>
+                isUpzeroCommerce(store, visibleProducts[0].product) &&
+                !customerApproved
+                  ? actions.onOpenProductPage(video, visibleProducts[0].product)
+                  : addToCartInline
+                    ? actions.onAddToCart(video, visibleProducts[0].product)
+                    : actions.onOpenProductPage(
+                        video,
+                        visibleProducts[0].product,
+                      )
+              }
+              onAction={() =>
+                isUpzeroCommerce(store, visibleProducts[0].product) &&
+                !customerApproved
+                  ? actions.onOpenProductPage(video, visibleProducts[0].product)
+                  : addToCartInline
+                    ? actions.onAddToCart(video, visibleProducts[0].product)
+                    : actions.onOpenProductPage(
+                        video,
+                        visibleProducts[0].product,
+                      )
+              }
+            />
+          ))}
+      </div>
+
+      <div className="absolute bottom-[206px] right-2 z-40 flex flex-col items-center gap-3">
+        {canLike && showLikes && (
+          <button
+            type="button"
+            className="flex w-10 flex-col items-center gap-1 text-white"
+            onClick={() => actions.onLike(video)}
+            aria-label="Curtir"
+          >
+            <Heart
+              className="h-8 w-8 drop-shadow-[0_2px_7px_rgba(0,0,0,.45)] transition-all"
+              fill={liked ? "#fe2c55" : "white"}
+              stroke={liked ? "#fe2c55" : "white"}
+              strokeWidth={2.3}
+            />
+            <span className="text-[11px] font-black leading-none text-white [text-shadow:0_1px_4px_rgba(0,0,0,.8)]">
+              {formatTikTokCount(likes)}
+            </span>
+          </button>
+        )}
+        {canComment && showComments && (
+          <button
+            type="button"
+            className="flex w-10 flex-col items-center gap-1 text-white"
+            onClick={() => actions.onOpenComments(video)}
+            aria-label="Comentários"
+          >
+            <MessageCircle
+              className="h-8 w-8 drop-shadow-[0_2px_7px_rgba(0,0,0,.45)]"
+              fill="white"
+              stroke="white"
+              strokeWidth={2.4}
+            />
+            <span className="text-[11px] font-black leading-none text-white [text-shadow:0_1px_4px_rgba(0,0,0,.8)]">
+              {formatTikTokCount(comments)}
+            </span>
+          </button>
+        )}
+        {canShare && showShare && product && (
+          <button
+            type="button"
+            className="flex w-10 flex-col items-center gap-1 text-white"
+            onClick={() => actions.onShare(video, product)}
+            aria-label="Compartilhar"
+          >
+            <Share2
+              className="h-8 w-8 drop-shadow-[0_2px_7px_rgba(0,0,0,.45)]"
+              fill="white"
+              stroke="white"
+              strokeWidth={2.4}
+            />
+            <span className="text-[11px] font-black leading-none text-white [text-shadow:0_1px_4px_rgba(0,0,0,.8)]">
+              Compart.
+            </span>
+          </button>
+        )}
+      </div>
+    </section>
+  );
+});
+
+// Owns the comment inputs so typing re-renders only this drawer, never the
+// feed. Fields persist across open/close and clear only after a successful
+// submit, matching the previous page-level state behavior.
+function CommentDrawer({
+  isSubmitting,
+  onClose,
+  onSubmit,
+  open,
+}: {
+  isSubmitting: boolean;
+  onClose: () => void;
+  onSubmit: (authorName: string, body: string) => Promise<boolean>;
+  open: boolean;
+}) {
+  const [author, setAuthor] = React.useState("");
+  const [body, setBody] = React.useState("");
+
+  const submit = async () => {
+    const ok = await onSubmit(author, body);
+    if (ok) {
+      setAuthor("");
+      setBody("");
+    }
+  };
+
+  return (
+    <Drawer
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose();
+      }}
+    >
+      <DrawerContent className="mx-auto max-w-[420px] border-white/10 bg-white text-slate-950">
+        <DrawerHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <DrawerTitle className="text-base">
+              Enviar comentário
+            </DrawerTitle>
+            <button
+              className="rounded-full p-1 text-slate-500 hover:bg-slate-100"
+              onClick={onClose}
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </DrawerHeader>
+        <div className="space-y-3 px-4 pb-4">
+          <Input
+            value={author}
+            onChange={(event) => setAuthor(event.target.value)}
+            placeholder="Seu nome"
+          />
+          <Textarea
+            value={body}
+            onChange={(event) => setBody(event.target.value)}
+            placeholder="Escreva seu comentário"
+            rows={4}
+          />
+          <p className="text-xs text-slate-500">
+            O comentário aparece no painel da loja como pendente.
+          </p>
+        </div>
+        <DrawerFooter className="border-t border-slate-100 bg-white">
+          <Button
+            className="h-12 bg-[#fe2c55] text-base font-black text-white hover:bg-[#e6294e]"
+            disabled={isSubmitting}
+            onClick={() => void submit()}
+          >
+            {isSubmitting ? "Enviando..." : "Enviar comentário"}
+          </Button>
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
   );
 }
