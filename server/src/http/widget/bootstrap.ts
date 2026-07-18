@@ -148,15 +148,14 @@ const WidgetSlimVideoSchema = z
     thumbnail_url: z.string(),
     product: z
       .object({
-        id: z.string(),
+        id: z.string().nullable(),
         external_id: z.string().nullable(),
         name: z.string(),
         image_url: z.string(),
         price_label: z.string(),
         product_url: z.string(),
       })
-      .loose()
-      .nullable(),
+      .loose(),
   })
   .loose();
 

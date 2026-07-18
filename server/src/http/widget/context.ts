@@ -479,7 +479,7 @@ export type SlimVideo = {
     image_url: string;
     price_label: string;
     product_url: string;
-  } | null;
+  };
 };
 
 export function slimVideos(videos: SerializedVideo[]): SlimVideo[] {
@@ -490,16 +490,17 @@ export function slimVideos(videos: SerializedVideo[]): SlimVideo[] {
       title: video.title,
       media_url: firstTextValue([video.video_url, video.playback_url]),
       thumbnail_url: text(video.thumbnail_url),
-      product: product
-        ? {
-            id: product.id,
-            external_id: product.external_id ?? null,
-            name: productDisplayName(product, video),
-            image_url: productImageUrl(product, video),
-            price_label: productPriceLabel(product),
-            product_url: text(product.product_url),
-          }
-        : null,
+      // Card fields are always resolved, product or not — the old client fell
+      // back to the video title/thumbnail for product-less videos and the
+      // fallback chains live server-side now.
+      product: {
+        id: product?.id ?? null,
+        external_id: product?.external_id ?? null,
+        name: productDisplayName(product, video),
+        image_url: productImageUrl(product, video),
+        price_label: productPriceLabel(product),
+        product_url: text(product?.product_url),
+      },
     };
   });
 }
