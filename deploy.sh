@@ -295,10 +295,18 @@ EOF
   if command -v certbot >/dev/null 2>&1; then
     local email_arg=(--register-unsafely-without-email)
     [[ -n "$LETSENCRYPT_EMAIL" ]] && email_arg=(-m "$LETSENCRYPT_EMAIL")
-    # --keep-until-expiring keeps redeploys from hitting Let's Encrypt rate limits.
-    certbot --nginx --non-interactive --agree-tos --redirect --keep-until-expiring "${email_arg[@]}" \
-      -d "$DOMAIN" -d "$CLIENT_DOMAIN" \
-      || warn "certbot failed for ${DOMAIN}/${CLIENT_DOMAIN} (serving HTTP only for now)"
+    # One certificate per domain: each run matches that domain's existing
+    # lineage exactly, so certbot never hits the interactive "expand and
+    # replace?" prompt a combined multi-domain cert triggers when a
+    # pre-existing single-domain cert is found. --keep-until-expiring keeps
+    # redeploys from hitting Let's Encrypt rate limits; --expand is a no-op
+    # belt-and-braces for lineages that ever grew extra names.
+    local cert_domain
+    for cert_domain in "$DOMAIN" "$CLIENT_DOMAIN"; do
+      certbot --nginx --non-interactive --agree-tos --redirect --keep-until-expiring --expand \
+        "${email_arg[@]}" -d "$cert_domain" \
+        || warn "certbot failed for ${cert_domain} (serving HTTP only for now)"
+    done
   else
     warn "certbot not installed — serving ${DOMAIN}/${CLIENT_DOMAIN} over HTTP only"
   fi
