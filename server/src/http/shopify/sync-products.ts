@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "@/lib/prisma";
+import { runInBatches } from "@/lib/batch";
 import {
   requestShopifyAccessToken,
   resolveShopifyAppConfig,
@@ -608,19 +609,21 @@ export async function shopifySyncProductsHandler(
   if (syncedProducts.length) {
     const productsToSave = uniqueByExternalId(syncedProducts);
     try {
-      for (const product of productsToSave) {
-        await prisma.product.upsert({
-          where: {
-            store_id_platform_external_id: {
-              store_id: storeId,
-              platform: "shopify",
-              external_id: product.external_id,
+      await runInBatches(
+        productsToSave.map((product) =>
+          prisma.product.upsert({
+            where: {
+              store_id_platform_external_id: {
+                store_id: storeId,
+                platform: "shopify",
+                external_id: product.external_id,
+              },
             },
-          },
-          create: product,
-          update: product,
-        });
-      }
+            create: product,
+            update: product,
+          }),
+        ),
+      );
     } catch (upsertError) {
       return reply.status(500).send({
         details: errorDetails(upsertError),
@@ -653,19 +656,21 @@ export async function shopifySyncProductsHandler(
     syncedVariantsCount = variantsToSave.length;
 
     try {
-      for (const variant of variantsToSave) {
-        await prisma.productVariant.upsert({
-          where: {
-            store_id_platform_external_id: {
-              store_id: storeId,
-              platform: "shopify",
-              external_id: variant.external_id,
+      await runInBatches(
+        variantsToSave.map((variant) =>
+          prisma.productVariant.upsert({
+            where: {
+              store_id_platform_external_id: {
+                store_id: storeId,
+                platform: "shopify",
+                external_id: variant.external_id,
+              },
             },
-          },
-          create: variant,
-          update: variant,
-        });
-      }
+            create: variant,
+            update: variant,
+          }),
+        ),
+      );
     } catch (variantsError) {
       return reply.status(500).send({
         details: errorDetails(variantsError),

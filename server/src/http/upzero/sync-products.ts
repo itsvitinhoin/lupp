@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "@/lib/prisma";
+import { runInBatches } from "@/lib/batch";
 import { findStoreMembership } from "@/lib/store-membership";
 import {
   normalizeUpzeroBaseUrl,
@@ -931,20 +932,22 @@ async function saveVariants(storeId: string, rows: VariantRow[]) {
       });
     }
 
-    for (const row of rowsToUpsert) {
-      const data = { ...row, metadata: row.metadata as Prisma.InputJsonValue };
-      await prisma.productVariant.upsert({
-        where: {
-          store_id_platform_external_id: {
-            store_id: storeId,
-            platform: row.platform,
-            external_id: row.external_id,
+    await runInBatches(
+      rowsToUpsert.map((row) => {
+        const data = { ...row, metadata: row.metadata as Prisma.InputJsonValue };
+        return prisma.productVariant.upsert({
+          where: {
+            store_id_platform_external_id: {
+              store_id: storeId,
+              platform: row.platform,
+              external_id: row.external_id,
+            },
           },
-        },
-        create: data,
-        update: data,
-      });
-    }
+          create: data,
+          update: data,
+        });
+      }),
+    );
 
     return { total: rowsToUpsert.length };
   } catch (error) {
@@ -980,7 +983,7 @@ async function saveProducts(storeId: string, rows: ProductRow[]) {
     }
 
     const rowsToInsert: ProductRow[] = [];
-    let updated = 0;
+    const updates: ReturnType<typeof prisma.product.update>[] = [];
 
     for (const row of uniqueRows) {
       const existing = existingByKey.get(productKey(row));
@@ -989,23 +992,26 @@ async function saveProducts(storeId: string, rows: ProductRow[]) {
         continue;
       }
 
-      await prisma.product.update({
-        where: { id: existing.id },
-        data: {
-          compare_at_price: row.compare_at_price ?? null,
-          currency: row.currency || "BRL",
-          description: row.description ?? null,
-          // A sync without images keeps the previously stored image.
-          image_url: row.image_url ?? existing.image_url ?? null,
-          name: row.name,
-          price: row.price ?? null,
-          product_url: row.product_url ?? null,
-          status: row.status || "active",
-        },
-      });
-
-      updated += 1;
+      updates.push(
+        prisma.product.update({
+          where: { id: existing.id },
+          data: {
+            compare_at_price: row.compare_at_price ?? null,
+            currency: row.currency || "BRL",
+            description: row.description ?? null,
+            // A sync without images keeps the previously stored image.
+            image_url: row.image_url ?? existing.image_url ?? null,
+            name: row.name,
+            price: row.price ?? null,
+            product_url: row.product_url ?? null,
+            status: row.status || "active",
+          },
+        }),
+      );
     }
+
+    await runInBatches(updates);
+    const updated = updates.length;
 
     if (rowsToInsert.length) {
       await prisma.product.createMany({ data: rowsToInsert });
