@@ -12,8 +12,9 @@ set -euo pipefail
 #   server         → node dist/server.js  (Fastify; 127.0.0.1:3333, systemd)
 #   client → static Vite SPA built to dist/public, published to /var/www
 #            and served by nginx from there (worker can't read /home/<user>)
-# Both live on one domain: nginx proxies /api/ (+ /health, /docs) to the API
-# and serves everything else as static SPA files with an index.html fallback.
+# Two managed vhosts: DOMAIN proxies /api/ (+ /health, /docs) to the API and
+# keeps an SPA fallback; CLIENT_DOMAIN serves the SPA + widget.js statically
+# from the same /var/www tree (its canonical host — VITE_APP_URL bakes it in).
 #
 # Deploy config (service name, domain, port, TLS email) is hardcoded below —
 # this script reads nothing from the apps' .env. The server's runtime .env
@@ -28,7 +29,8 @@ set -euo pipefail
 
 # ── Deploy config (hardcoded) ────────────────────────────────────────────────
 SERVICE_NAME=luup-server
-DOMAIN=luup.dzns.net            # single vhost: SPA + /api proxy
+DOMAIN=luup.dzns.net            # API vhost: /api proxy (+ SPA fallback)
+CLIENT_DOMAIN=luup.dzns.com.br  # client vhost: static SPA + widget.js
 SERVER_PORT=3333                # matches the server default (src/env.ts)
 
 LETSENCRYPT_EMAIL=""
@@ -244,18 +246,61 @@ ${proxy_block}
     }
 }
 EOF
+  # Client vhost: the SPA + widget.js on their canonical domain. Static only —
+  # no /api proxy (the SPA and embeds call https://DOMAIN directly; CORS
+  # already allows this origin) and no systemd unit (nothing to run).
+  local client_site="/etc/nginx/sites-available/${SERVICE_NAME}-client.conf"
+  cat > "$client_site" <<EOF
+server {
+    listen 80;
+    server_name ${CLIENT_DOMAIN};
+
+    root ${WEB_ROOT};
+    index index.html;
+
+    # Hashed Vite build assets — safe to cache forever.
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        try_files \$uri =404;
+    }
+
+    # SPA entry point must revalidate so new deploys are picked up.
+    location = /index.html {
+        add_header Cache-Control "no-cache";
+    }
+
+    location / {
+        limit_req  zone=req_per_ip burst=40 nodelay;
+        limit_conn conn_per_ip 20;
+        try_files \$uri \$uri/ /index.html;
+    }
+}
+EOF
+
   mkdir -p /etc/nginx/sites-enabled
   ln -sf "$site" "/etc/nginx/sites-enabled/${SERVICE_NAME}.conf"
-  if ! nginx -t >/dev/null 2>&1; then warn "nginx config test failed — leaving ${DOMAIN} unconfigured"; return 0; fi
+  ln -sf "$client_site" "/etc/nginx/sites-enabled/${SERVICE_NAME}-client.conf"
+
+  # A hand-configured vhost already claiming the client domain would win or
+  # lose non-deterministically on server_name — surface it instead of fighting.
+  local conflicting
+  conflicting="$(grep -rlsE "server_name[^;]*[[:space:]]${CLIENT_DOMAIN}" /etc/nginx/sites-enabled/ 2>/dev/null \
+    | grep -v "${SERVICE_NAME}-client.conf" || true)"
+  [[ -n "$conflicting" ]] \
+    && warn "another enabled nginx site also declares ${CLIENT_DOMAIN}: ${conflicting} — remove it so this managed vhost owns the domain"
+
+  if ! nginx -t >/dev/null 2>&1; then warn "nginx config test failed — leaving ${DOMAIN}/${CLIENT_DOMAIN} unconfigured"; return 0; fi
   systemctl reload nginx || warn "nginx reload failed"
   if command -v certbot >/dev/null 2>&1; then
     local email_arg=(--register-unsafely-without-email)
     [[ -n "$LETSENCRYPT_EMAIL" ]] && email_arg=(-m "$LETSENCRYPT_EMAIL")
     # --keep-until-expiring keeps redeploys from hitting Let's Encrypt rate limits.
-    certbot --nginx --non-interactive --agree-tos --redirect --keep-until-expiring "${email_arg[@]}" -d "$DOMAIN" \
-      || warn "certbot failed for ${DOMAIN} (serving HTTP only for now)"
+    certbot --nginx --non-interactive --agree-tos --redirect --keep-until-expiring "${email_arg[@]}" \
+      -d "$DOMAIN" -d "$CLIENT_DOMAIN" \
+      || warn "certbot failed for ${DOMAIN}/${CLIENT_DOMAIN} (serving HTTP only for now)"
   else
-    warn "certbot not installed — serving ${DOMAIN} over HTTP only"
+    warn "certbot not installed — serving ${DOMAIN}/${CLIENT_DOMAIN} over HTTP only"
   fi
   return 0
 }
@@ -339,7 +384,7 @@ log "Building server (@workspace/server → dist/server.js)"
   || err "server build failed"
 
 log "Building client (@workspace/lupp → client/dist/public)"
-( cd "$ROOT_DIR" && run_as_app env "VITE_API_URL=https://${DOMAIN}" "VITE_APP_URL=https://${DOMAIN}" \
+( cd "$ROOT_DIR" && run_as_app env "VITE_API_URL=https://${DOMAIN}" "VITE_APP_URL=https://${CLIENT_DOMAIN}" \
     "$PNPM_BIN" --filter @workspace/lupp build ) \
   || err "client build failed"
 [[ -f "${CLIENT_DIST}/index.html" ]] || err "client build produced no ${CLIENT_DIST}/index.html"
@@ -356,4 +401,4 @@ deploy_server_service
 publish_client_dist
 setup_nginx_tls
 
-ok "Deploy complete (${SERVICE_NAME} API on :${SERVER_PORT} + static SPA at https://${DOMAIN})."
+ok "Deploy complete (${SERVICE_NAME} API at https://${DOMAIN}, client SPA + widget at https://${CLIENT_DOMAIN})."
