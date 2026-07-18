@@ -29,7 +29,7 @@ import { prepareLazyVideos } from "./hls.js";
 
   // Lupp REST API host used when data-api-url is absent on a non-localhost
   // page. CONFIRM this hostname before deploying the widget.
-  var PROD_API_URL = "https://api.playluup.com.br";
+  var PROD_API_URL = "https://luup.dzns.net";
 
   var scriptParams = {
     get: function (name) {
@@ -208,11 +208,11 @@ import { prepareLazyVideos } from "./hls.js";
     /apps-scripts\.tiendanube\.com/i.test(
       getUrlHostname(script.src || window.location.href),
     ) &&
-    !/^https?:\/\/(www\.)?(playluup\.com\.br|lupp-lupp\.vercel\.app)/i.test(
+    !/^https?:\/\/(www\.)?(luup\.dzns\.com\.br|playluup\.com\.br|lupp-lupp\.vercel\.app)/i.test(
       luppBaseUrl,
     )
   ) {
-    luppBaseUrl = "https://www.playluup.com.br";
+    luppBaseUrl = "https://luup.dzns.com.br";
   }
 
   // The API host is distinct from data-lupp-url (the SPA host): explicit
@@ -695,6 +695,7 @@ import { prepareLazyVideos } from "./hls.js";
       }
       var hostname = getUrlHostname(normalizedOrigin);
       return (
+        sameStorefrontHostname(hostname, "luup.dzns.com.br") ||
         sameStorefrontHostname(hostname, "playluup.com.br") ||
         sameStorefrontHostname(hostname, "www.playluup.com.br") ||
         /(^|\.)vercel\.app$/i.test(hostname)
@@ -2238,7 +2239,7 @@ import { prepareLazyVideos } from "./hls.js";
       feedback.innerHTML =
         '<div style="width:min(100%,430px);height:min(100dvh,805px);border-radius:18px;background:radial-gradient(circle at 50% 0%,rgba(255,255,255,.28),rgba(255,255,255,.08) 42%,rgba(0,0,0,.34));box-shadow:0 28px 90px rgba(0,0,0,.55);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);padding:26px 28px;display:flex;flex-direction:column;justify-content:center;gap:14px;">' +
         '<a href="' +
-        escapeHtml(luppBaseUrl || "https://www.playluup.com.br") +
+        escapeHtml(luppBaseUrl || "https://luup.dzns.com.br") +
         '" target="_blank" rel="noopener noreferrer" aria-label="Luup" style="display:flex;justify-content:center;margin-bottom:4px;text-decoration:none;"><img src="' +
         escapeHtml(feedbackLogoUrl) +
         '" alt="Luup" style="height:42px;max-width:150px;object-fit:contain;display:block;"/></a>' +

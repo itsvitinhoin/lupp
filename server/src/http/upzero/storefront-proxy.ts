@@ -113,6 +113,7 @@ function isInternalHost(hostname: string) {
   return (
     hostname === "localhost" ||
     hostname === "127.0.0.1" ||
+    hostname === "luup.dzns.com.br" ||
     hostname === "playluup.com.br" ||
     hostname === "www.playluup.com.br" ||
     hostname.endsWith(".vercel.app")

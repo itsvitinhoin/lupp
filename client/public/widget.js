@@ -218,7 +218,7 @@
     "use strict";
     var script = document.currentScript;
     if (!script) return;
-    var PROD_API_URL = "https://api.playluup.com.br";
+    var PROD_API_URL = "https://luup.dzns.net";
     var scriptParams = {
       get: function(name) {
         return readQueryValue(script.src || "", name);
@@ -358,10 +358,10 @@
     }
     if (/apps-scripts\.tiendanube\.com/i.test(
       getUrlHostname(script.src || window.location.href)
-    ) && !/^https?:\/\/(www\.)?(playluup\.com\.br|lupp-lupp\.vercel\.app)/i.test(
+    ) && !/^https?:\/\/(www\.)?(luup\.dzns\.com\.br|playluup\.com\.br|lupp-lupp\.vercel\.app)/i.test(
       luppBaseUrl
     )) {
-      luppBaseUrl = "https://www.playluup.com.br";
+      luppBaseUrl = "https://luup.dzns.com.br";
     }
     if (!apiUrl) {
       apiUrl = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(luppBaseUrl) ? "http://localhost:3333" : PROD_API_URL;
@@ -742,7 +742,7 @@
           return true;
         }
         var hostname = getUrlHostname(normalizedOrigin);
-        return sameStorefrontHostname(hostname, "playluup.com.br") || sameStorefrontHostname(hostname, "www.playluup.com.br") || /(^|\.)vercel\.app$/i.test(hostname);
+        return sameStorefrontHostname(hostname, "luup.dzns.com.br") || sameStorefrontHostname(hostname, "playluup.com.br") || sameStorefrontHostname(hostname, "www.playluup.com.br") || /(^|\.)vercel\.app$/i.test(hostname);
       } catch (_) {
         return false;
       }
@@ -1912,7 +1912,7 @@
         var feedback = document.createElement("div");
         feedback.setAttribute("data-lupp-feedback", "true");
         feedback.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:12px;color:#fff;";
-        feedback.innerHTML = '<div style="width:min(100%,430px);height:min(100dvh,805px);border-radius:18px;background:radial-gradient(circle at 50% 0%,rgba(255,255,255,.28),rgba(255,255,255,.08) 42%,rgba(0,0,0,.34));box-shadow:0 28px 90px rgba(0,0,0,.55);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);padding:26px 28px;display:flex;flex-direction:column;justify-content:center;gap:14px;"><a href="' + escapeHtml(luppBaseUrl || "https://www.playluup.com.br") + '" target="_blank" rel="noopener noreferrer" aria-label="Luup" style="display:flex;justify-content:center;margin-bottom:4px;text-decoration:none;"><img src="' + escapeHtml(feedbackLogoUrl) + '" alt="Luup" style="height:42px;max-width:150px;object-fit:contain;display:block;"/></a><div style="text-align:center;margin-bottom:8px;"><h2 style="margin:0 0 8px;font-size:20px;line-height:1.1;font-weight:800;">Queremos saber sua opinião!</h2><p style="margin:0 auto;max-width:360px;font-size:12px;line-height:1.15;font-weight:700;color:rgba(255,255,255,.92);">Sua experiência é muito importante para nós. Responda rapidamente e ajude-nos a melhorar cada vez mais.</p></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;"><div style="border:1px solid rgba(255,255,255,.24);border-radius:10px;background:rgba(255,255,255,.12);padding:10px;text-align:center;"><strong style="display:block;font-size:18px;line-height:1;">0</strong><span style="display:block;margin-top:3px;font-size:11px;font-weight:800;color:rgba(255,255,255,.76);">Comentários</span></div><div style="border:1px solid rgba(255,255,255,.24);border-radius:10px;background:rgba(255,255,255,.12);padding:10px;text-align:center;"><strong data-lupp-rating-count style="display:block;font-size:18px;line-height:1;">0/5</strong><span style="display:block;margin-top:3px;font-size:11px;font-weight:800;color:rgba(255,255,255,.76);">Estrelas</span></div></div><div data-lupp-feedback-stars style="display:flex;justify-content:center;gap:8px;margin-bottom:10px;"></div><div data-lupp-feedback-options style="display:grid;gap:10px;"></div><textarea data-lupp-feedback-text placeholder="Deixe aqui sua sugestão do que achou ou de como podemos melhorar." style="margin-top:24px;width:100%;min-height:66px;resize:none;border:1px solid rgba(255,255,255,.32);border-radius:9px;background:rgba(255,255,255,.13);color:#fff;outline:none;padding:14px;font-family:inherit;font-size:13px;font-weight:600;line-height:1.4;box-sizing:border-box;"></textarea><button data-lupp-feedback-submit type="button" style="height:40px;border:0;border-radius:5px;background:#fff;color:#050505;font-family:inherit;font-size:15px;font-weight:800;line-height:1;cursor:pointer;">Enviar Feedback</button><button data-lupp-feedback-skip type="button" style="height:40px;border:0;background:transparent;color:#fff;font-family:inherit;font-size:16px;font-weight:800;line-height:1;cursor:pointer;">Agora não</button></div>';
+        feedback.innerHTML = '<div style="width:min(100%,430px);height:min(100dvh,805px);border-radius:18px;background:radial-gradient(circle at 50% 0%,rgba(255,255,255,.28),rgba(255,255,255,.08) 42%,rgba(0,0,0,.34));box-shadow:0 28px 90px rgba(0,0,0,.55);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);padding:26px 28px;display:flex;flex-direction:column;justify-content:center;gap:14px;"><a href="' + escapeHtml(luppBaseUrl || "https://luup.dzns.com.br") + '" target="_blank" rel="noopener noreferrer" aria-label="Luup" style="display:flex;justify-content:center;margin-bottom:4px;text-decoration:none;"><img src="' + escapeHtml(feedbackLogoUrl) + '" alt="Luup" style="height:42px;max-width:150px;object-fit:contain;display:block;"/></a><div style="text-align:center;margin-bottom:8px;"><h2 style="margin:0 0 8px;font-size:20px;line-height:1.1;font-weight:800;">Queremos saber sua opinião!</h2><p style="margin:0 auto;max-width:360px;font-size:12px;line-height:1.15;font-weight:700;color:rgba(255,255,255,.92);">Sua experiência é muito importante para nós. Responda rapidamente e ajude-nos a melhorar cada vez mais.</p></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;"><div style="border:1px solid rgba(255,255,255,.24);border-radius:10px;background:rgba(255,255,255,.12);padding:10px;text-align:center;"><strong style="display:block;font-size:18px;line-height:1;">0</strong><span style="display:block;margin-top:3px;font-size:11px;font-weight:800;color:rgba(255,255,255,.76);">Comentários</span></div><div style="border:1px solid rgba(255,255,255,.24);border-radius:10px;background:rgba(255,255,255,.12);padding:10px;text-align:center;"><strong data-lupp-rating-count style="display:block;font-size:18px;line-height:1;">0/5</strong><span style="display:block;margin-top:3px;font-size:11px;font-weight:800;color:rgba(255,255,255,.76);">Estrelas</span></div></div><div data-lupp-feedback-stars style="display:flex;justify-content:center;gap:8px;margin-bottom:10px;"></div><div data-lupp-feedback-options style="display:grid;gap:10px;"></div><textarea data-lupp-feedback-text placeholder="Deixe aqui sua sugestão do que achou ou de como podemos melhorar." style="margin-top:24px;width:100%;min-height:66px;resize:none;border:1px solid rgba(255,255,255,.32);border-radius:9px;background:rgba(255,255,255,.13);color:#fff;outline:none;padding:14px;font-family:inherit;font-size:13px;font-weight:600;line-height:1.4;box-sizing:border-box;"></textarea><button data-lupp-feedback-submit type="button" style="height:40px;border:0;border-radius:5px;background:#fff;color:#050505;font-family:inherit;font-size:15px;font-weight:800;line-height:1;cursor:pointer;">Enviar Feedback</button><button data-lupp-feedback-skip type="button" style="height:40px;border:0;background:transparent;color:#fff;font-family:inherit;font-size:16px;font-weight:800;line-height:1;cursor:pointer;">Agora não</button></div>';
         var options = [
           "A experiência foi incrível",
           "Atendeu às expectativas",

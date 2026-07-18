@@ -57,7 +57,7 @@ function resolveWidgetCdnUrl() {
     return `${window.location.origin}/widget.js`;
   }
 
-  return "https://www.playluup.com.br/widget.js";
+  return "https://luup.dzns.com.br/widget.js";
 }
 
 function resolveApiUrl() {
@@ -68,7 +68,7 @@ function resolveApiUrl() {
     return "http://localhost:3333";
   }
 
-  return "";
+  return "https://luup.dzns.net";
 }
 
 function resolveAppUrl() {
@@ -77,7 +77,10 @@ function resolveAppUrl() {
   const pointsToLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\/?$/i.test(configuredUrl);
 
   if (configuredUrl && !(isHttpsApp && pointsToLocalhost)) return configuredUrl.replace(/\/$/, "");
-  return window.location.origin;
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/i.test(window.location.hostname)) {
+    return window.location.origin;
+  }
+  return "https://luup.dzns.com.br";
 }
 
 export const env: PublicEnv = {
