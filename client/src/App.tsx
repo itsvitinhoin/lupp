@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import { initializeShopifyEmbeddedSession } from "@/lib/shopify-embedded";
 import { AppRoutes } from "@/routes/AppRoutes";
+import { DashboardVideoWidget } from "@/components/shared/DashboardVideoWidget";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,6 +32,7 @@ function App() {
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <AppRoutes />
+            <DashboardVideoWidget />
           </WouterRouter>
           <Toaster />
         </TooltipProvider>
