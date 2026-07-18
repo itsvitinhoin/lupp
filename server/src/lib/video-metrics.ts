@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/prisma";
+import { prisma, dbSchema } from "@/lib/prisma";
+import { Prisma } from "../../generated/prisma/client";
 
 /**
  * Per-video engagement counters, ported from the SPA's appendVideoMetrics
@@ -18,12 +19,6 @@ export function emptyVideoMetrics(): VideoMetrics {
   return { views: 0, clicks: 0, likes: 0, comments: 0, revenue: 0 };
 }
 
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
 export async function getVideoMetrics(
   storeId: string,
   videoIds: string[],
@@ -37,11 +32,30 @@ export async function getVideoMetrics(
     return current;
   };
 
+  // Counts and the revenue sum are aggregated in Postgres — this used to
+  // load every analytics row for the requested videos into JS on the public
+  // feed's hot path. Revenue parses metadata.revenue|order_value|amount when
+  // it looks like a plain positive decimal (the old JS Number() also accepted
+  // exotic formats like "1e3"; those are intentionally ignored now).
   const [events, likes, comments] = await Promise.all([
-    prisma.analyticsEvent.findMany({
-      where: { store_id: storeId, video_id: { in: videoIds } },
-      select: { video_id: true, event_type: true, metadata: true },
-    }),
+    prisma.$queryRaw<
+      { video_id: string; event_type: string; count: number; revenue: number }[]
+    >`
+      SELECT
+        video_id,
+        event_type::text AS event_type,
+        count(*)::int AS count,
+        COALESCE(SUM(CASE
+          WHEN COALESCE(metadata->>'revenue', metadata->>'order_value', metadata->>'amount')
+            ~ '^\\d+(\\.\\d+)?$'
+          THEN COALESCE(metadata->>'revenue', metadata->>'order_value', metadata->>'amount')::numeric
+          ELSE 0
+        END), 0)::float8 AS revenue
+      FROM ${Prisma.raw(`"${dbSchema.replace(/"/g, "")}".analytics_events`)}
+      WHERE store_id = ${storeId}
+        AND video_id IN (${Prisma.join(videoIds)})
+      GROUP BY 1, 2
+    `,
     prisma.videoLike.groupBy({
       by: ["video_id"],
       where: { store_id: storeId, video_id: { in: videoIds } },
@@ -54,22 +68,18 @@ export async function getVideoMetrics(
     }),
   ]);
 
-  for (const event of events) {
-    if (!event.video_id) continue;
-    const metrics = ensure(event.video_id);
-    if (event.event_type === "video_view") metrics.views += 1;
+  for (const row of events) {
+    const metrics = ensure(row.video_id);
+    if (row.event_type === "video_view") metrics.views += row.count;
     if (
-      event.event_type === "product_click" ||
-      event.event_type === "add_to_cart_click" ||
-      event.event_type === "share_click"
+      row.event_type === "product_click" ||
+      row.event_type === "add_to_cart_click" ||
+      row.event_type === "share_click"
     ) {
-      metrics.clicks += 1;
+      metrics.clicks += row.count;
     }
-    if (event.event_type === "like_click") metrics.likes += 1;
-
-    const metadata = asRecord(event.metadata);
-    const revenue = Number(metadata.revenue ?? metadata.order_value ?? metadata.amount ?? 0);
-    if (Number.isFinite(revenue) && revenue > 0) metrics.revenue += revenue;
+    if (row.event_type === "like_click") metrics.likes += row.count;
+    if (row.revenue > 0) metrics.revenue += row.revenue;
   }
 
   // Real like rows win over the like_click event fallback.

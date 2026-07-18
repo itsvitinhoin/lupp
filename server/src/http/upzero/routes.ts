@@ -24,9 +24,13 @@ export async function UpzeroRoutes(app: FastifyTypedInstance) {
   );
 
   // Public: called by the widget from the merchant's storefront (no JWT).
+  // Rate-limited — every action fans out to an outbound upstream fetch.
   app.post(
     "/api/widget/upzero-proxy",
-    { schema: UpzeroStorefrontProxySchema.schema },
+    {
+      schema: UpzeroStorefrontProxySchema.schema,
+      config: { rateLimit: { max: 30, timeWindow: "1m" } },
+    },
     upzeroStorefrontProxyHandler,
   );
 }

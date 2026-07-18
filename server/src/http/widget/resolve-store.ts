@@ -84,9 +84,17 @@ async function storeFromDomainIndex(storeDomain: string) {
     where: { domain: { in: parentDomainCandidates(storeDomain) } },
     select: { domain: true, store_id: true },
   });
+  if (!rows.length) return null;
   rows.sort((left, right) => right.domain.length - left.domain.length);
+
+  // One fetch for every candidate, longest-domain match wins.
+  const stores = await prisma.store.findMany({
+    where: { id: { in: rows.map((row) => row.store_id) }, status: "active" },
+    select: STORE_SELECT,
+  });
+  const storesById = new Map(stores.map((store) => [store.id, store]));
   for (const row of rows) {
-    const store = await activeStoreById(row.store_id);
+    const store = storesById.get(row.store_id);
     if (store) return store;
   }
   return null;

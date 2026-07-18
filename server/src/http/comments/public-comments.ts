@@ -40,6 +40,7 @@ export async function listPublicCommentsHandler(request: FastifyRequest, reply: 
     where: { video_id, status: "approved" },
     select: { id: true, author_name: true, body: true, created_at: true },
     orderBy: { created_at: "desc" },
+    take: 100,
   });
 
   return reply.status(200).send({ comments });

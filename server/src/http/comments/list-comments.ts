@@ -40,6 +40,9 @@ export async function listCommentsHandler(request: FastifyRequest, reply: Fastif
       status: query.status ?? { not: "deleted" },
     },
     orderBy: { created_at: "desc" },
+    // Newest 500 — the moderation screen never pages deeper today; a cursor
+    // param can follow when it does.
+    take: 500,
     include: {
       video: {
         select: {

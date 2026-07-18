@@ -478,6 +478,8 @@ model Comment {
   video Video @relation(fields: [video_id], references: [id], onDelete: Cascade)
 
   @@index([store_id, status])
+  // Public storefront comments + video metrics read purely by video.
+  @@index([video_id, status])
   @@map("comments")
 }
 

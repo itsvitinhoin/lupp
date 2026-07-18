@@ -7,6 +7,7 @@ import { serializeVideo, VIDEO_PRODUCTS_INCLUDE, type VideoRow } from "@/lib/ser
 import { edgeErrorSchemas, rateLimitErrorSchema } from "@/schemas/http-errors";
 import { WidgetStoreSchema, WidgetVideoSchema } from "@/http/widget/bootstrap";
 import { Prisma } from "../../../generated/prisma/client";
+import { asRecord } from "@/lib/text";
 
 const QuerySchema = z.object({
   store_slug: z.string().optional(),
@@ -50,12 +51,6 @@ export const GetFeedSchema = {
     },
   },
 };
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
 
 // Port of the SPA's productKeyFromUrl: the product handle (or its numeric
 // prefix) from /produto|produtos|product|products/<handle> paths.
@@ -143,6 +138,8 @@ export async function getFeedHandler(request: FastifyRequest, reply: FastifyRepl
     where: { ...FEED_BASE_WHERE, store_id: store.id, is_feed_enabled: true },
     orderBy,
     include: VIDEO_PRODUCTS_INCLUDE,
+    // Safety ceiling: the fullscreen feed never usefully shows more.
+    take: 200,
   });
   const feedVideos = feedRows.map((row) =>
     serializeVideo(row as unknown as VideoRow),
@@ -177,6 +174,8 @@ export async function getFeedHandler(request: FastifyRequest, reply: FastifyRepl
           where: { ...FEED_BASE_WHERE, store_id: store.id, is_product_page_enabled: true },
           orderBy: [{ sort_order: "asc" }, { created_at: "desc" }],
           include: VIDEO_PRODUCTS_INCLUDE,
+          // JS-side URL matching below — cap what gets serialized per request.
+          take: 200,
         });
         const matching = productRows
           .map((row) => serializeVideo(row as unknown as VideoRow) as SerializedVideo)
