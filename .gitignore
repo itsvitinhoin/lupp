@@ -56,5 +56,4 @@ Thumbs.db
 # Replit
 .cache/
 .local/
-supabase/.temp/
 .vercel

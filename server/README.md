@@ -38,11 +38,14 @@ Vitest runs two projects:
   ephemeral Postgres schema (`?schema=<uuid>` + `prisma db push --force-reset`),
   dropped on teardown. Requires the docker-compose Postgres to be up.
 
-## Routes (ported from supabase/functions)
+## Routes
 
-Every Supabase edge function was ported 1:1 — same status codes and
-machine-readable `{ "error": "snake_case_code" }` bodies the SPA switches on.
-Swagger UI at `/docs` documents all of them.
+The API originated as a 1:1 port of the legacy Supabase edge functions — same
+status codes and machine-readable `{ "error": "snake_case_code" }` bodies the
+SPA switches on ("original edge function" below is the historical name; the
+functions themselves no longer exist in this repo). Swagger UI at `/docs`
+documents everything, including the auth/stores/videos/widgets domains not
+listed here.
 
 | Route | Original edge function | Auth |
 | --- | --- | --- |
@@ -72,14 +75,16 @@ Swagger UI at `/docs` documents all of them.
 | `POST /api/integrations/upzero/connect` | upzero-connect | JWT + membership |
 | `POST /api/integrations/upzero/sync-products` | upzero-sync-products | JWT + membership |
 | `POST /api/widget/upzero-proxy` | upzero-storefront-proxy | public + origin gate |
-| `GET /api/widget/bootstrap` | lupp-widget-bootstrap (GET) | public + billing gate |
+| `GET /api/widget/bootstrap` | lupp-widget-bootstrap (GET) — now also "context mode" (`url=` param → server-side display rules, page/product matching and slim render-ready cards under ETag/60s cache; see `src/http/widget/context.ts`) | public + billing gate |
 | `POST /api/widget/events` | lupp-widget-bootstrap (POST) | public |
 | `GET\|POST /api/master-console` | master-console | JWT + admin allowlist |
 
 Known deferred seams (marked with TODO comments at the exact plug-in points):
-the Bunny processing-status refresh and Upzero storefront-id discovery inside
-`GET /api/widget/bootstrap`, and the storefront HTML-scraping fallback source
-in the Upzero product sync.
+the Bunny processing-status refresh inside `GET /api/widget/bootstrap`, and
+the storefront HTML-scraping fallback source in the Upzero product sync. (The
+Upzero storefront-id/cart-action discovery is implemented: the proxy's
+`discover_cart_context` action scrapes server-side and caches into
+`integrations.settings`.)
 
 ## Conventions
 
