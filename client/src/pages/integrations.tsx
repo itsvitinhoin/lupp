@@ -284,8 +284,17 @@ function isShopifyCustomManualSettings(settings: unknown) {
 function getManualSnippet(store: LuppStore | null) {
   const storeId = store?.id || "id-da-loja";
   const storeSlug = store?.slug || "sua-loja";
-  const storeName = store?.name || "Sua loja";
-  const storeUrl = store?.url || "https://sualoja.com.br";
+  // Identity fallback chain mirrors the server resolution
+  // (store_id -> store_slug -> store_domain); the domain comes from the
+  // storefront URL's hostname when it parses.
+  let storeDomain = "";
+  if (store?.url) {
+    try {
+      storeDomain = new URL(store.url).hostname;
+    } catch {
+      storeDomain = "";
+    }
+  }
 
   return `<script>
 (function () {
@@ -293,14 +302,16 @@ function getManualSnippet(store: LuppStore | null) {
   s.async = true;
   s.src = ${jsStringLiteral(env.widgetCdnUrl)};
 
+  // Apenas identidade: aparência, exibição e vídeos vêm das configurações
+  // salvas no painel Luup, resolvidas pelo servidor a cada página. Atributos
+  // extras SOBRESCREVEM o painel — não adicione a menos que queira fixar um
+  // valor para sempre.
   s.setAttribute('data-store-id', ${jsStringLiteral(storeId)});
   s.setAttribute('data-store', ${jsStringLiteral(storeSlug)});
-  s.setAttribute('data-store-name', ${jsStringLiteral(storeName)});
-  s.setAttribute('data-store-url', ${jsStringLiteral(storeUrl)});
-  s.setAttribute('data-widget', 'floating_launcher');
+${storeDomain ? `  s.setAttribute('data-store-domain', ${jsStringLiteral(storeDomain)});\n` : ""}  s.setAttribute('data-widget', 'floating_launcher');
+  s.setAttribute('data-require-active', 'true');
   s.setAttribute('data-lupp-url', ${jsStringLiteral(env.appUrl)});
   s.setAttribute('data-api-url', ${jsStringLiteral(env.apiUrl)});
-  s.setAttribute('data-require-active', 'true');
 
   var firstScript = document.getElementsByTagName('script')[0];
   firstScript.parentNode.insertBefore(s, firstScript);
