@@ -395,6 +395,7 @@ describe("GET /api/widget/bootstrap (e2e)", () => {
     expect(response.status).toBe(200);
     expect(response.body.upzero_config).toEqual({
       base_url: "https://api.upzero.com.br",
+      cart_action_ids: [],
       external_store_id: "552",
       integration_name: "lupp",
       last_connection_source: null,

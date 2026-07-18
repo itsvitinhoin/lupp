@@ -7,6 +7,7 @@ import {
   upzeroFetch,
   upzeroProxyHeaders,
 } from "@/lib/upzero";
+import { discoverUpzeroCartContext } from "@/lib/upzero-discovery";
 
 // Ported from supabase/functions/upzero-storefront-proxy. PUBLIC route (no
 // JWT): the widget running on the merchant's storefront calls it, gated by
@@ -18,13 +19,24 @@ const BodySchema = z.object({
   action: z
     .string()
     .optional()
-    .describe("One of customer_status | cart_batch."),
+    .describe("One of customer_status | cart_batch | discover_cart_context."),
   store_id: z.string().optional().describe("Luup store id."),
   payload: z.unknown().optional().describe("Single cart_batch payload."),
   payloads: z
     .array(z.unknown())
     .optional()
     .describe("cart_batch payloads, tried in order until one succeeds."),
+  product_path: z
+    .string()
+    .optional()
+    .describe(
+      "discover_cart_context only: storefront path to scan (resolved against the " +
+        "integration's own storefront origin — never a client-supplied host).",
+    ),
+  force_refresh: z
+    .boolean()
+    .optional()
+    .describe("discover_cart_context only: bypass the cached discovery."),
 });
 
 // Both our own gate errors and the upstream pass-through bodies flow out of
@@ -168,6 +180,56 @@ export async function upzeroStorefrontProxyHandler(
 
   if (!hostAllowed(request, store, integration)) {
     return reply.status(403).send({ error: "origin_not_allowed" });
+  }
+
+  if (action === "discover_cart_context") {
+    const settings = asRecord(integration.settings);
+    const cachedIds = Array.isArray(settings.cart_action_ids)
+      ? settings.cart_action_ids.filter((id): id is string => typeof id === "string")
+      : [];
+    const cachedStoreId = Number(settings.storefront_store_id) || null;
+    if (cachedIds.length && cachedStoreId && body.force_refresh !== true) {
+      return reply
+        .status(200)
+        .send({ cached: true, cart_action_ids: cachedIds, storefront_store_id: cachedStoreId });
+    }
+
+    // SSRF pin: the fetched page always lives on the storefront origin we
+    // have on record; the client may only choose the path.
+    const storefrontBase = clean(settings.storefront_url) || clean(store.url);
+    if (!storefrontBase) {
+      return reply.status(424).send({ error: "upzero_storefront_url_missing" });
+    }
+    let pageUrl: string;
+    try {
+      const origin = new URL(
+        /^https?:\/\//i.test(storefrontBase) ? storefrontBase : `https://${storefrontBase}`,
+      ).origin;
+      const path = clean(body.product_path) || "/";
+      pageUrl = new URL(path.startsWith("/") ? path : `/${path}`, origin).href;
+    } catch {
+      return reply.status(424).send({ error: "upzero_storefront_url_invalid" });
+    }
+
+    const discovered = await discoverUpzeroCartContext(pageUrl);
+    if (discovered.cart_action_ids.length || discovered.storefront_store_id) {
+      await prisma.integration
+        .update({
+          where: { id: integration.id },
+          data: {
+            settings: {
+              ...settings,
+              cart_action_ids: discovered.cart_action_ids,
+              storefront_store_id:
+              discovered.storefront_store_id ?? (Number(settings.storefront_store_id) || null),
+              storefront_store_id_source: "public_storefront",
+              cart_context_discovered_at: new Date().toISOString(),
+            },
+          },
+        })
+        .catch(() => null);
+    }
+    return reply.status(200).send({ cached: false, ...discovered });
   }
 
   const secret = await prisma.integrationSecret.findUnique({

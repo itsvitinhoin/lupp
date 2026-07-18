@@ -1,6 +1,15 @@
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "@/lib/prisma";
+import {
+  buildPageContext,
+  filterVideosForContext,
+  resolveDisplay,
+  resolveWidgetConfig,
+  slimVideos,
+  type SerializedVideo,
+} from "./context";
 import { storeHasBillingAccess } from "@/lib/billing-access";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
 import { serializeVideo, VARIANT_SELECT, VIDEO_PRODUCTS_INCLUDE, type VideoRow } from "@/lib/serialize";
@@ -28,7 +37,136 @@ const QuerySchema = z.object({
   hostname: z.string().optional().describe("Alias of store_domain."),
   mode: z.string().optional().describe("feed (default) | preview | meta."),
   widget: z.string().optional().describe("Requested widget type (default floating_video)."),
+  url: z
+    .string()
+    .optional()
+    .describe(
+      "Storefront page URL (origin+path). When present the server filters and " +
+        "orders the videos for that page and returns slim render-ready cards " +
+        "plus resolved config (context mode).",
+    ),
+  product_url: z.string().optional().describe("Explicit product URL override (data-product-url)."),
+  external_product_id: z
+    .string()
+    .optional()
+    .describe("Platform product id scraped from the page, for product matching."),
 });
+
+// Typed response contract for the embed script. Every object stays .loose():
+// the serializers spread full DB rows (mode=feed returns extra video columns,
+// timestamps, etc.), and unknown keys must keep passing through — the typed
+// fields below are the ones widget.js actually reads and the generated API
+// client exposes.
+const WidgetStoreSchema = z
+  .object({
+    id: z.string(),
+    slug: z.string(),
+    button_color: z.string(),
+    status: z.string(),
+    platform: z.string().nullable(),
+    url: z.string().nullable(),
+    plan_id: z.string(),
+  })
+  .loose();
+
+const WidgetProductVariantSchema = z
+  .object({
+    id: z.string(),
+    external_id: z.string(),
+    sku: z.string().nullable(),
+    color_name: z.string().nullable(),
+    color_code: z.string().nullable(),
+    color_hex: z.string().nullable(),
+    size_name: z.string().nullable(),
+    size_code: z.string().nullable(),
+    price: z.number().nullable(),
+    compare_at_price: z.number().nullable(),
+    stock_qty: z.number().nullable(),
+    image_url: z.string().nullable(),
+    asset_id: z.string().nullable(),
+    status: z.string(),
+    metadata: z.unknown(),
+  })
+  .loose();
+
+const WidgetProductSchema = z
+  .object({
+    id: z.string(),
+    external_id: z.string().nullable(),
+    name: z.string(),
+    description: z.string().nullable(),
+    price: z.number().nullable(),
+    compare_at_price: z.number().nullable(),
+    currency: z.string(),
+    image_url: z.string().nullable(),
+    product_url: z.string().nullable(),
+    platform: z.string().nullable(),
+    status: z.string(),
+    product_variants: z.array(WidgetProductVariantSchema),
+  })
+  .loose();
+
+// serializeVideo maps Prisma relations back to the PostgREST nesting the
+// embed script consumes: video_products[].products.product_variants[].
+const WidgetVideoSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    video_url: z.string().nullable(),
+    playback_url: z.string().nullable(),
+    thumbnail_url: z.string().nullable(),
+    product_visibility_scope: z.string(),
+    product_visibility_url: z.string().nullable(),
+    is_feed_enabled: z.boolean(),
+    is_product_page_enabled: z.boolean(),
+    is_featured: z.boolean(),
+    sort_order: z.number(),
+    video_products: z.array(
+      z
+        .object({ is_primary: z.boolean(), products: WidgetProductSchema })
+        .loose(),
+    ),
+  })
+  .loose();
+
+const WidgetConfigSchema = z
+  .object({
+    id: z.string(),
+    type: z.string(),
+    status: z.string(),
+    settings: z.unknown(),
+  })
+  .loose();
+
+// Context mode (url param present): slim render-ready cards — the browser
+// renders these fields verbatim, no filtering/formatting client-side.
+const WidgetSlimVideoSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    media_url: z.string(),
+    thumbnail_url: z.string(),
+    product: z
+      .object({
+        id: z.string(),
+        external_id: z.string().nullable(),
+        name: z.string(),
+        image_url: z.string(),
+        price_label: z.string(),
+        product_url: z.string(),
+      })
+      .loose()
+      .nullable(),
+  })
+  .loose();
+
+const ResolvedConfigSchema = z
+  .object({
+    launcher: z.record(z.string(), z.unknown()),
+    display: z.record(z.string(), z.unknown()),
+    carousel: z.record(z.string(), z.unknown()),
+  })
+  .loose();
 
 const BootstrapResponseSchema = z
   .object({
@@ -36,10 +174,12 @@ const BootstrapResponseSchema = z
     error: z.string().optional(),
     mode: z.string().optional(),
     resolved_by: z.string().nullable(),
-    store: z.any(),
-    upzero_config: z.any().nullable().optional(),
-    videos: z.array(z.any()),
-    widget: z.any().nullable(),
+    store: WidgetStoreSchema,
+    upzero_config: z.record(z.string(), z.unknown()).nullable().optional(),
+    display: z.object({ show: z.boolean(), reason: z.string() }).optional(),
+    config: ResolvedConfigSchema.optional(),
+    videos: z.array(z.union([WidgetSlimVideoSchema, WidgetVideoSchema])),
+    widget: WidgetConfigSchema.nullable(),
   })
   .loose();
 
@@ -66,6 +206,12 @@ export const WidgetBootstrapSchema = {
     },
   },
 };
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
 
 function mappedWidgetType(type: string) {
   if (
@@ -101,14 +247,8 @@ type WidgetRow = {
 function enforceWidgetPlanLimits(widget: WidgetRow | null, store: WidgetStore) {
   if (!widget || allowsHorizontalFeed(store.plan_id)) return widget;
 
-  const settings =
-    widget.settings && typeof widget.settings === "object" && !Array.isArray(widget.settings)
-      ? (widget.settings as Record<string, unknown>)
-      : {};
-  const carousel =
-    settings.carousel && typeof settings.carousel === "object" && !Array.isArray(settings.carousel)
-      ? (settings.carousel as Record<string, unknown>)
-      : {};
+  const settings = asRecord(widget.settings);
+  const carousel = asRecord(settings.carousel);
 
   return {
     ...widget,
@@ -198,25 +338,19 @@ async function buildUpzeroConfig(store: WidgetStore) {
   });
   if (!integration) return null;
 
-  const settings =
-    integration.settings &&
-    typeof integration.settings === "object" &&
-    !Array.isArray(integration.settings)
-      ? (integration.settings as Record<string, unknown>)
-      : {};
+  const settings = asRecord(integration.settings);
   const storefrontUrl = settings.storefront_url || store.url || null;
   const storefrontStoreId =
     settings.storefront_store_id || settings.store_id || settings.upzero_store_id || null;
-
-  // TODO(upzero-discovery): when storefrontStoreId is still null the original
-  // edge function fetched storefrontUrl's public HTML and scraped the numeric
-  // storefront store id out of __NEXT_DATA__ / the /_next/static/chunks/ JS
-  // bundles, then persisted it back to integrations.settings as
-  // { storefront_store_id, storefront_store_id_source: "public_storefront" }.
-  // That reaches an external site, so it is intentionally not ported yet —
-  // plug the discovery here.
+  // Populated by the upzero-proxy discover_cart_context action (server-side
+  // scrape of the storefront's Next.js chunks, cached per store) — the widget
+  // uses these ids directly instead of scraping in the visitor's browser.
+  const cartActionIds = Array.isArray(settings.cart_action_ids)
+    ? settings.cart_action_ids.filter((id): id is string => typeof id === "string")
+    : [];
 
   return {
+    cart_action_ids: cartActionIds,
     base_url: settings.base_url || null,
     external_store_id: integration.external_store_id || null,
     integration_name: settings.integration_name || null,
@@ -231,6 +365,7 @@ export async function widgetBootstrapHandler(request: FastifyRequest, reply: Fas
   const query = QuerySchema.parse(request.query ?? {});
   const mode = clean(query.mode) || "feed";
   const widgetType = mappedWidgetType(clean(query.widget) || "floating_video");
+  const context = mode === "meta" ? null : buildPageContext(query);
 
   const resolution = await findStore(query);
   const store = resolution.store;
@@ -249,6 +384,7 @@ export async function widgetBootstrapHandler(request: FastifyRequest, reply: Fas
       error: "trial_expired",
       resolved_by: resolution.resolvedBy,
       store,
+      ...(context ? { display: { show: false, reason: "trial_expired" } } : {}),
       videos: [],
       widget: null,
     });
@@ -265,20 +401,52 @@ export async function widgetBootstrapHandler(request: FastifyRequest, reply: Fas
     // refresh here.
   }
 
-  // Widget types outside the enum can never exist, so skip the query (the
-  // original's text column simply returned no row for them).
-  const widget = isWidgetType(widgetType)
-    ? await prisma.widget.findFirst({
-        where: { store_id: store.id, type: widgetType, status: "active" },
-        select: { id: true, type: true, status: true, settings: true },
-      })
-    : null;
+  // The widget config, the feed videos and the Upzero settings are
+  // independent lookups — run them concurrently. Widget types outside the
+  // enum can never exist, so skip that query (the original's text column
+  // simply returned no row for them).
+  const [widget, videos, upzeroConfig] = await Promise.all([
+    isWidgetType(widgetType)
+      ? prisma.widget.findFirst({
+          where: { store_id: store.id, type: widgetType, status: "active" },
+          select: { id: true, type: true, status: true, settings: true },
+        })
+      : null,
+    // Context mode always works from the bounded preview set — the launcher
+    // never needs more, and the slim cards only use preview fields.
+    mode === "meta" ? [] : loadVideos(store.id, context ? "preview" : mode),
+    clean(store.platform).toLowerCase() === "upzero" ? buildUpzeroConfig(store) : null,
+  ]);
   const effectiveWidget = enforceWidgetPlanLimits(widget, store);
 
-  const videos = mode === "meta" ? [] : await loadVideos(store.id, mode);
+  if (context) {
+    const config = resolveWidgetConfig(widget, store);
+    const filtered = filterVideosForContext(videos as SerializedVideo[], config, context);
+    const display = resolveDisplay(config, context, filtered.length);
+    const body = {
+      active: Boolean(effectiveWidget),
+      ...(effectiveWidget ? {} : { error: "no_active_widget" }),
+      mode: "context",
+      resolved_by: resolution.resolvedBy,
+      store,
+      upzero_config: upzeroConfig,
+      display,
+      config,
+      videos: display.show ? slimVideos(filtered) : [],
+      widget: effectiveWidget,
+    };
 
-  const upzeroConfig =
-    clean(store.platform).toLowerCase() === "upzero" ? await buildUpzeroConfig(store) : null;
+    // The context answer is deterministic per (store, page, widget, data
+    // version), so let browsers/CDNs reuse it: 60s freshness plus ETag
+    // revalidation. 304s skip the payload; max-age skips the request.
+    const etag = `"${createHash("md5").update(JSON.stringify(body)).digest("hex")}"`;
+    reply.header("cache-control", "public, max-age=60");
+    reply.header("etag", etag);
+    if (request.headers["if-none-match"] === etag) {
+      return reply.status(304).send();
+    }
+    return reply.status(200).send(body);
+  }
 
   return reply.status(200).send({
     active: Boolean(effectiveWidget),
