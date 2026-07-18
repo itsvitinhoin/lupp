@@ -250,6 +250,27 @@ export default function Widgets() {
     setCarouselEnabled(enabled);
   };
 
+  // Identity attributes from the logged-in store's context: id (primary),
+  // slug and storefront domain as fallbacks — the same resolution chain the
+  // server walks (store_id -> store_slug -> store_domain).
+  const storeIdentityAttrLines = () => {
+    if (!store) return "";
+    const lines = [
+      `  s.setAttribute('data-store-id', ${jsStringLiteral(store.id)});`,
+      `  s.setAttribute('data-store', ${jsStringLiteral(store.slug)});`,
+    ];
+    if (store.url) {
+      try {
+        lines.push(
+          `  s.setAttribute('data-store-domain', ${jsStringLiteral(new URL(store.url).hostname)});`,
+        );
+      } catch {
+        // stores.url isn't a parseable URL — skip the domain fallback
+      }
+    }
+    return lines.join("\n");
+  };
+
   const getEmbedCode = () => {
     if (!store)
       return "<!-- Crie uma loja para gerar o código de instalação da Lupp. -->";
@@ -264,8 +285,7 @@ export default function Widgets() {
   // salvas neste painel, resolvidas pelo servidor a cada página. Atributos
   // extras no snippet SOBRESCREVEM o painel — não adicione a menos que queira
   // fixar um valor para sempre.
-  s.setAttribute('data-store-id', ${jsStringLiteral(store.id)});
-  s.setAttribute('data-store', ${jsStringLiteral(store.slug)});
+${storeIdentityAttrLines()}
   s.setAttribute('data-widget', ${jsStringLiteral(launcherWidget.type)});
   s.setAttribute('data-require-active', 'true');
   s.setAttribute('data-lupp-url', ${jsStringLiteral(env.appUrl)});
@@ -289,8 +309,7 @@ export default function Widgets() {
 
   // Apenas identidade: título, textos e limites do carrossel vêm das
   // configurações salvas neste painel, resolvidas pelo servidor.
-  s.setAttribute('data-store-id', ${jsStringLiteral(store.id)});
-  s.setAttribute('data-store', ${jsStringLiteral(store.slug)});
+${storeIdentityAttrLines()}
   s.setAttribute('data-widget', 'home_carousel');
   s.setAttribute('data-require-active', 'true');
   s.setAttribute('data-lupp-url', ${jsStringLiteral(env.appUrl)});
