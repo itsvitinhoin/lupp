@@ -156,3 +156,10 @@ export function emitCartEvent(eventName: string, detail: unknown): void {
     document.dispatchEvent(new CustomEvent(eventName, { detail: detail }));
   } catch (_) {}
 }
+
+export function normalizeText(value: unknown): string {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}

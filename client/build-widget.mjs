@@ -4,8 +4,9 @@
 //   widget-src/platforms/shopify.js   -> public/widget-shopify.js
 //   widget-src/platforms/nuvemshop.js -> public/widget-nuvemshop.js
 // The platform adapters are lazily injected by the core at runtime (see the
-// widget bridge in widget-src/main.js). Outputs are unminified IIFEs so
-// production diffs stay reviewable.
+// widget bridge in widget-src/main.ts). Outputs are minified IIFEs (roughly
+// a third of the unminified size on every storefront page view); the
+// adjacent .map sourcemaps keep production stack traces readable.
 //
 // esbuild compiles the TypeScript sources natively (types are simply
 // stripped) — no plugins needed.
@@ -44,7 +45,8 @@ for (const [entry, outfile] of entries) {
     bundle: true,
     format: "iife",
     target: "es2017",
-    minify: false,
+    minify: true,
+    sourcemap: "linked",
     charset: "utf8",
     logLevel: "info",
   });

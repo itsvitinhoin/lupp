@@ -103,3 +103,25 @@ export function prepareLazyVideos(root: ParentNode): void {
     observer.observe(video);
   });
 }
+
+export function primeInlineVideos(root: HTMLElement | null): void {
+  if (!root || !root.querySelectorAll) return;
+  try {
+    Array.prototype.forEach.call(root.querySelectorAll("video"), function (video) {
+      video.muted = true;
+      video.defaultMuted = true;
+      video.autoplay = true;
+      video.playsInline = true;
+      video.setAttribute("muted", "");
+      video.setAttribute("autoplay", "");
+      video.setAttribute("playsinline", "");
+      video.setAttribute("webkit-playsinline", "");
+      if (video.getAttribute("data-lupp-video-src")) return;
+      var playPromise = video.play && video.play();
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(function () {});
+      }
+    });
+    prepareLazyVideos(root);
+  } catch (_) {}
+}
