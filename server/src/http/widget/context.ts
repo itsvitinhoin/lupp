@@ -290,15 +290,15 @@ function isHomeCarouselWidget(rawWidgetType: string): boolean {
   );
 }
 
-export function resolveDisplay(
+function displayVerdict(
   config: ResolvedWidgetConfig,
   ctx: PageContext,
   videoCount: number,
+  home: boolean,
 ): { show: boolean; reason: string } {
   if (matchesAnyPattern(ctx.path, config.display.exclude_paths)) {
     return { show: false, reason: "excluded_path" };
   }
-  const home = isHomePath(ctx.path, ctx.hostname);
   if (isHomeCarouselWidget(ctx.rawWidgetType)) {
     if (!home) return { show: false, reason: "carousel_outside_home" };
     if (!config.display.home_experience_enabled) {
@@ -314,6 +314,30 @@ export function resolveDisplay(
     return { show: false, reason: "no_matching_videos" };
   }
   return { show: true, reason: "ok" };
+}
+
+export function resolveDisplay(
+  config: ResolvedWidgetConfig,
+  ctx: PageContext,
+  videoCount: number,
+): { show: boolean; reason: string; show_home_carousel: boolean } {
+  const home = isHomePath(ctx.path, ctx.hostname);
+  const verdict = displayVerdict(config, ctx, videoCount, home);
+  const isFloating =
+    ctx.rawWidgetType === "floating_launcher" || ctx.rawWidgetType === "floating_video";
+  return {
+    ...verdict,
+    // Page-scoped: the embedded home carousel a floating widget injects
+    // alongside the launcher renders only on the storefront home, with the
+    // home experience on and the carousel plan-allowed. The client renders
+    // this flag verbatim — it no longer evaluates home paths itself.
+    show_home_carousel:
+      verdict.show &&
+      isFloating &&
+      home &&
+      config.display.home_experience_enabled &&
+      config.carousel.enabled,
+  };
 }
 
 // ---------------------------------------------------------------------------

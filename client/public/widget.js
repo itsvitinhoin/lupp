@@ -1192,6 +1192,7 @@
     var activeStore = null;
     var activeVideos = [];
     var hasLoadedVideoList = false;
+    var contextDisplay = {};
     var lastRenderedUrl = "";
     var trackedLauncherImpressions = {};
     var homeCarouselRoot = null;
@@ -1524,22 +1525,8 @@
         renderForCurrentUrl(root2);
       }, Math.min(1600, 250 + homeCarouselAnchorRetryCount * 180));
     }
-    function currentPath() {
-      if (nubesdkFrameMode && configuredProductUrl) {
-        return normalizePath(configuredProductUrl);
-      }
-      return normalizePath(window.location.pathname);
-    }
-    function isUpzeroDevelopmentHomePath(path) {
-      var host = normalizedHostname(window.location.hostname || "");
-      return /^\/\d+\/?$/.test(normalizePath(path)) && /(^|\.)upzero\.com\.br$/.test(host);
-    }
-    function isHomePath(path) {
-      var normalizedPath = normalizePath(path);
-      return normalizedPath === "/" || normalizedPath === "" || isUpzeroDevelopmentHomePath(normalizedPath);
-    }
     function shouldRenderEmbeddedHomeCarousel() {
-      return carouselConfig.enabled !== false && isFloatingWidget() && isHomePath(currentPath()) && displayConfig.homeExperienceEnabled !== false;
+      return isFloatingWidget() && contextDisplay.show_home_carousel === true;
     }
     function renderEmbeddedHomeCarousel(videos, root2) {
       if (!shouldRenderEmbeddedHomeCarousel()) {
@@ -1596,7 +1583,8 @@
         applyContextConfig(payload.config);
         activeVideos = payload.videos || [];
         hasLoadedVideoList = true;
-        var display = asRecord(payload.display);
+        contextDisplay = asRecord(payload.display);
+        var display = contextDisplay;
         if (display.show === false) {
           debugLog("render skipped: server display rules", {
             reason: display.reason || null
@@ -2182,7 +2170,8 @@
             }
           }
           applyContextConfig(payload.config);
-          var display = asRecord(payload.display);
+          contextDisplay = asRecord(payload.display);
+          var display = contextDisplay;
           if (display.show === false) {
             debugLog("abort: server display rules", {
               reason: display.reason || null

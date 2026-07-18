@@ -1293,6 +1293,9 @@ import { prepareLazyVideos } from "./hls.js";
   var activeStore = null;
   var activeVideos = [];
   var hasLoadedVideoList = false;
+  // Server-evaluated display block for the current page (show, reason,
+  // show_home_carousel) — refreshed on every context fetch.
+  var contextDisplay = {};
   var lastRenderedUrl = "";
   var trackedLauncherImpressions = {};
   var homeCarouselRoot = null;
@@ -1718,38 +1721,11 @@ import { prepareLazyVideos } from "./hls.js";
     }, Math.min(1600, 250 + homeCarouselAnchorRetryCount * 180));
   }
 
-  // Kept client-side on purpose: the context payload's carousel config is not
-  // page-scoped (the live API returns carousel.enabled=true on product pages
-  // too), and the embedded home carousel must only ever attach on the
-  // storefront home page.
-  function currentPath() {
-    if (nubesdkFrameMode && configuredProductUrl) {
-      return normalizePath(configuredProductUrl);
-    }
-    return normalizePath(window.location.pathname);
-  }
-
-  function isUpzeroDevelopmentHomePath(path) {
-    var host = normalizedHostname(window.location.hostname || "");
-    return /^\/\d+\/?$/.test(normalizePath(path)) && /(^|\.)upzero\.com\.br$/.test(host);
-  }
-
-  function isHomePath(path) {
-    var normalizedPath = normalizePath(path);
-    return (
-      normalizedPath === "/" ||
-      normalizedPath === "" ||
-      isUpzeroDevelopmentHomePath(normalizedPath)
-    );
-  }
-
+  // Page scoping is server-evaluated: display.show_home_carousel is true only
+  // on the storefront home with the home experience on and the carousel
+  // plan-allowed, per the current context URL.
   function shouldRenderEmbeddedHomeCarousel() {
-    return (
-      carouselConfig.enabled !== false &&
-      isFloatingWidget() &&
-      isHomePath(currentPath()) &&
-      displayConfig.homeExperienceEnabled !== false
-    );
+    return isFloatingWidget() && contextDisplay.show_home_carousel === true;
   }
 
   function renderEmbeddedHomeCarousel(videos, root) {
@@ -1824,7 +1800,8 @@ import { prepareLazyVideos } from "./hls.js";
         applyContextConfig(payload.config);
         activeVideos = payload.videos || [];
         hasLoadedVideoList = true;
-        var display = asRecord(payload.display);
+        contextDisplay = asRecord(payload.display);
+        var display = contextDisplay;
         if (display.show === false) {
           debugLog("render skipped: server display rules", {
             reason: display.reason || null,
@@ -2797,7 +2774,8 @@ import { prepareLazyVideos } from "./hls.js";
             }
           }
           applyContextConfig(payload.config);
-          var display = asRecord(payload.display);
+          contextDisplay = asRecord(payload.display);
+          var display = contextDisplay;
           if (display.show === false) {
             debugLog("abort: server display rules", {
               reason: display.reason || null,

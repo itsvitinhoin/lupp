@@ -5,8 +5,8 @@ import { app } from "@/app";
 import { prisma } from "@/lib/prisma";
 import { createStore } from "../../../test/utils/create-store";
 
-async function seedContextStore(settings: object = {}) {
-  const { store } = await createStore();
+async function seedContextStore(settings: object = {}, storeOverrides: { plan_id?: string } = {}) {
+  const { store } = await createStore(storeOverrides);
   await prisma.widget.create({
     data: {
       store_id: store.id,
@@ -85,7 +85,12 @@ describe("GET /api/widget/bootstrap context mode (e2e)", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.mode).toBe("context");
-    expect(response.body.display).toEqual({ show: true, reason: "ok" });
+    expect(response.body.display).toEqual({
+      show: true,
+      reason: "ok",
+      // start plan: the horizontal carousel is plan-gated off.
+      show_home_carousel: false,
+    });
     expect(response.body.config.launcher.accent_color).toBe("#123456");
     expect(response.body.config.launcher.label).toBe("Assista");
     expect(response.body.config.launcher.position).toBe("bottom-left");
@@ -129,7 +134,11 @@ describe("GET /api/widget/bootstrap context mode (e2e)", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(response.body.display).toEqual({ show: false, reason: "excluded_path" });
+    expect(response.body.display).toEqual({
+      show: false,
+      reason: "excluded_path",
+      show_home_carousel: false,
+    });
     expect(response.body.videos).toHaveLength(0);
   });
 
@@ -138,12 +147,30 @@ describe("GET /api/widget/bootstrap context mode (e2e)", () => {
     await seedVideo(store.id);
 
     const home = await request(app.server).get(contextUrl(store.id, "https://loja.example.com/"));
-    expect(home.body.display).toEqual({ show: false, reason: "home_experience_disabled" });
+    expect(home.body.display).toEqual({
+      show: false,
+      reason: "home_experience_disabled",
+      show_home_carousel: false,
+    });
 
     const inner = await request(app.server).get(
       contextUrl(store.id, "https://loja.example.com/colecao"),
     );
-    expect(inner.body.display).toEqual({ show: true, reason: "ok" });
+    expect(inner.body.display).toEqual({ show: true, reason: "ok", show_home_carousel: false });
+  });
+
+  it("page-scopes the embedded home carousel for plan-allowed stores", async () => {
+    const store = await seedContextStore({}, { plan_id: "growth" });
+    await seedVideo(store.id);
+
+    const home = await request(app.server).get(contextUrl(store.id, "https://loja.example.com/"));
+    expect(home.body.display).toEqual({ show: true, reason: "ok", show_home_carousel: true });
+
+    const product = await request(app.server).get(
+      contextUrl(store.id, "https://loja.example.com/produtos/tenis"),
+    );
+    expect(product.body.display).toEqual({ show: true, reason: "ok", show_home_carousel: false });
+    expect(product.body.config.carousel.enabled).toBe(true);
   });
 
   it("answers 304 to a matching If-None-Match revalidation", async () => {

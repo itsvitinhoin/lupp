@@ -175,7 +175,13 @@ const BootstrapResponseSchema = z
     resolved_by: z.string().nullable(),
     store: WidgetStoreSchema,
     upzero_config: z.record(z.string(), z.unknown()).nullable().optional(),
-    display: z.object({ show: z.boolean(), reason: z.string() }).optional(),
+    display: z
+      .object({
+        show: z.boolean(),
+        reason: z.string(),
+        show_home_carousel: z.boolean(),
+      })
+      .optional(),
     config: ResolvedConfigSchema.optional(),
     videos: z.array(z.union([WidgetSlimVideoSchema, WidgetVideoSchema])),
     widget: WidgetConfigSchema.nullable(),
@@ -383,7 +389,9 @@ export async function widgetBootstrapHandler(request: FastifyRequest, reply: Fas
       error: "trial_expired",
       resolved_by: resolution.resolvedBy,
       store,
-      ...(context ? { display: { show: false, reason: "trial_expired" } } : {}),
+      ...(context
+        ? { display: { show: false, reason: "trial_expired", show_home_carousel: false } }
+        : {}),
       videos: [],
       widget: null,
     });
