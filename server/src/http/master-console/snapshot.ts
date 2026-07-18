@@ -122,8 +122,12 @@ export async function getMasterConsoleSnapshot() {
     }),
     prisma.product.findMany({ select: { id: true, store_id: true, status: true } }),
     prisma.widget.findMany({ select: { id: true, store_id: true, status: true } }),
-    prisma.analyticsEvent.findMany({
-      select: { store_id: true, event_type: true },
+    // Aggregated in Postgres: the events table grows without bound and
+    // loading raw rows to count them in JS made this admin snapshot the
+    // heaviest query in the app.
+    prisma.analyticsEvent.groupBy({
+      by: ["store_id", "event_type"],
+      _count: { _all: true },
       where: {
         created_at: { gte: since },
         event_type: {
@@ -155,13 +159,19 @@ export async function getMasterConsoleSnapshot() {
   );
   const productsByStore = countByStore(products, (product) => product.status === "active");
   const widgetsByStore = countByStore(widgets, (widget) => widget.status === "active");
+  const eventCountsFor = (type: string) =>
+    new Map(
+      events
+        .filter((row) => row.event_type === type)
+        .map((row) => [row.store_id, row._count._all] as const),
+    );
   const eventCounts = {
-    addToCart: countByStore(events, (event) => event.event_type === "add_to_cart_click"),
-    feedOpen: countByStore(events, (event) => event.event_type === "feed_open"),
-    productClick: countByStore(events, (event) => event.event_type === "product_click"),
-    share: countByStore(events, (event) => event.event_type === "share_click"),
-    videoView: countByStore(events, (event) => event.event_type === "video_view"),
-    widgetView: countByStore(events, (event) => event.event_type === "widget_view"),
+    addToCart: eventCountsFor("add_to_cart_click"),
+    feedOpen: eventCountsFor("feed_open"),
+    productClick: eventCountsFor("product_click"),
+    share: eventCountsFor("share_click"),
+    videoView: eventCountsFor("video_view"),
+    widgetView: eventCountsFor("widget_view"),
   };
 
   const now = Date.now();

@@ -43,6 +43,52 @@ describe("GET /api/analytics/events (e2e)", () => {
     expect(view.id).toBeUndefined();
   });
 
+  it("aggregates per-day/per-type counts with the daily_counts preset", async () => {
+    const { owner, store } = await createStore();
+    const token = app.jwt.sign({ sub: owner.id, role: "agent" });
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await prisma.analyticsEvent.createMany({
+      data: [
+        { store_id: store.id, event_type: "video_view" },
+        { store_id: store.id, event_type: "video_view" },
+        { store_id: store.id, event_type: "product_click" },
+        { store_id: store.id, event_type: "video_view", created_at: yesterday },
+        // Outside the type filter — must not appear.
+        { store_id: store.id, event_type: "feed_open" },
+      ],
+    });
+
+    const response = await request(app.server)
+      .get("/api/analytics/events")
+      .query({
+        store_id: store.id,
+        since: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        event_types: "video_view,product_click",
+        fields: "daily_counts",
+        tz: "UTC",
+      })
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    const buckets = response.body.buckets as {
+      day: string;
+      event_type: string;
+      count: number;
+    }[];
+    const today = new Date().toISOString().slice(0, 10);
+    const yesterdayKey = yesterday.toISOString().slice(0, 10);
+    expect(buckets).toEqual(
+      expect.arrayContaining([
+        { day: today, event_type: "video_view", count: 2 },
+        { day: today, event_type: "product_click", count: 1 },
+        { day: yesterdayKey, event_type: "video_view", count: 1 },
+      ]),
+    );
+    expect(buckets.some((bucket) => bucket.event_type === "feed_open")).toBe(false);
+    // Ordered by day ascending.
+    expect(buckets[0].day <= buckets[buckets.length - 1].day).toBe(true);
+  });
+
   it("returns the feedbacks preset with the video title join", async () => {
     const { owner, store } = await createStore();
     const token = app.jwt.sign({ sub: owner.id, role: "agent" });

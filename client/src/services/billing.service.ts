@@ -96,11 +96,12 @@ function buildTrendSkeleton(days: number) {
 function applyEventCount(
   point: BillingUsageTrendPoint,
   eventType: TrackedEventType,
+  count: number,
 ) {
-  if (eventType === "video_view") point.views += 1;
-  if (eventType === "product_click") point.productClicks += 1;
-  if (eventType === "add_to_cart_click") point.addToCart += 1;
-  if (eventType === "share_click") point.shares += 1;
+  if (eventType === "video_view") point.views += count;
+  if (eventType === "product_click") point.productClicks += count;
+  if (eventType === "add_to_cart_click") point.addToCart += count;
+  if (eventType === "share_click") point.shares += count;
 }
 
 export const billingService = {
@@ -148,22 +149,25 @@ export const billingService = {
     since.setDate(since.getDate() - (safeDays - 1));
     since.setHours(0, 0, 0, 0);
 
+    // daily_counts: the server buckets per day/type in SQL (in this
+    // browser's timezone), so ≤ days×types rows come back instead of every
+    // raw event row.
     const params = new URLSearchParams({
       store_id: storeId,
       since: since.toISOString(),
       event_types: TRACKED_EVENT_TYPES.join(","),
-      fields: "trend",
+      fields: "daily_counts",
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     });
-    const data = await apiGet<{ events: { event_type: string; created_at: string }[] }>(
-      `/api/analytics/events?${params}`,
-    );
+    const data = await apiGet<{
+      buckets: { day: string; event_type: string; count: number }[];
+    }>(`/api/analytics/events?${params}`);
 
-    for (const event of data.events ?? []) {
-      const eventType = event.event_type as TrackedEventType;
+    for (const bucket of data.buckets ?? []) {
+      const eventType = bucket.event_type as TrackedEventType;
       if (!TRACKED_EVENT_TYPES.includes(eventType)) continue;
-      const key = dateKey(new Date(event.created_at));
-      const point = trendByDate.get(key);
-      if (point) applyEventCount(point, eventType);
+      const point = trendByDate.get(bucket.day);
+      if (point) applyEventCount(point, eventType, bucket.count);
     }
 
     return trend;
@@ -178,11 +182,12 @@ export const billingService = {
       store_id: storeId,
       since: monthStart.toISOString(),
       event_types: TRACKED_EVENT_TYPES.join(","),
-      fields: "trend",
+      fields: "daily_counts",
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     });
-    const data = await apiGet<{ events: { event_type: string }[] }>(
-      `/api/analytics/events?${params}`,
-    );
+    const data = await apiGet<{
+      buckets: { day: string; event_type: string; count: number }[];
+    }>(`/api/analytics/events?${params}`);
 
     const summary: BillingEventSummary = {
       addToCart: 0,
@@ -191,12 +196,12 @@ export const billingService = {
       views: 0,
     };
 
-    for (const event of data.events ?? []) {
-      const eventType = event.event_type as TrackedEventType;
-      if (eventType === "video_view") summary.views += 1;
-      if (eventType === "product_click") summary.productClicks += 1;
-      if (eventType === "add_to_cart_click") summary.addToCart += 1;
-      if (eventType === "share_click") summary.shares += 1;
+    for (const bucket of data.buckets ?? []) {
+      const eventType = bucket.event_type as TrackedEventType;
+      if (eventType === "video_view") summary.views += bucket.count;
+      if (eventType === "product_click") summary.productClicks += bucket.count;
+      if (eventType === "add_to_cart_click") summary.addToCart += bucket.count;
+      if (eventType === "share_click") summary.shares += bucket.count;
     }
 
     return summary;

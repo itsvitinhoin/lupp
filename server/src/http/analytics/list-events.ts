@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { FastifyReply, FastifyRequest } from "fastify";
-import { prisma } from "@/lib/prisma";
+import { prisma, dbSchema } from "@/lib/prisma";
 import { findStoreMembership } from "@/lib/store-membership";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
 import { AnalyticsEventRowSchema } from "@/schemas/rows";
@@ -18,12 +18,18 @@ const QuerySchema = z.object({
     .optional()
     .describe("Comma-separated AnalyticsEventType filter."),
   fields: z
-    .enum(["full", "trend", "feedbacks"])
+    .enum(["full", "trend", "feedbacks", "daily_counts"])
     .default("full")
     .describe(
       "Projection preset: full (dashboard), trend (event_type+created_at), " +
-        "feedbacks (adds the video title join).",
+        "feedbacks (adds the video title join), daily_counts (SQL-aggregated " +
+        "per-day/per-type counts — preferred over trend for charts/summaries).",
     ),
+  tz: z
+    .string()
+    .regex(/^[A-Za-z_]+(?:\/[A-Za-z0-9_+-]+){0,2}$/)
+    .optional()
+    .describe("daily_counts: IANA timezone for day bucketing (default UTC)."),
   limit: z.coerce.number().int().positive().max(MAX_LIMIT).optional(),
 });
 
@@ -39,7 +45,14 @@ export const ListAnalyticsEventsSchema = {
     security: [{ bearerAuth: [] }],
     querystring: QuerySchema,
     response: {
-      200: z.object({ events: z.array(AnalyticsEventRowSchema) }),
+      200: z.union([
+        z.object({ events: z.array(AnalyticsEventRowSchema) }),
+        z.object({
+          buckets: z.array(
+            z.object({ day: z.string(), event_type: z.string(), count: z.number() }),
+          ),
+        }),
+      ]),
       ...edgeErrorSchemas,
     },
   },
@@ -72,6 +85,34 @@ export async function listAnalyticsEventsHandler(request: FastifyRequest, reply:
     },
     ...(eventTypes.length ? { event_type: { in: eventTypes } } : {}),
   };
+
+  if (query.fields === "daily_counts") {
+    // Postgres does the bucketing: ≤ window-days × event-types rows come back
+    // instead of every raw event (the trend preset shipped up to 100k rows
+    // for the client to count). The timezone is a bound parameter, so the
+    // client's local day boundaries are preserved.
+    const timezone = query.tz ?? "UTC";
+    const rows = await prisma.$queryRaw<
+      { day: string; event_type: string; count: number }[]
+    >`
+      SELECT
+        to_char(created_at AT TIME ZONE ${timezone}, 'YYYY-MM-DD') AS day,
+        event_type::text AS event_type,
+        count(*)::int AS count
+      FROM ${Prisma.raw(`"${dbSchema.replace(/"/g, "")}".analytics_events`)}
+      WHERE store_id = ${query.store_id}
+        AND created_at >= ${effectiveSince}
+        ${query.until ? Prisma.sql`AND created_at <= ${new Date(query.until)}` : Prisma.empty}
+        ${
+          eventTypes.length
+            ? Prisma.sql`AND event_type::text IN (${Prisma.join(eventTypes)})`
+            : Prisma.empty
+        }
+      GROUP BY 1, 2
+      ORDER BY 1 ASC
+    `;
+    return reply.status(200).send({ buckets: rows });
+  }
 
   if (query.fields === "trend") {
     const events = await prisma.analyticsEvent.findMany({
