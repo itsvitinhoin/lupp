@@ -9,7 +9,8 @@
     "build:widget": "node build-widget.mjs",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "start": "serve -s dist/public -l 3040",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck:widget",
+    "typecheck:widget": "tsc -p widget-src/tsconfig.json"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",

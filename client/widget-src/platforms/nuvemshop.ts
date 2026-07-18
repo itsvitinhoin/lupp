@@ -4,11 +4,22 @@
 // NubeSDK frame mode). Shares config/state/helpers with the core through
 // window.__LUPP_WIDGET_BRIDGE__ and answers the feed iframe's
 // LUPP_NUVEMSHOP_ADD_TO_CART_REQUEST messages.
+import type { NuvemshopCartItem, WidgetBridge } from "../types";
+
+type NuvemshopCartBridgeFn = (items: NuvemshopCartItem[]) => unknown;
+
 (function () {
   "use strict";
 
-  var bridge = window.__LUPP_WIDGET_BRIDGE__;
-  if (!bridge || !bridge.adapters || bridge.adapters.nuvemshop) return;
+  var bridgeInstance = window.__LUPP_WIDGET_BRIDGE__;
+  if (
+    !bridgeInstance ||
+    !bridgeInstance.adapters ||
+    bridgeInstance.adapters.nuvemshop
+  ) {
+    return;
+  }
+  var bridge: WidgetBridge = bridgeInstance;
 
   var state = bridge.state;
   var emitCartEvent = bridge.utils.emitCartEvent;
@@ -17,8 +28,8 @@
   var postFrameResponse = bridge.postFrameResponse;
   var updateNuvemshopCartCounters = bridge.updateNuvemshopCartCounters;
 
-  function notifyNuvemshopCartUpdated(items) {
-    var quantity = (items || []).reduce(function (sum, item) {
+  function notifyNuvemshopCartUpdated(items: NuvemshopCartItem[]): void {
+    var quantity = (items || []).reduce(function (sum: number, item) {
       return sum + Number(item.quantity || 0);
     }, 0);
     var detail = {
@@ -50,7 +61,9 @@
     );
   }
 
-  function waitForNuvemshopCartBridge(deadline) {
+  function waitForNuvemshopCartBridge(
+    deadline: number,
+  ): Promise<NuvemshopCartBridgeFn> {
     var bridge = getNuvemshopCartBridge();
     if (typeof bridge === "function") return Promise.resolve(bridge);
     if (Date.now() >= deadline) {
@@ -63,7 +76,9 @@
     });
   }
 
-  function postNativeNuvemshopCartItem(item) {
+  function postNativeNuvemshopCartItem(
+    item: NuvemshopCartItem,
+  ): Promise<Record<string, unknown>> {
     if (!window.fetch || !window.URLSearchParams) {
       return Promise.reject(new Error("nuvemshop_cart_bridge_not_ready"));
     }
@@ -99,17 +114,21 @@
     });
   }
 
-  function addNuvemshopItemsWithNativeCart(validItems) {
-    return validItems.reduce(function (promise, item) {
-      return promise.then(function () {
-        return postNativeNuvemshopCartItem(item);
+  function addNuvemshopItemsWithNativeCart(
+    validItems: NuvemshopCartItem[],
+  ): Promise<{ method: string }> {
+    return validItems
+      .reduce(function (promise: Promise<unknown>, item) {
+        return promise.then(function () {
+          return postNativeNuvemshopCartItem(item);
+        });
+      }, Promise.resolve() as Promise<unknown>)
+      .then(function () {
+        return { method: "native_form_post" };
       });
-    }, Promise.resolve()).then(function () {
-      return { method: "native_form_post" };
-    });
   }
 
-  function addNuvemshopItemsToCart(items) {
+  function addNuvemshopItemsToCart(items: unknown): Promise<unknown> {
     if (!isNuvemshopStore(state.activeStore)) {
       return Promise.reject(new Error("nuvemshop_store_not_detected"));
     }
@@ -133,15 +152,15 @@
           variant_id: Math.trunc(variantId),
         };
       })
-      .filter(Boolean);
+      .filter(Boolean) as NuvemshopCartItem[];
 
     if (!validItems.length) {
       return Promise.reject(new Error("empty_cart_items"));
     }
 
     return waitForNuvemshopCartBridge(Date.now() + 6000)
-      .then(function (bridge) {
-        return Promise.resolve(bridge(validItems)).then(function (result) {
+      .then(function (bridge: NuvemshopCartBridgeFn) {
+        return Promise.resolve(bridge(validItems)).then(function (result: unknown) {
           notifyNuvemshopCartUpdated(validItems);
           return result || {};
         });

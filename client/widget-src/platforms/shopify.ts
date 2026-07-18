@@ -4,11 +4,40 @@
 // identifies a Shopify store. Shares config/state/helpers with the core
 // through window.__LUPP_WIDGET_BRIDGE__ and answers the feed iframe's
 // LUPP_SHOPIFY_ADD_TO_CART_REQUEST / LUPP_SHOPIFY_PRODUCT_REQUEST messages.
+import type { ShopifyCartItem, WidgetBridge } from "../types";
+
+// Loose view of Shopify's public product .js JSON.
+type ShopifyVariantJson = {
+  id?: number | string;
+  available?: boolean;
+  featured_image?: { src?: unknown } | string | null;
+  options?: unknown[];
+  [key: string]: unknown;
+};
+
+type ShopifyProductJson = {
+  id?: number | string;
+  handle?: string;
+  title?: string;
+  options?: unknown[];
+  variants?: ShopifyVariantJson[];
+  featured_image?: unknown;
+  image?: unknown;
+  [key: string]: unknown;
+};
+
 (function () {
   "use strict";
 
-  var bridge = window.__LUPP_WIDGET_BRIDGE__;
-  if (!bridge || !bridge.adapters || bridge.adapters.shopify) return;
+  var bridgeInstance = window.__LUPP_WIDGET_BRIDGE__;
+  if (
+    !bridgeInstance ||
+    !bridgeInstance.adapters ||
+    bridgeInstance.adapters.shopify
+  ) {
+    return;
+  }
+  var bridge: WidgetBridge = bridgeInstance;
 
   var state = bridge.state;
   var createAnchor = bridge.utils.createAnchor;
@@ -19,8 +48,11 @@
   var postFrameResponse = bridge.postFrameResponse;
   var updateShopifyCartCounters = bridge.updateShopifyCartCounters;
 
-  function notifyShopifyCartUpdated(items, cart) {
-    var quantity = (items || []).reduce(function (sum, item) {
+  function notifyShopifyCartUpdated(
+    items: ShopifyCartItem[],
+    cart: unknown,
+  ): void {
+    var quantity = (items || []).reduce(function (sum: number, item) {
       return sum + Number(item.quantity || 0);
     }, 0);
     var detail = {
@@ -47,7 +79,7 @@
     state.pendingStorefrontCartDetail = detail;
   }
 
-  function shopifyProductJsonUrl(productUrl) {
+  function shopifyProductJsonUrl(productUrl: string | undefined): string {
     var resolved = resolveUrl(productUrl || window.location.href, window.location.href);
     var anchor = createAnchor(resolved);
     var path = String(anchor.pathname || "");
@@ -56,17 +88,24 @@
     return "/products/" + encodeURIComponent(decodeURIComponent(match[1])) + ".js";
   }
 
-  function addShopifyProductJsonCandidate(candidates, productUrl) {
+  function addShopifyProductJsonCandidate(
+    candidates: string[],
+    productUrl: string | undefined,
+  ): void {
     var jsonUrl = shopifyProductJsonUrl(productUrl);
     if (!jsonUrl || candidates.indexOf(jsonUrl) !== -1) return;
     candidates.push(jsonUrl);
   }
 
-  function shopifyProductJsonCandidates(productUrl) {
-    var candidates = [];
+  function shopifyProductJsonCandidates(
+    productUrl: string | undefined,
+  ): string[] {
+    var candidates: string[] = [];
     addShopifyProductJsonCandidate(candidates, productUrl);
     try {
-      var canonical = document.querySelector('link[rel="canonical"]');
+      var canonical = document.querySelector(
+        'link[rel="canonical"]',
+      ) as HTMLLinkElement | null;
       if (canonical && canonical.href) {
         addShopifyProductJsonCandidate(candidates, canonical.href);
       }
@@ -75,13 +114,18 @@
     return candidates;
   }
 
-  function fetchShopifyProductJson(productUrl) {
+  function fetchShopifyProductJson(
+    productUrl?: string,
+  ): Promise<ShopifyProductJson> {
     var candidates = shopifyProductJsonCandidates(productUrl);
     if (!candidates.length) {
       return Promise.reject(new Error("shopify_variant_not_found"));
     }
 
-    function tryCandidate(index, lastError) {
+    function tryCandidate(
+      index: number,
+      lastError?: Error | null,
+    ): Promise<ShopifyProductJson> {
       if (index >= candidates.length) {
         throw lastError || new Error("shopify_product_json_failed");
       }
@@ -100,7 +144,7 @@
         });
     }
 
-    return tryCandidate(0).catch(function (error) {
+    return tryCandidate(0).catch(function (error: Error) {
       if (error && error.message === "shopify_product_json_failed") {
         throw new Error("shopify_product_not_published");
       }
@@ -108,7 +152,7 @@
     });
   }
 
-  function normalizeShopifyMoney(value) {
+  function normalizeShopifyMoney(value: unknown): number | null {
     var amount = Number(value);
     if (!Number.isFinite(amount)) return null;
     if (Math.floor(amount) === amount && Math.abs(amount) >= 1000) {
@@ -117,32 +161,35 @@
     return amount;
   }
 
-  function getShopifyOptionName(product, index) {
-    var options = Array.isArray(product && product.options)
-      ? product.options
-      : [];
-    var option = options[index];
+  function getShopifyOptionName(
+    product: ShopifyProductJson | null,
+    index: number,
+  ): string {
+    var options =
+      product && Array.isArray(product.options) ? product.options : [];
+    var option = options[index] as { name?: unknown } | string | null;
     if (typeof option === "string") return option;
     if (option && option.name) return String(option.name);
     return "";
   }
 
-  function getShopifyVariantOptionValue(variant, index) {
-    if (Array.isArray(variant && variant.options)) {
+  function getShopifyVariantOptionValue(
+    variant: ShopifyVariantJson | null | undefined,
+    index: number,
+  ): string {
+    if (variant && Array.isArray(variant.options)) {
       return variant.options[index] == null ? "" : String(variant.options[index]);
     }
     var key = "option" + String(index + 1);
-    return variant && variant[key] == null ? "" : String(variant[key]);
+    return variant && variant[key] == null ? "" : String(variant![key]);
   }
 
-  function normalizeShopifyProductForLupp(product) {
-    var variants = Array.isArray(product && product.variants)
-      ? product.variants
-      : [];
-    var options = [];
-    var rawOptions = Array.isArray(product && product.options)
-      ? product.options
-      : [];
+  function normalizeShopifyProductForLupp(product: ShopifyProductJson | null) {
+    var variants =
+      product && Array.isArray(product.variants) ? product.variants : [];
+    var options: string[] = [];
+    var rawOptions =
+      product && Array.isArray(product.options) ? product.options : [];
     for (var optionIndex = 0; optionIndex < rawOptions.length; optionIndex += 1) {
       var optionName = getShopifyOptionName(product, optionIndex);
       if (optionName) options.push(optionName);
@@ -153,14 +200,16 @@
       handle: product && product.handle ? String(product.handle) : "",
       image_url:
         (product && (product.featured_image || product.image)) ||
-        (variants[0] && variants[0].featured_image && variants[0].featured_image.src) ||
+        (variants[0] &&
+          variants[0].featured_image &&
+          (variants[0].featured_image as { src?: unknown }).src) ||
         null,
       options: options,
       title: product && product.title ? String(product.title) : "",
-      variants: variants.map(function (variant, variantIndex) {
+      variants: variants.map(function (variant, variantIndex: number) {
         var colorName = "";
         var sizeName = "";
-        var selectedOptions = [];
+        var selectedOptions: { name: string; value: string }[] = [];
         for (var index = 0; index < 3; index += 1) {
           var name = getShopifyOptionName(product, index);
           var value = getShopifyVariantOptionValue(variant, index);
@@ -176,7 +225,8 @@
         var variantImage =
           (variant &&
             variant.featured_image &&
-            (variant.featured_image.src || variant.featured_image)) ||
+            ((variant.featured_image as { src?: unknown }).src ||
+              variant.featured_image)) ||
           null;
         return {
           color_code: colorName || null,
@@ -204,12 +254,13 @@
     };
   }
 
-  function resolveShopifyDefaultCartItem(productUrl) {
+  function resolveShopifyDefaultCartItem(
+    productUrl: string | undefined,
+  ): Promise<ShopifyCartItem> {
     return fetchShopifyProductJson(productUrl)
       .then(function (product) {
-        var variants = Array.isArray(product && product.variants)
-          ? product.variants
-          : [];
+        var variants =
+          product && Array.isArray(product.variants) ? product.variants : [];
         var variant =
           variants.find(function (item) {
             return item && item.available !== false;
@@ -222,7 +273,9 @@
       });
   }
 
-  function postShopifyCartItems(validItems) {
+  function postShopifyCartItems(
+    validItems: ShopifyCartItem[],
+  ): Promise<unknown> {
     var root = "/";
     try {
       root =
@@ -263,7 +316,10 @@
       });
   }
 
-  function addShopifyItemsToCart(items, options) {
+  function addShopifyItemsToCart(
+    items: unknown,
+    options?: { productUrl?: string },
+  ): Promise<unknown> {
     if (!isShopifyStore(state.activeStore)) {
       return Promise.reject(new Error("shopify_store_not_detected"));
     }
@@ -281,11 +337,11 @@
           quantity: Math.trunc(quantity),
         };
       })
-      .filter(Boolean);
+      .filter(Boolean) as ShopifyCartItem[];
 
     if (!validItems.length) {
       return resolveShopifyDefaultCartItem(options && options.productUrl).then(
-        function (item) {
+        function (item: ShopifyCartItem) {
           return postShopifyCartItems([item]);
         },
       );

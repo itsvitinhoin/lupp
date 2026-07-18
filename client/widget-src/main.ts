@@ -18,21 +18,47 @@ import {
   readQueryValue,
   resolveUrl,
   sameStorefrontHostname,
-} from "./utils.js";
-import { prepareLazyVideos } from "./hls.js";
+} from "./utils";
+import { prepareLazyVideos } from "./hls";
+import type {
+  AdapterPlatform,
+  BootstrapPayload,
+  BridgeState,
+  CarouselConfig,
+  CarouselServerConfig,
+  CartUpdateDetail,
+  ContextConfig,
+  ContextDisplay,
+  CustomerStatus,
+  DisplayConfig,
+  DisplayServerConfig,
+  LauncherConfig,
+  LauncherServerConfig,
+  NuvemshopAdapter,
+  ShopifyAdapter,
+  SlimProduct,
+  SlimVideo,
+  StorePayload,
+  UpzeroAdapter,
+  UpzeroConfig,
+  WidgetBridge,
+} from "./types";
+
+type AnyAdapter = UpzeroAdapter | NuvemshopAdapter | ShopifyAdapter;
 
 (function () {
   "use strict";
 
-  var script = document.currentScript;
-  if (!script) return;
+  var scriptElement = document.currentScript as HTMLScriptElement | null;
+  if (!scriptElement) return;
+  var script: HTMLScriptElement = scriptElement;
 
   // Lupp REST API host used when data-api-url is absent on a non-localhost
   // page. CONFIRM this hostname before deploying the widget.
   var PROD_API_URL = "https://luup.dzns.net";
 
   var scriptParams = {
-    get: function (name) {
+    get: function (name: string): string | null {
       return readQueryValue(script.src || "", name);
     },
   };
@@ -46,100 +72,100 @@ import { prepareLazyVideos } from "./hls.js";
     return;
   }
 
-  function readScriptValue(attributeName, queryNames, fallback) {
-    var attributeValue = script.getAttribute(attributeName);
+  interface ScriptValueSpec {
+    attr: string;
+    query: string[];
+    def: string;
+  }
+
+  // Embed configuration surface: data-* attribute, script-src query aliases
+  // and default value, resolved in one pass below. Attribute/query names and
+  // defaults are public embed contract — never rename them.
+  var SCRIPT_VALUE_SPECS = {
+    storeId: { attr: "data-store-id", query: ["lupp_store_id", "store_id"], def: "" },
+    storeSlug: { attr: "data-store", query: ["lupp_store", "lupp_store_slug", "store_slug"], def: "" },
+    widgetType: { attr: "data-widget", query: ["lupp_widget", "widget"], def: "floating_launcher" },
+    nubesdkFrameMode: { attr: "data-nubesdk-frame", query: ["lupp_nubesdk_frame"], def: "" },
+    productUrl: { attr: "data-product-url", query: ["lupp_product_url", "product_url"], def: "" },
+    productId: { attr: "data-product-id", query: ["lupp_product_id", "product_id", "external_product_id", "lupp_external_product_id"], def: "" },
+    apiUrl: { attr: "data-api-url", query: ["lupp_api_url", "api_url"], def: "" },
+    luppUrl: { attr: "data-lupp-url", query: ["lupp_url", "lupp_base_url"], def: "" },
+    requireActive: { attr: "data-require-active", query: ["lupp_require_active", "require_active"], def: "false" },
+    externalStoreId: { attr: "data-external-store-id", query: ["external_store_id", "lupp_external_store_id", "nuvemshop_store_id", "store"], def: "" },
+    storeDomain: { attr: "data-store-domain", query: ["store_domain", "lupp_store_domain", "domain", "hostname"], def: "" },
+    position: { attr: "data-position", query: ["lupp_position"], def: "bottom-left" },
+    accentColor: { attr: "data-accent-color", query: ["lupp_accent_color"], def: "#fe2c55" },
+    backgroundColor: { attr: "data-background-color", query: ["lupp_background_color"], def: "#0b0b0f" },
+    textColor: { attr: "data-text-color", query: ["lupp_text_color"], def: "#ffffff" },
+    label: { attr: "data-label", query: ["lupp_label"], def: "Compre pelo vídeo" },
+    fontFamily: { attr: "data-font-family", query: ["lupp_font_family"], def: "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" },
+    bubbleSize: { attr: "data-bubble-size", query: ["lupp_bubble_size"], def: "74" },
+    model: { attr: "data-model", query: ["lupp_model"], def: "circular" },
+    offsetX: { attr: "data-offset-x", query: ["lupp_offset_x"], def: "18" },
+    offsetY: { attr: "data-offset-y", query: ["lupp_offset_y"], def: "18" },
+    hideWithoutVideos: { attr: "data-hide-without-videos", query: ["lupp_hide_without_videos"], def: "false" },
+    homeExperienceEnabled: { attr: "data-home-experience-enabled", query: ["lupp_home_experience_enabled"], def: "true" },
+    carouselTitle: { attr: "data-carousel-title", query: ["lupp_carousel_title"], def: "Descubra cada detalhe e Compre" },
+    carouselDescription: { attr: "data-carousel-description", query: ["lupp_carousel_description"], def: "" },
+    homeCarouselEnabled: { attr: "data-home-carousel-enabled", query: ["lupp_home_carousel_enabled"], def: "true" },
+    carouselBeforeHeading: { attr: "data-carousel-before-heading", query: ["lupp_carousel_before_heading"], def: "Com Capa" },
+    carouselAnchorSelector: { attr: "data-carousel-anchor-selector", query: ["lupp_carousel_anchor_selector"], def: "" },
+    carouselAnchorPlacement: { attr: "data-carousel-anchor-placement", query: ["lupp_carousel_anchor_placement"], def: "before" },
+    carouselMaxItems: { attr: "data-carousel-max-items", query: ["lupp_carousel_max_items"], def: "12" },
+    carouselMobileMaxItems: { attr: "data-carousel-mobile-max-items", query: ["lupp_carousel_mobile_max_items"], def: "6" },
+    loadStrategy: { attr: "data-load-strategy", query: ["lupp_load_strategy"], def: "idle" },
+    previewMode: { attr: "data-preview-mode", query: ["lupp_preview_mode"], def: "balanced" },
+  } satisfies Record<string, ScriptValueSpec>;
+
+  function readScriptValue(spec: ScriptValueSpec): string {
+    var attributeValue = script.getAttribute(spec.attr);
     if (attributeValue !== null && attributeValue !== "") return attributeValue;
-    for (var index = 0; index < queryNames.length; index += 1) {
-      var queryValue = scriptParams.get(queryNames[index]);
+    for (var index = 0; index < spec.query.length; index += 1) {
+      var queryValue = scriptParams.get(spec.query[index]);
       if (queryValue !== null && queryValue !== "") return queryValue;
     }
-    return fallback;
+    return spec.def;
   }
 
   // True when the embed set this value explicitly on the script tag (data-*
   // attribute or script-src query param). Explicit embed values outrank the
   // dashboard-configured settings echoed back by the server.
-  function hasExplicitScriptValue(attributeName, queryNames) {
-    var attributeValue = script.getAttribute(attributeName);
+  function hasExplicitScriptValue(spec: ScriptValueSpec): boolean {
+    var attributeValue = script.getAttribute(spec.attr);
     if (attributeValue !== null && attributeValue !== "") return true;
-    for (var index = 0; index < queryNames.length; index += 1) {
-      var queryValue = scriptParams.get(queryNames[index]);
+    for (var index = 0; index < spec.query.length; index += 1) {
+      var queryValue = scriptParams.get(spec.query[index]);
       if (queryValue !== null && queryValue !== "") return true;
     }
     return false;
   }
 
-  var storeId = readScriptValue(
-    "data-store-id",
-    ["lupp_store_id", "store_id"],
-    "",
+  // One pass over the table resolves every raw (string) embed value.
+  var rawScript = {} as Record<keyof typeof SCRIPT_VALUE_SPECS, string>;
+  (Object.keys(SCRIPT_VALUE_SPECS) as (keyof typeof SCRIPT_VALUE_SPECS)[]).forEach(
+    function (key) {
+      rawScript[key] = readScriptValue(SCRIPT_VALUE_SPECS[key]);
+    },
   );
-  var storeSlug = readScriptValue(
-    "data-store",
-    ["lupp_store", "lupp_store_slug", "store_slug"],
-    "",
-  );
-  var widgetType = readScriptValue(
-    "data-widget",
-    ["lupp_widget", "widget"],
-    "floating_launcher",
-  ).replace(/-/g, "_");
-  var nubesdkFrameMode = readScriptValue(
-    "data-nubesdk-frame",
-    ["lupp_nubesdk_frame"],
-    "",
-  );
-  var configuredProductUrl = readScriptValue(
-    "data-product-url",
-    ["lupp_product_url", "product_url"],
-    "",
-  );
-  var configuredProductId = readScriptValue(
-    "data-product-id",
-    [
-      "lupp_product_id",
-      "product_id",
-      "external_product_id",
-      "lupp_external_product_id",
-    ],
-    "",
-  );
-  var apiUrl = readScriptValue(
-    "data-api-url",
-    ["lupp_api_url", "api_url"],
-    window.LUPP_API_URL || "",
-  );
-  var luppBaseUrl = readScriptValue(
-    "data-lupp-url",
-    ["lupp_url", "lupp_base_url"],
-    getUrlOrigin(script.src || window.location.href),
-  ).replace(/\/$/, "");
-  var requireActiveWidget =
-    readScriptValue(
-      "data-require-active",
-      ["lupp_require_active", "require_active"],
-      "false",
-    ) === "true";
-  var externalStoreId = readScriptValue(
-    "data-external-store-id",
-    [
-      "external_store_id",
-      "lupp_external_store_id",
-      "nuvemshop_store_id",
-      "store",
-    ],
-    "",
-  );
-  var storeDomain = normalizedHostname(
-    readScriptValue(
-      "data-store-domain",
-      ["store_domain", "lupp_store_domain", "domain", "hostname"],
-      window.location.hostname || "",
-    ),
-  );
-  var upzeroConfig = {};
 
-  function inferNuvemshopStoreId() {
+  var storeId = rawScript.storeId;
+  var storeSlug = rawScript.storeSlug;
+  var widgetType = rawScript.widgetType.replace(/-/g, "_");
+  var nubesdkFrameMode = rawScript.nubesdkFrameMode;
+  var configuredProductUrl = rawScript.productUrl;
+  var configuredProductId = rawScript.productId;
+  var apiUrl = rawScript.apiUrl || window.LUPP_API_URL || "";
+  var luppBaseUrl = (
+    rawScript.luppUrl || getUrlOrigin(script.src || window.location.href)
+  ).replace(/\/$/, "");
+  var requireActiveWidget = rawScript.requireActive === "true";
+  var externalStoreId = rawScript.externalStoreId;
+  var storeDomain = normalizedHostname(
+    rawScript.storeDomain || window.location.hostname || "",
+  );
+  var upzeroConfig: UpzeroConfig = {};
+
+  function inferNuvemshopStoreId(): string {
     try {
       if (
         window.LS &&
@@ -171,7 +197,7 @@ import { prepareLazyVideos } from "./hls.js";
     return "";
   }
 
-  function inferShopifyStoreId() {
+  function inferShopifyStoreId(): string {
     try {
       if (
         window.Shopify &&
@@ -225,112 +251,37 @@ import { prepareLazyVideos } from "./hls.js";
   }
   apiUrl = apiUrl.replace(/\/$/, "");
 
-  var launcherConfig = {
-    position: readScriptValue(
-      "data-position",
-      ["lupp_position"],
-      "bottom-left",
-    ),
-    accentColor: readScriptValue(
-      "data-accent-color",
-      ["lupp_accent_color"],
-      "#fe2c55",
-    ),
-    backgroundColor: readScriptValue(
-      "data-background-color",
-      ["lupp_background_color"],
-      "#0b0b0f",
-    ),
-    textColor: readScriptValue(
-      "data-text-color",
-      ["lupp_text_color"],
-      "#ffffff",
-    ),
-    label: readScriptValue("data-label", ["lupp_label"], "Compre pelo vídeo"),
-    fontFamily: readScriptValue(
-      "data-font-family",
-      ["lupp_font_family"],
-      "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-    ),
-    bubbleSize: Number(
-      readScriptValue("data-bubble-size", ["lupp_bubble_size"], 74),
-    ),
-    model: readScriptValue("data-model", ["lupp_model"], "circular"),
-    offsetX: Number(readScriptValue("data-offset-x", ["lupp_offset_x"], 18)),
-    offsetY: Number(readScriptValue("data-offset-y", ["lupp_offset_y"], 18)),
+  var launcherConfig: LauncherConfig = {
+    position: rawScript.position,
+    accentColor: rawScript.accentColor,
+    backgroundColor: rawScript.backgroundColor,
+    textColor: rawScript.textColor,
+    label: rawScript.label,
+    fontFamily: rawScript.fontFamily,
+    bubbleSize: Number(rawScript.bubbleSize),
+    model: rawScript.model,
+    offsetX: Number(rawScript.offsetX),
+    offsetY: Number(rawScript.offsetY),
   };
 
   // Path/product display rules are evaluated server-side in context mode;
   // only the flags the client still acts on locally remain here.
-  var displayConfig = {
-    hideWithoutVideos:
-      readScriptValue(
-        "data-hide-without-videos",
-        ["lupp_hide_without_videos"],
-        "false",
-      ) === "true",
-    homeExperienceEnabled:
-      readScriptValue(
-        "data-home-experience-enabled",
-        ["lupp_home_experience_enabled"],
-        "true",
-      ) !== "false",
+  var displayConfig: DisplayConfig = {
+    hideWithoutVideos: rawScript.hideWithoutVideos === "true",
+    homeExperienceEnabled: rawScript.homeExperienceEnabled !== "false",
   };
-  var carouselConfig = {
-    title: readScriptValue(
-      "data-carousel-title",
-      ["lupp_carousel_title"],
-      "Descubra cada detalhe e Compre",
-    ),
-    description: readScriptValue(
-      "data-carousel-description",
-      ["lupp_carousel_description"],
-      "",
-    ),
-    enabled:
-      readScriptValue(
-        "data-home-carousel-enabled",
-        ["lupp_home_carousel_enabled"],
-        "true",
-      ) !== "false",
-    beforeHeading: readScriptValue(
-      "data-carousel-before-heading",
-      ["lupp_carousel_before_heading"],
-      "Com Capa",
-    ),
-    anchorSelector: readScriptValue(
-      "data-carousel-anchor-selector",
-      ["lupp_carousel_anchor_selector"],
-      "",
-    ),
-    anchorPlacement: readScriptValue(
-      "data-carousel-anchor-placement",
-      ["lupp_carousel_anchor_placement"],
-      "before",
-    ),
-    maxItems:
-      Number(
-        readScriptValue("data-carousel-max-items", ["lupp_carousel_max_items"], 12),
-      ) || 12,
-    mobileMaxItems:
-      Number(
-        readScriptValue(
-          "data-carousel-mobile-max-items",
-          ["lupp_carousel_mobile_max_items"],
-          6,
-        ),
-      ) || 6,
+  var carouselConfig: CarouselConfig = {
+    title: rawScript.carouselTitle,
+    description: rawScript.carouselDescription,
+    enabled: rawScript.homeCarouselEnabled !== "false",
+    beforeHeading: rawScript.carouselBeforeHeading,
+    anchorSelector: rawScript.carouselAnchorSelector,
+    anchorPlacement: rawScript.carouselAnchorPlacement,
+    maxItems: Number(rawScript.carouselMaxItems) || 12,
+    mobileMaxItems: Number(rawScript.carouselMobileMaxItems) || 6,
   };
-  var loadStrategy = readScriptValue(
-    "data-load-strategy",
-    ["lupp_load_strategy"],
-    "idle",
-  );
-  var previewMode = readScriptValue(
-    "data-preview-mode",
-    ["lupp_preview_mode"],
-    "balanced",
-  );
+  var loadStrategy = rawScript.loadStrategy;
+  var previewMode = rawScript.previewMode;
 
   var canUseBootstrap =
     widgetType === "floating_launcher" ||
@@ -373,26 +324,24 @@ import { prepareLazyVideos } from "./hls.js";
   var eventsBase = apiUrl + "/api/widget/events";
   var upzeroProxyBase = apiUrl + "/api/widget/upzero-proxy";
 
-  function ensureVisitorId() {
-    var key = "lupp_visitor_id";
-    var current = localStorage.getItem(key);
+  // Visitor/session ids share one storage-backed generator (localStorage
+  // persists across visits, sessionStorage is per tab session).
+  function ensureStoredId(storage: Storage, key: string): string {
+    var current = storage.getItem(key);
     if (current) return current;
     var id = crypto.randomUUID
       ? crypto.randomUUID()
       : String(Date.now()) + Math.random().toString(16).slice(2);
-    localStorage.setItem(key, id);
+    storage.setItem(key, id);
     return id;
   }
 
-  function ensureSessionId() {
-    var key = "lupp_session_id";
-    var current = sessionStorage.getItem(key);
-    if (current) return current;
-    var id = crypto.randomUUID
-      ? crypto.randomUUID()
-      : String(Date.now()) + Math.random().toString(16).slice(2);
-    sessionStorage.setItem(key, id);
-    return id;
+  function ensureVisitorId(): string {
+    return ensureStoredId(localStorage, "lupp_visitor_id");
+  }
+
+  function ensureSessionId(): string {
+    return ensureStoredId(sessionStorage, "lupp_session_id");
   }
 
   // Context-mode bootstrap: the request carries the page URL (plus product
@@ -403,7 +352,7 @@ import { prepareLazyVideos } from "./hls.js";
   // Sandboxed pages (about:srcdoc / blob: iframes such as the dashboard
   // simulator) expose no usable origin; data-product-url then drives the page
   // context, with the Lupp app origin as the last-resort parseable URL.
-  function hasUsablePageOrigin() {
+  function hasUsablePageOrigin(): boolean {
     try {
       var origin = window.location.origin;
       if (!origin || origin === "null") return false;
@@ -413,7 +362,7 @@ import { prepareLazyVideos } from "./hls.js";
     }
   }
 
-  function contextUrl() {
+  function contextUrl(): string {
     var raw;
     if (nubesdkFrameMode && configuredProductUrl) {
       raw = configuredProductUrl;
@@ -431,7 +380,7 @@ import { prepareLazyVideos } from "./hls.js";
     );
   }
 
-  function fetchBootstrap() {
+  function fetchBootstrap(): Promise<BootstrapPayload> {
     var params = new URLSearchParams();
     var externalProvider =
       /\.myshopify\.com$/i.test(String(externalStoreId || ""))
@@ -489,15 +438,15 @@ import { prepareLazyVideos } from "./hls.js";
     });
   }
 
-  function shouldUseBootstrap() {
+  function shouldUseBootstrap(): boolean {
     return canUseBootstrap;
   }
 
-  function shouldAutoplayLauncherPreview() {
+  function shouldAutoplayLauncherPreview(): boolean {
     return previewMode !== "performance";
   }
 
-  function runAfterPageReady(callback) {
+  function runAfterPageReady(callback: () => void): void {
     var hasRun = false;
     function run() {
       if (hasRun) return;
@@ -517,7 +466,7 @@ import { prepareLazyVideos } from "./hls.js";
           window.requestIdleCallback(run, { timeout: 3000 });
           return;
         }
-        window.setTimeout(run, 1);
+        setTimeout(run, 1);
       }, delay);
     }
 
@@ -529,7 +478,7 @@ import { prepareLazyVideos } from "./hls.js";
     window.addEventListener("load", scheduleIdle, { once: true });
   }
 
-  function isUpzeroStore(store) {
+  function isUpzeroStore(store: StorePayload | null | undefined): boolean {
     return String((store && store.platform) || "").toLowerCase() === "upzero";
   }
 
@@ -541,7 +490,7 @@ import { prepareLazyVideos } from "./hls.js";
   // helpers exclusively through this window bridge.
   // -------------------------------------------------------------------------
 
-  var sharedState = {
+  var sharedState: BridgeState = {
     activeStore: null,
     upzeroConfig: upzeroConfig,
     pendingStorefrontCartRefresh: false,
@@ -550,7 +499,7 @@ import { prepareLazyVideos } from "./hls.js";
     upzeroCustomerStatusLastRefreshAt: 0,
   };
 
-  var widgetBridge = {
+  var widgetBridge: WidgetBridge = {
     adapters: {},
     config: {
       apiUrl: apiUrl,
@@ -598,24 +547,29 @@ import { prepareLazyVideos } from "./hls.js";
     window.location.href,
   ).replace(/[^/]*(?:[?#].*)?$/, "");
 
-  var adapterLoadPromises = {};
+  var adapterLoadPromises: Partial<
+    Record<AdapterPlatform, Promise<AnyAdapter>>
+  > = {};
 
-  function loadAdapter(platform) {
+  function loadAdapter(platform: AdapterPlatform): Promise<AnyAdapter> {
     if (!platform) {
       return Promise.reject(new Error("lupp_adapter_platform_missing"));
     }
-    if (adapterLoadPromises[platform]) return adapterLoadPromises[platform];
-    adapterLoadPromises[platform] = new Promise(function (resolve, reject) {
-      if (widgetBridge.adapters[platform]) {
-        resolve(widgetBridge.adapters[platform]);
+    var pending = adapterLoadPromises[platform];
+    if (pending) return pending;
+    var loadPromise = new Promise<AnyAdapter>(function (resolve, reject) {
+      var registered = widgetBridge.adapters[platform];
+      if (registered) {
+        resolve(registered);
         return;
       }
       var adapterScript = document.createElement("script");
       adapterScript.async = true;
       adapterScript.src = adapterScriptBase + "widget-" + platform + ".js";
       adapterScript.onload = function () {
-        if (widgetBridge.adapters[platform]) {
-          resolve(widgetBridge.adapters[platform]);
+        var adapter = widgetBridge.adapters[platform];
+        if (adapter) {
+          resolve(adapter);
         } else {
           reject(new Error("lupp_adapter_register_failed"));
         }
@@ -627,10 +581,11 @@ import { prepareLazyVideos } from "./hls.js";
         adapterScript,
       );
     });
-    return adapterLoadPromises[platform];
+    adapterLoadPromises[platform] = loadPromise;
+    return loadPromise;
   }
 
-  function resolveAdapterPlatform(payload) {
+  function resolveAdapterPlatform(payload: BootstrapPayload): AdapterPlatform | "" {
     var platform = String(
       (payload && payload.store && payload.store.platform) || "",
     ).toLowerCase();
@@ -653,7 +608,10 @@ import { prepareLazyVideos } from "./hls.js";
 
   // Core-side customer status resolver: non-Upzero stores keep the historical
   // fast path; Upzero stores delegate to the lazily loaded upzero adapter.
-  function detectCustomerStatus(store, options) {
+  function detectCustomerStatus(
+    store: StorePayload | null,
+    options?: { forceRefresh?: boolean },
+  ): Promise<CustomerStatus> {
     if (!isUpzeroStore(store)) {
       return Promise.resolve({
         approved: true,
@@ -664,7 +622,10 @@ import { prepareLazyVideos } from "./hls.js";
     }
     return loadAdapter("upzero")
       .then(function (adapter) {
-        return adapter.detectUpzeroCustomerStatus(store, options);
+        return (adapter as UpzeroAdapter).detectUpzeroCustomerStatus(
+          store,
+          options,
+        );
       })
       .catch(function () {
         // Mirrors detectUpzeroCustomerStatus's final fallback when every
@@ -685,7 +646,7 @@ import { prepareLazyVideos } from "./hls.js";
     loadAdapter("nuvemshop").catch(function () {});
   }
 
-  function isTrustedLuppFrameOrigin(origin) {
+  function isTrustedLuppFrameOrigin(origin: string): boolean {
     try {
       var normalizedOrigin = getUrlOrigin(origin);
       var configuredOrigin = getUrlOrigin(resolveUrl(luppBaseUrl, window.location.href));
@@ -705,9 +666,13 @@ import { prepareLazyVideos } from "./hls.js";
     }
   }
 
-  function postUpzeroCustomerStatus(target, origin, status) {
+  function postUpzeroCustomerStatus(
+    target: MessageEventSource | null,
+    origin: string,
+    status: CustomerStatus,
+  ): void {
     if (!target || typeof target.postMessage !== "function") return;
-    target.postMessage(
+    (target as Window).postMessage(
       {
         type: "LUPP_UPZERO_CUSTOMER_STATUS_RESPONSE",
         approved: Boolean(status.approved),
@@ -723,9 +688,15 @@ import { prepareLazyVideos } from "./hls.js";
   // pairs (cart + product lookups): every response carries the same
   // requestId/ok/error envelope; extra fields (product) ride along when the
   // payload provides them.
-  function postFrameResponse(target, origin, type, requestId, payload) {
+  function postFrameResponse(
+    target: MessageEventSource | Window | null,
+    origin: string,
+    type: string,
+    requestId: unknown,
+    payload: { ok?: boolean; error?: unknown; product?: unknown },
+  ): void {
     if (!target || typeof target.postMessage !== "function") return;
-    var message = {
+    var message: Record<string, unknown> = {
       type: type,
       requestId: requestId,
       ok: Boolean(payload && payload.ok),
@@ -734,14 +705,14 @@ import { prepareLazyVideos } from "./hls.js";
     if (payload && "product" in payload) {
       message.product = payload.product || null;
     }
-    target.postMessage(message, origin);
+    (target as Window).postMessage(message, origin);
   }
 
-  function formatUpzeroCartCount(quantity) {
+  function formatUpzeroCartCount(quantity: number): string {
     return quantity === 1 ? "1 PC." : quantity + " PCS.";
   }
 
-  function updateUpzeroCartCounters(quantity) {
+  function updateUpzeroCartCounters(quantity: number): void {
     if (!document.body || !Number.isFinite(quantity)) return;
 
     var label = formatUpzeroCartCount(Math.max(0, Math.trunc(quantity)));
@@ -788,9 +759,10 @@ import { prepareLazyVideos } from "./hls.js";
     } catch (_) {}
   }
 
-  function flushPendingStorefrontCartRefresh() {
+  function flushPendingStorefrontCartRefresh(): void {
     if (!sharedState.pendingStorefrontCartRefresh) return;
-    var detail = sharedState.pendingStorefrontCartDetail || {};
+    var detail: Partial<CartUpdateDetail> =
+      sharedState.pendingStorefrontCartDetail || {};
     sharedState.pendingStorefrontCartRefresh = false;
     sharedState.pendingStorefrontCartDetail = null;
 
@@ -829,7 +801,7 @@ import { prepareLazyVideos } from "./hls.js";
     }, 180);
   }
 
-  function isNuvemshopStore(store) {
+  function isNuvemshopStore(store: StorePayload | null | undefined): boolean {
     var platform = String((store && store.platform) || "").toLowerCase();
     return (
       platform === "nuvemshop" ||
@@ -839,11 +811,11 @@ import { prepareLazyVideos } from "./hls.js";
     );
   }
 
-  function isShopifyStore(store) {
+  function isShopifyStore(store: StorePayload | null | undefined): boolean {
     return String((store && store.platform) || "").toLowerCase() === "shopify";
   }
 
-  function updateNuvemshopCartCounters(quantity) {
+  function updateNuvemshopCartCounters(quantity: number): void {
     if (!quantity || quantity <= 0 || typeof document === "undefined") return;
     try {
       var counters = document.querySelectorAll(
@@ -861,7 +833,7 @@ import { prepareLazyVideos } from "./hls.js";
     } catch (_) {}
   }
 
-  function updateShopifyCartCounters(quantity) {
+  function updateShopifyCartCounters(quantity: number): void {
     if (!quantity || quantity <= 0 || typeof document === "undefined") return;
     try {
       var counters = document.querySelectorAll(
@@ -878,8 +850,8 @@ import { prepareLazyVideos } from "./hls.js";
     } catch (_) {}
   }
 
-  window.addEventListener("message", function (event) {
-    var data = event.data || {};
+  window.addEventListener("message", function (event: MessageEvent) {
+    var data = (event.data || {}) as Record<string, unknown>;
     if (
       !data ||
       data.type !== "LUPP_UPZERO_CUSTOMER_STATUS_REQUEST" ||
@@ -889,14 +861,14 @@ import { prepareLazyVideos } from "./hls.js";
     }
 
     detectCustomerStatus(activeStore, { forceRefresh: true }).then(
-      function (status) {
+      function (status: CustomerStatus) {
         postUpzeroCustomerStatus(event.source, event.origin, status);
       },
     );
   });
 
-  window.addEventListener("message", function (event) {
-    var data = event.data || {};
+  window.addEventListener("message", function (event: MessageEvent) {
+    var data = (event.data || {}) as Record<string, unknown>;
     if (
       !data ||
       data.type !== "LUPP_OPEN_PRODUCT_PAGE_REQUEST" ||
@@ -914,7 +886,7 @@ import { prepareLazyVideos } from "./hls.js";
     }
   });
 
-  function normalizePath(value) {
+  function normalizePath(value: unknown): string {
     var path = String(value || "/").trim();
     try {
       path = getUrlPathname(path, window.location.origin);
@@ -924,7 +896,7 @@ import { prepareLazyVideos } from "./hls.js";
     return path || "/";
   }
 
-  function primeInlineVideos(root) {
+  function primeInlineVideos(root: HTMLElement | null): void {
     if (!root || !root.querySelectorAll) return;
     try {
       Array.prototype.forEach.call(root.querySelectorAll("video"), function (video) {
@@ -950,13 +922,13 @@ import { prepareLazyVideos } from "./hls.js";
     return configuredProductUrl || window.location.href;
   }
 
-  function extractProductHandle(value) {
+  function extractProductHandle(value: unknown): string {
     var path = normalizePath(value);
     var match = path.match(/\/(?:produto|produtos|product|products)\/([^/]+)/i);
     return match ? decodeURIComponent(match[1]).toLowerCase() : "";
   }
 
-  function slugifyForPath(value) {
+  function slugifyForPath(value: unknown): string {
     var text = String(value || "")
       .trim()
       .toLowerCase();
@@ -969,7 +941,10 @@ import { prepareLazyVideos } from "./hls.js";
       .replace(/^-+|-+$/g, "");
   }
 
-  function upzeroReferenceSlugFromProduct(product, fallbackUrl) {
+  function upzeroReferenceSlugFromProduct(
+    product: Record<string, unknown> | null,
+    fallbackUrl?: unknown,
+  ): string {
     var candidates = [
       fallbackUrl,
       product && product.product_url,
@@ -1006,7 +981,10 @@ import { prepareLazyVideos } from "./hls.js";
     return numericFallback;
   }
 
-  function upzeroProductHandleFromProduct(product, fallbackUrl) {
+  function upzeroProductHandleFromProduct(
+    product: Record<string, unknown> | null,
+    fallbackUrl?: unknown,
+  ): string {
     var referenceSlug = upzeroReferenceSlugFromProduct(product, fallbackUrl);
     var savedHandle = extractProductHandle(fallbackUrl || (product && product.product_url));
     if (savedHandle) {
@@ -1034,13 +1012,21 @@ import { prepareLazyVideos } from "./hls.js";
     return referenceSlug || nameSlug;
   }
 
-  function repairUpzeroProductUrl(product, fallbackUrl, store) {
-    var url = fallbackUrl || (product && product.product_url) || "";
-    var base =
+  function repairUpzeroProductUrl(
+    productInput: SlimProduct | Record<string, unknown> | null,
+    fallbackUrl: string | undefined,
+    store: StorePayload | null,
+  ): string {
+    var product = productInput as Record<string, unknown> | null;
+    var url = String(
+      fallbackUrl || (product && product.product_url) || "",
+    );
+    var base = String(
       (store && (store.url || store.store_url)) ||
-      (upzeroConfig && upzeroConfig.storefront_url) ||
-      (activeStore && activeStore.url) ||
-      window.location.origin;
+        (upzeroConfig && upzeroConfig.storefront_url) ||
+        (activeStore && activeStore.url) ||
+        window.location.origin,
+    );
     var handle = upzeroProductHandleFromProduct(product, url);
     if (!handle) return url;
 
@@ -1065,7 +1051,7 @@ import { prepareLazyVideos } from "./hls.js";
     }
   }
 
-  function isHomeCarouselWidget() {
+  function isHomeCarouselWidget(): boolean {
     return (
       widgetType === "home_carousel" ||
       widgetType === "horizontal_feed" ||
@@ -1073,7 +1059,7 @@ import { prepareLazyVideos } from "./hls.js";
     );
   }
 
-  function isCarouselWidget() {
+  function isCarouselWidget(): boolean {
     return (
       isHomeCarouselWidget() ||
       widgetType === "carousel" ||
@@ -1081,11 +1067,11 @@ import { prepareLazyVideos } from "./hls.js";
     );
   }
 
-  function isFloatingWidget() {
+  function isFloatingWidget(): boolean {
     return widgetType === "floating_launcher" || widgetType === "floating_video";
   }
 
-  function mappedWidgetType() {
+  function mappedWidgetType(): string {
     if (widgetType === "floating_launcher" || isCarouselWidget()) {
       return "floating_video";
     }
@@ -1097,54 +1083,54 @@ import { prepareLazyVideos } from "./hls.js";
   // explicit data-* attributes > dashboard settings > defaults. (Previously
   // dashboard settings silently overrode explicit attributes, which kept
   // test-store/simulator overrides from sticking.)
-  function applyContextConfig(config) {
-    var launcher = asRecord(config && config.launcher);
-    var display = asRecord(config && config.display);
-    var carousel = asRecord(config && config.carousel);
+  function applyContextConfig(config: ContextConfig | undefined): void {
+    var launcher: LauncherServerConfig = (config && config.launcher) || {};
+    var display: DisplayServerConfig = (config && config.display) || {};
+    var carousel: CarouselServerConfig = (config && config.carousel) || {};
 
-    if (launcher.position && !hasExplicitScriptValue("data-position", ["lupp_position"])) {
+    if (launcher.position && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.position)) {
       launcherConfig.position = launcher.position;
     }
-    if (launcher.accent_color && !hasExplicitScriptValue("data-accent-color", ["lupp_accent_color"])) {
+    if (launcher.accent_color && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.accentColor)) {
       launcherConfig.accentColor = launcher.accent_color;
     }
-    if (launcher.background_color && !hasExplicitScriptValue("data-background-color", ["lupp_background_color"])) {
+    if (launcher.background_color && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.backgroundColor)) {
       launcherConfig.backgroundColor = launcher.background_color;
     }
-    if (launcher.text_color && !hasExplicitScriptValue("data-text-color", ["lupp_text_color"])) {
+    if (launcher.text_color && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.textColor)) {
       launcherConfig.textColor = launcher.text_color;
     }
-    if (typeof launcher.label === "string" && !hasExplicitScriptValue("data-label", ["lupp_label"])) {
+    if (typeof launcher.label === "string" && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.label)) {
       launcherConfig.label = launcher.label;
     }
-    if (launcher.font_family && !hasExplicitScriptValue("data-font-family", ["lupp_font_family"])) {
+    if (launcher.font_family && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.fontFamily)) {
       launcherConfig.fontFamily = launcher.font_family;
     }
-    if (launcher.bubble_size && !hasExplicitScriptValue("data-bubble-size", ["lupp_bubble_size"])) {
+    if (launcher.bubble_size && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.bubbleSize)) {
       launcherConfig.bubbleSize =
         Number(launcher.bubble_size) || launcherConfig.bubbleSize;
     }
-    if (launcher.model && !hasExplicitScriptValue("data-model", ["lupp_model"])) {
+    if (launcher.model && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.model)) {
       launcherConfig.model = launcher.model;
     }
-    if (launcher.offset_x && !hasExplicitScriptValue("data-offset-x", ["lupp_offset_x"])) {
+    if (launcher.offset_x && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.offsetX)) {
       launcherConfig.offsetX =
         Number(launcher.offset_x) || launcherConfig.offsetX;
     }
-    if (launcher.offset_y && !hasExplicitScriptValue("data-offset-y", ["lupp_offset_y"])) {
+    if (launcher.offset_y && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.offsetY)) {
       launcherConfig.offsetY =
         Number(launcher.offset_y) || launcherConfig.offsetY;
     }
 
     if (
       "hide_without_videos" in display &&
-      !hasExplicitScriptValue("data-hide-without-videos", ["lupp_hide_without_videos"])
+      !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.hideWithoutVideos)
     ) {
       displayConfig.hideWithoutVideos = display.hide_without_videos === true;
     }
     if (
       "home_experience_enabled" in display &&
-      !hasExplicitScriptValue("data-home-experience-enabled", ["lupp_home_experience_enabled"])
+      !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.homeExperienceEnabled)
     ) {
       displayConfig.homeExperienceEnabled =
         display.home_experience_enabled !== false;
@@ -1152,63 +1138,63 @@ import { prepareLazyVideos } from "./hls.js";
 
     if (
       "enabled" in carousel &&
-      !hasExplicitScriptValue("data-home-carousel-enabled", ["lupp_home_carousel_enabled"])
+      !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.homeCarouselEnabled)
     ) {
       carouselConfig.enabled = carousel.enabled !== false;
     }
     if (
       typeof carousel.title === "string" &&
-      !hasExplicitScriptValue("data-carousel-title", ["lupp_carousel_title"])
+      !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.carouselTitle)
     ) {
       carouselConfig.title = carousel.title || carouselConfig.title;
     }
     if (
       typeof carousel.description === "string" &&
-      !hasExplicitScriptValue("data-carousel-description", ["lupp_carousel_description"])
+      !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.carouselDescription)
     ) {
       carouselConfig.description = carousel.description;
     }
     if (
       typeof carousel.before_heading === "string" &&
-      !hasExplicitScriptValue("data-carousel-before-heading", ["lupp_carousel_before_heading"])
+      !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.carouselBeforeHeading)
     ) {
       carouselConfig.beforeHeading =
         carousel.before_heading || carouselConfig.beforeHeading;
     }
     if (
       carousel.anchor_selector &&
-      !hasExplicitScriptValue("data-carousel-anchor-selector", ["lupp_carousel_anchor_selector"])
+      !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.carouselAnchorSelector)
     ) {
       carouselConfig.anchorSelector = carousel.anchor_selector;
     }
     if (
       carousel.anchor_placement &&
-      !hasExplicitScriptValue("data-carousel-anchor-placement", ["lupp_carousel_anchor_placement"])
+      !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.carouselAnchorPlacement)
     ) {
       carouselConfig.anchorPlacement = carousel.anchor_placement;
     }
     if (
       "max_items" in carousel &&
-      !hasExplicitScriptValue("data-carousel-max-items", ["lupp_carousel_max_items"])
+      !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.carouselMaxItems)
     ) {
       carouselConfig.maxItems =
         Number(carousel.max_items) || carouselConfig.maxItems;
     }
     if (
       "mobile_max_items" in carousel &&
-      !hasExplicitScriptValue("data-carousel-mobile-max-items", ["lupp_carousel_mobile_max_items"])
+      !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.carouselMobileMaxItems)
     ) {
       carouselConfig.mobileMaxItems =
         Number(carousel.mobile_max_items) || carouselConfig.mobileMaxItems;
     }
   }
 
-  function videoMediaUrl(video) {
+  function videoMediaUrl(video: Partial<SlimVideo> | null | undefined): string {
     if (!video) return "";
     return video.media_url || "";
   }
 
-  function firstTextValue(values, fallback) {
+  function firstTextValue(values: unknown[], fallback?: string): string {
     for (var index = 0; index < values.length; index += 1) {
       if (values[index] !== undefined && values[index] !== null && values[index] !== "") {
         return String(values[index]);
@@ -1217,7 +1203,7 @@ import { prepareLazyVideos } from "./hls.js";
     return fallback || "";
   }
 
-  function currentExternalProductId() {
+  function currentExternalProductId(): string {
     if (configuredProductId) return String(configuredProductId);
     try {
       if (
@@ -1246,7 +1232,13 @@ import { prepareLazyVideos } from "./hls.js";
     return "";
   }
 
-  function track(storeId, eventType, videoId, productId, metadata) {
+  function track(
+    storeId: string | null | undefined,
+    eventType: string,
+    videoId?: string | null,
+    productId?: string | null,
+    metadata?: Record<string, unknown>,
+  ): void {
     if (!storeId) return;
     var payload = {
       store_id: storeId,
@@ -1274,7 +1266,7 @@ import { prepareLazyVideos } from "./hls.js";
     }).catch(function () {});
   }
 
-  function createRoot() {
+  function createRoot(): HTMLElement {
     var root = document.createElement("div");
     root.setAttribute("data-lupp-widget-root", widgetType);
     if (
@@ -1291,58 +1283,58 @@ import { prepareLazyVideos } from "./hls.js";
     return root;
   }
 
-  var activeStore = null;
-  var activeVideos = [];
+  var activeStore: StorePayload | null = null;
+  var activeVideos: SlimVideo[] = [];
   var hasLoadedVideoList = false;
   // Server-evaluated display block for the current page (show, reason,
   // show_home_carousel) — refreshed on every context fetch.
-  var contextDisplay = {};
+  var contextDisplay: Partial<ContextDisplay> = {};
   var lastRenderedUrl = "";
-  var trackedLauncherImpressions = {};
-  var homeCarouselRoot = null;
-  var homeCarouselAnchorObserver = null;
-  var homeCarouselAnchorRetryTimer = null;
+  var trackedLauncherImpressions: Record<string, boolean> = {};
+  var homeCarouselRoot: HTMLElement | null = null;
+  var homeCarouselAnchorObserver: MutationObserver | null = null;
+  var homeCarouselAnchorRetryTimer: number | null = null;
   var homeCarouselAnchorRetryCount = 0;
 
-  function ensureRootAttached(root) {
+  function ensureRootAttached(root: HTMLElement): void {
     if (!root.parentNode) {
       (document.body || document.documentElement).appendChild(root);
     }
   }
 
-  function normalizeText(value) {
+  function normalizeText(value: unknown): string {
     return String(value || "")
       .replace(/\s+/g, " ")
       .trim()
       .toLowerCase();
   }
 
-  function closestSection(element) {
-    var node = element;
+  function closestSection(element: Element): Element {
+    var node: Element | null = element;
     while (node && node !== document.body && node !== document.documentElement) {
       if (node.tagName && node.tagName.toLowerCase() === "section") {
         return node;
       }
-      node = node.parentNode;
+      node = node.parentNode as Element | null;
     }
     return element;
   }
 
-  function hasAncestorTag(element, tags) {
-    var node = element;
+  function hasAncestorTag(element: Element | null, tags: string[]): boolean {
+    var node: Element | null = element;
     while (node && node !== document.body && node !== document.documentElement) {
       var tagName = node.tagName ? node.tagName.toLowerCase() : "";
       for (var index = 0; index < tags.length; index += 1) {
         if (tagName === tags[index]) return true;
       }
-      node = node.parentNode;
+      node = node.parentNode as Element | null;
     }
     return false;
   }
 
-  function closestHomeBlock(element) {
+  function closestHomeBlock(element: Element): Element {
     var main = document.querySelector("main, #MainContent, [role='main']");
-    var node = element;
+    var node: Element | null = element;
     while (node && node !== document.body && node !== document.documentElement) {
       var tagName = node.tagName ? node.tagName.toLowerCase() : "";
       var signature = normalizeText(
@@ -1367,13 +1359,13 @@ import { prepareLazyVideos } from "./hls.js";
       ) {
         return node;
       }
-      node = node.parentNode;
+      node = node.parentNode as Element | null;
     }
     return element;
   }
 
-  function closestShopifySection(element) {
-    var node = element;
+  function closestShopifySection(element: Element): Element {
+    var node: Element | null = element;
     while (node && node !== document.body && node !== document.documentElement) {
       if (
         node.id &&
@@ -1386,12 +1378,12 @@ import { prepareLazyVideos } from "./hls.js";
       if (node.tagName && node.tagName.toLowerCase() === "section") {
         return node;
       }
-      node = node.parentNode;
+      node = node.parentNode as Element | null;
     }
     return element;
   }
 
-  function findShopifyProductShowcaseSection() {
+  function findShopifyProductShowcaseSection(): Element | null {
     var primarySelectors = [
       ".product-grid",
       ".card-information__text",
@@ -1432,7 +1424,7 @@ import { prepareLazyVideos } from "./hls.js";
     return null;
   }
 
-  function findUpzeroProductShowcaseSection() {
+  function findUpzeroProductShowcaseSection(): Element | null {
     var productLinks = document.querySelectorAll("a[href*='/produtos/']");
     for (var linkIndex = 0; linkIndex < productLinks.length; linkIndex += 1) {
       if (hasAncestorTag(productLinks[linkIndex], ["header", "nav", "footer"])) continue;
@@ -1479,7 +1471,7 @@ import { prepareLazyVideos } from "./hls.js";
     return null;
   }
 
-  function findCarouselAnchorBySelector() {
+  function findCarouselAnchorBySelector(): Element | null {
     var selector = String(carouselConfig.anchorSelector || "").trim();
     if (!selector) return null;
     try {
@@ -1491,18 +1483,18 @@ import { prepareLazyVideos } from "./hls.js";
     }
   }
 
-  function insertHomeCarouselNear(anchorNode) {
+  function insertHomeCarouselNear(anchorNode: Element | null): boolean {
     if (!anchorNode || !anchorNode.parentNode) return false;
     var placement = String(carouselConfig.anchorPlacement || "before").toLowerCase();
     if (placement === "after") {
-      anchorNode.parentNode.insertBefore(homeCarouselRoot, anchorNode.nextSibling);
+      anchorNode.parentNode.insertBefore(homeCarouselRoot!, anchorNode.nextSibling);
     } else {
-      anchorNode.parentNode.insertBefore(homeCarouselRoot, anchorNode);
+      anchorNode.parentNode.insertBefore(homeCarouselRoot!, anchorNode);
     }
     return true;
   }
 
-  function findHomeCarouselBeforeNode() {
+  function findHomeCarouselBeforeNode(): Element | null {
     var headingTarget = normalizeText(carouselConfig.beforeHeading);
     var headings = document.querySelectorAll("h1,h2,h3,h4");
     for (var index = 0; index < headings.length; index += 1) {
@@ -1524,9 +1516,9 @@ import { prepareLazyVideos } from "./hls.js";
     return null;
   }
 
-  function findHomeBenefitsSection() {
-    var candidates = [];
-    var seen = [];
+  function findHomeBenefitsSection(): Element | null {
+    var candidates: Element[] = [];
+    var seen: Element[] = [];
     var selectors = [
       "section",
       "main > div",
@@ -1536,7 +1528,7 @@ import { prepareLazyVideos } from "./hls.js";
       "[id]",
     ];
 
-    function addCandidate(candidate) {
+    function addCandidate(candidate: Element | null) {
       if (!candidate || candidate === document.body || candidate === document.documentElement) {
         return;
       }
@@ -1591,7 +1583,7 @@ import { prepareLazyVideos } from "./hls.js";
     return null;
   }
 
-  function ensureHomeCarouselRoot() {
+  function ensureHomeCarouselRoot(): HTMLElement | null {
     if (!homeCarouselRoot) {
       homeCarouselRoot = document.createElement("div");
       homeCarouselRoot.setAttribute("data-lupp-widget-root", "home_carousel");
@@ -1662,13 +1654,13 @@ import { prepareLazyVideos } from "./hls.js";
     return null;
   }
 
-  function removeHomeCarouselRoot() {
+  function removeHomeCarouselRoot(): void {
     if (homeCarouselRoot && homeCarouselRoot.parentNode) {
       homeCarouselRoot.parentNode.removeChild(homeCarouselRoot);
     }
   }
 
-  function hasHomeCarouselAnchor() {
+  function hasHomeCarouselAnchor(): boolean {
     return Boolean(
       findCarouselAnchorBySelector() ||
         findHomeCarouselBeforeNode() ||
@@ -1679,7 +1671,7 @@ import { prepareLazyVideos } from "./hls.js";
     );
   }
 
-  function clearHomeCarouselAnchorWatch() {
+  function clearHomeCarouselAnchorWatch(): void {
     if (homeCarouselAnchorObserver) {
       homeCarouselAnchorObserver.disconnect();
       homeCarouselAnchorObserver = null;
@@ -1690,7 +1682,7 @@ import { prepareLazyVideos } from "./hls.js";
     }
   }
 
-  function scheduleHomeCarouselAnchorRetry(root) {
+  function scheduleHomeCarouselAnchorRetry(root: HTMLElement): void {
     if (!root || !shouldRenderEmbeddedHomeCarousel()) return;
     if (homeCarouselAnchorRetryTimer || homeCarouselAnchorObserver) return;
 
@@ -1725,11 +1717,11 @@ import { prepareLazyVideos } from "./hls.js";
   // Page scoping is server-evaluated: display.show_home_carousel is true only
   // on the storefront home with the home experience on and the carousel
   // plan-allowed, per the current context URL.
-  function shouldRenderEmbeddedHomeCarousel() {
+  function shouldRenderEmbeddedHomeCarousel(): boolean {
     return isFloatingWidget() && contextDisplay.show_home_carousel === true;
   }
 
-  function renderEmbeddedHomeCarousel(videos, root) {
+  function renderEmbeddedHomeCarousel(videos: SlimVideo[], root: HTMLElement): void {
     if (!shouldRenderEmbeddedHomeCarousel()) {
       clearHomeCarouselAnchorWatch();
       removeHomeCarouselRoot();
@@ -1750,10 +1742,10 @@ import { prepareLazyVideos } from "./hls.js";
 
     clearHomeCarouselAnchorWatch();
     homeCarouselAnchorRetryCount = 0;
-    renderCarousel(carouselRoot, activeStore, videos);
+    renderCarousel(carouselRoot, activeStore as StorePayload, videos);
   }
 
-  function renderForCurrentUrl(root) {
+  function renderForCurrentUrl(root: HTMLElement): void {
     if (!activeStore) return;
     lastRenderedUrl = window.location.href;
 
@@ -1792,7 +1784,7 @@ import { prepareLazyVideos } from "./hls.js";
   // SPA navigation refetches the context for the new URL instead of filtering
   // locally; the browser HTTP cache + ETag makes repeat visits cheap. Only
   // the latest requested URL may render (out-of-order guard).
-  function refreshContextForUrl(root) {
+  function refreshContextForUrl(root: HTMLElement): void {
     var requestedUrl = window.location.href;
     lastRequestedContextUrl = requestedUrl;
     fetchBootstrap()
@@ -1801,7 +1793,7 @@ import { prepareLazyVideos } from "./hls.js";
         applyContextConfig(payload.config);
         activeVideos = payload.videos || [];
         hasLoadedVideoList = true;
-        contextDisplay = asRecord(payload.display);
+        contextDisplay = payload.display || {};
         var display = contextDisplay;
         if (display.show === false) {
           debugLog("render skipped: server display rules", {
@@ -1819,7 +1811,7 @@ import { prepareLazyVideos } from "./hls.js";
       });
   }
 
-  function watchUrlChanges(root) {
+  function watchUrlChanges(root: HTMLElement): void {
     function scheduleRender() {
       window.setTimeout(function () {
         if (window.location.href === lastRenderedUrl) return;
@@ -1827,11 +1819,14 @@ import { prepareLazyVideos } from "./hls.js";
       }, 80);
     }
 
-    ["pushState", "replaceState"].forEach(function (method) {
+    (["pushState", "replaceState"] as const).forEach(function (method) {
       var original = history[method];
       if (typeof original !== "function") return;
-      history[method] = function () {
-        var result = original.apply(this, arguments);
+      history[method] = function (this: History) {
+        var result = original.apply(
+          this,
+          arguments as unknown as Parameters<History["pushState"]>,
+        );
         scheduleRender();
         return result;
       };
@@ -1841,9 +1836,9 @@ import { prepareLazyVideos } from "./hls.js";
     window.addEventListener("hashchange", scheduleRender);
   }
 
-  var upzeroCustomerRefreshTimer = null;
+  var upzeroCustomerRefreshTimer: number | null = null;
 
-  function refreshUpzeroCustomerState(root) {
+  function refreshUpzeroCustomerState(root: HTMLElement): void {
     if (!isUpzeroStore(activeStore)) return;
     if (upzeroCustomerRefreshTimer) {
       window.clearTimeout(upzeroCustomerRefreshTimer);
@@ -1859,7 +1854,7 @@ import { prepareLazyVideos } from "./hls.js";
     }, 160);
   }
 
-  function watchUpzeroCustomerState(root) {
+  function watchUpzeroCustomerState(root: HTMLElement): void {
     var refresh = function () {
       refreshUpzeroCustomerState(root);
     };
@@ -1873,7 +1868,7 @@ import { prepareLazyVideos } from "./hls.js";
     document.addEventListener(
       "click",
       function (event) {
-        var target = event.target;
+        var target = event.target as HTMLElement | null;
         if (target && target.nodeType === 3) target = target.parentElement;
         var action =
           target && target.closest ? target.closest("a,button") : null;
@@ -1896,7 +1891,7 @@ import { prepareLazyVideos } from "./hls.js";
     );
   }
 
-  function positionStyles() {
+  function positionStyles(): string {
     if (nubesdkFrameMode === "launcher") {
       return "position:relative;z-index:1;left:0;top:0;right:auto;bottom:auto";
     }
@@ -1914,7 +1909,7 @@ import { prepareLazyVideos } from "./hls.js";
     return styles.join(";");
   }
 
-  function launcherDragStorageKey(store) {
+  function launcherDragStorageKey(store: StorePayload | null): string {
     var storeKey =
       (store && (store.id || store.slug)) ||
       storeId ||
@@ -1928,7 +1923,9 @@ import { prepareLazyVideos } from "./hls.js";
     ].join(":");
   }
 
-  function readLauncherDragPosition(store) {
+  function readLauncherDragPosition(
+    store: StorePayload | null,
+  ): { x: number; y: number } | null {
     try {
       if (!window.localStorage) return null;
       var raw = window.localStorage.getItem(launcherDragStorageKey(store));
@@ -1943,7 +1940,10 @@ import { prepareLazyVideos } from "./hls.js";
     }
   }
 
-  function saveLauncherDragPosition(store, position) {
+  function saveLauncherDragPosition(
+    store: StorePayload | null,
+    position: { x: number; y: number } | null,
+  ): void {
     try {
       if (!window.localStorage || !position) return;
       window.localStorage.setItem(
@@ -1956,7 +1956,11 @@ import { prepareLazyVideos } from "./hls.js";
     } catch (_) {}
   }
 
-  function clampLauncherPosition(root, x, y) {
+  function clampLauncherPosition(
+    root: HTMLElement,
+    x: number,
+    y: number,
+  ): { x: number; y: number } {
     var rect = root.getBoundingClientRect
       ? root.getBoundingClientRect()
       : { width: 80, height: 80 };
@@ -1969,7 +1973,10 @@ import { prepareLazyVideos } from "./hls.js";
     };
   }
 
-  function applyLauncherDragPosition(root, position) {
+  function applyLauncherDragPosition(
+    root: HTMLElement,
+    position: { x: number; y: number } | null,
+  ): void {
     if (!position) return;
     root.style.left = position.x + "px";
     root.style.top = position.y + "px";
@@ -1977,20 +1984,36 @@ import { prepareLazyVideos } from "./hls.js";
     root.style.bottom = "auto";
   }
 
-  function installLauncherDrag(root, button, store) {
-    if (!root || !button || button.__luppDragInstalled) return;
-    button.__luppDragInstalled = true;
+  function installLauncherDrag(
+    root: HTMLElement,
+    button: HTMLElement | null,
+    store: StorePayload,
+  ): void {
+    var flaggedButton = button as
+      | (HTMLElement & { __luppDragInstalled?: boolean })
+      | null;
+    if (!root || !flaggedButton || flaggedButton.__luppDragInstalled) return;
+    flaggedButton.__luppDragInstalled = true;
 
-    var state = null;
+    interface DragState {
+      moved: boolean;
+      startLeft: number;
+      startTop: number;
+      startX: number;
+      startY: number;
+      lastPosition: { x: number; y: number } | null;
+    }
+    var state: DragState | null = null;
     var previousUserSelect = "";
 
-    function pointFromEvent(event) {
-      var source =
-        event.touches && event.touches.length
-          ? event.touches[0]
-          : event.changedTouches && event.changedTouches.length
-            ? event.changedTouches[0]
-            : event;
+    function pointFromEvent(event: Event): { x: number; y: number } {
+      var touchEvent = event as TouchEvent;
+      var source: { clientX?: number; clientY?: number } =
+        touchEvent.touches && touchEvent.touches.length
+          ? touchEvent.touches[0]
+          : touchEvent.changedTouches && touchEvent.changedTouches.length
+            ? touchEvent.changedTouches[0]
+            : (event as MouseEvent);
       return {
         x: Number(source.clientX || 0),
         y: Number(source.clientY || 0),
@@ -2004,7 +2027,7 @@ import { prepareLazyVideos } from "./hls.js";
       }, 260);
     }
 
-    function onMove(event) {
+    function onMove(event: Event) {
       if (!state) return;
       var point = pointFromEvent(event);
       var deltaX = point.x - state.startX;
@@ -2054,8 +2077,10 @@ import { prepareLazyVideos } from "./hls.js";
       document.removeEventListener("touchcancel", onEnd);
     }
 
-    function onStart(event) {
-      if (event.type === "mousedown" && event.button !== 0) return;
+    function onStart(event: Event) {
+      if (event.type === "mousedown" && (event as MouseEvent).button !== 0) {
+        return;
+      }
       var point = pointFromEvent(event);
       var rect = root.getBoundingClientRect();
       previousUserSelect = document.body.style.userSelect;
@@ -2070,11 +2095,14 @@ import { prepareLazyVideos } from "./hls.js";
       addListeners();
     }
 
-    button.addEventListener("mousedown", onStart);
-    button.addEventListener("touchstart", onStart, { passive: true });
+    flaggedButton.addEventListener("mousedown", onStart);
+    flaggedButton.addEventListener("touchstart", onStart, { passive: true });
   }
 
-  function previewVideoFor(videoId, fallbackVideo) {
+  function previewVideoFor(
+    videoId: string | null | undefined,
+    fallbackVideo?: Partial<SlimVideo> | null,
+  ): Partial<SlimVideo> | null {
     if (
       fallbackVideo &&
       (fallbackVideo.media_url || fallbackVideo.thumbnail_url)
@@ -2088,7 +2116,12 @@ import { prepareLazyVideos } from "./hls.js";
     return activeVideos[0] || null;
   }
 
-  function openFeedOverlay(store, videoId, fallbackVideo, productUrlOverride) {
+  function openFeedOverlay(
+    store: StorePayload,
+    videoId?: string | null,
+    fallbackVideo?: Partial<SlimVideo> | null,
+    productUrlOverride?: string,
+  ): void {
     if (nubesdkFrameMode) {
       var framePreviewVideo = previewVideoFor(videoId, fallbackVideo);
       try {
@@ -2145,7 +2178,7 @@ import { prepareLazyVideos } from "./hls.js";
     frame.style.cssText =
       "width:min(100vw,430px);height:100dvh;max-height:100dvh;border:0;background:#000;box-shadow:0 24px 80px rgba(0,0,0,.42);";
 
-    function setFrameSrc(customerStatus) {
+    function setFrameSrc(customerStatus: CustomerStatus) {
       var params =
         "/feed?embed=1" +
         "&autoplay_sound=1" +
@@ -2162,7 +2195,7 @@ import { prepareLazyVideos } from "./hls.js";
       frame.src =
         luppBaseUrl +
         "/s/" +
-        encodeURIComponent(store.slug) +
+        encodeURIComponent(store.slug as string) +
         params +
         (previewVideo && videoMediaUrl(previewVideo)
           ? "&preview_video_url=" + encodeURIComponent(videoMediaUrl(previewVideo))
@@ -2192,7 +2225,7 @@ import { prepareLazyVideos } from "./hls.js";
 
     var feedbackShown = false;
 
-    function trackFeedClose(reason) {
+    function trackFeedClose(reason?: string) {
       if (closeTracked) return;
       closeTracked = true;
       var durationSeconds = Math.max(
@@ -2207,7 +2240,7 @@ import { prepareLazyVideos } from "./hls.js";
       });
     }
 
-    function destroyOverlay(reason) {
+    function destroyOverlay(reason?: string) {
       trackFeedClose(reason);
       overlay.remove();
       document.body.style.overflow = previousOverflow;
@@ -2258,9 +2291,9 @@ import { prepareLazyVideos } from "./hls.js";
         "Poderia ser melhor",
         "Prefiro ver somente fotos",
       ];
-      var optionList = feedback.querySelector("[data-lupp-feedback-options]");
-      var starList = feedback.querySelector("[data-lupp-feedback-stars]");
-      var ratingCount = feedback.querySelector("[data-lupp-rating-count]");
+      var optionList = feedback.querySelector("[data-lupp-feedback-options]")!;
+      var starList = feedback.querySelector("[data-lupp-feedback-stars]")!;
+      var ratingCount = feedback.querySelector("[data-lupp-rating-count]")!;
 
       function renderStars() {
         starList.innerHTML = [1, 2, 3, 4, 5]
@@ -2300,7 +2333,8 @@ import { prepareLazyVideos } from "./hls.js";
       renderOptions();
       feedback.addEventListener("click", function (event) {
         event.stopPropagation();
-        var starButton = event.target.closest("[data-lupp-feedback-star]");
+        var eventTarget = event.target as HTMLElement;
+        var starButton = eventTarget.closest("[data-lupp-feedback-star]");
         if (starButton) {
           selectedRating = Number(
             starButton.getAttribute("data-lupp-feedback-star") || 0,
@@ -2309,7 +2343,7 @@ import { prepareLazyVideos } from "./hls.js";
           return;
         }
 
-        var optionButton = event.target.closest("[data-lupp-feedback-option]");
+        var optionButton = eventTarget.closest("[data-lupp-feedback-option]");
         if (optionButton) {
           selected =
             optionButton.getAttribute("data-lupp-feedback-option") || "";
@@ -2317,9 +2351,13 @@ import { prepareLazyVideos } from "./hls.js";
           return;
         }
 
-        if (event.target.closest("[data-lupp-feedback-submit]")) {
+        if (eventTarget.closest("[data-lupp-feedback-submit]")) {
           var text =
-            feedback.querySelector("[data-lupp-feedback-text]").value || "";
+            (
+              feedback.querySelector(
+                "[data-lupp-feedback-text]",
+              ) as HTMLTextAreaElement
+            ).value || "";
           track(store.id, "widget_view", videoId || null, null, {
             action: "feedback_submit",
             feedback_option: selected,
@@ -2330,7 +2368,7 @@ import { prepareLazyVideos } from "./hls.js";
           return;
         }
 
-        if (event.target.closest("[data-lupp-feedback-skip]")) {
+        if (eventTarget.closest("[data-lupp-feedback-skip]")) {
           track(store.id, "widget_view", videoId || null, null, {
             action: "feedback_skip",
           });
@@ -2359,7 +2397,11 @@ import { prepareLazyVideos } from "./hls.js";
     });
   }
 
-  function trackLauncherImpression(root, store, video) {
+  function trackLauncherImpression(
+    root: HTMLElement,
+    store: StorePayload,
+    video: Partial<SlimVideo> | undefined,
+  ): void {
     if (!store || !store.id) return;
     var key = [store.id, currentProductUrl(), widgetType].join("|");
     if (trackedLauncherImpressions[key]) return;
@@ -2390,7 +2432,11 @@ import { prepareLazyVideos } from "./hls.js";
     }, 250);
   }
 
-  function renderLauncher(root, store, videos) {
+  function renderLauncher(
+    root: HTMLElement,
+    store: StorePayload,
+    videos: SlimVideo[],
+  ): void {
     var video = videos[0] || {};
     var size = Math.max(56, launcherConfig.bubbleSize);
     var model = launcherConfig.model || "circular";
@@ -2470,7 +2516,9 @@ import { prepareLazyVideos } from "./hls.js";
 
     trackLauncherImpression(root, store, video);
 
-    var launcherButton = root.querySelector("[data-lupp-launcher]");
+    var launcherButton = root.querySelector(
+      "[data-lupp-launcher]",
+    ) as HTMLElement;
     var storedPosition = readLauncherDragPosition(store);
     if (storedPosition) {
       applyLauncherDragPosition(
@@ -2489,7 +2537,11 @@ import { prepareLazyVideos } from "./hls.js";
     });
   }
 
-  function renderStoriesBar(root, store, videos) {
+  function renderStoriesBar(
+    root: HTMLElement,
+    store: StorePayload,
+    videos: SlimVideo[],
+  ): void {
     var accent = launcherConfig.accentColor || store.button_color || "#006BFF";
     root.innerHTML =
       '<div style="font-family:' +
@@ -2518,13 +2570,17 @@ import { prepareLazyVideos } from "./hls.js";
     primeInlineVideos(root);
 
     root.addEventListener("click", function (event) {
-      var button = event.target.closest("[data-video]");
+      var button = (event.target as HTMLElement).closest("[data-video]");
       if (!button) return;
       openFeedOverlay(store, button.getAttribute("data-video"));
     });
   }
 
-  function renderCarousel(root, store, videos) {
+  function renderCarousel(
+    root: HTMLElement,
+    store: StorePayload,
+    videos: SlimVideo[],
+  ): void {
     var accent = launcherConfig.accentColor || store.button_color || "#006BFF";
     var isMobileViewport =
       typeof window.matchMedia === "function" &&
@@ -2542,7 +2598,7 @@ import { prepareLazyVideos } from "./hls.js";
         "</p>"
       : "";
 
-    function productCardHtml(video) {
+    function productCardHtml(video: SlimVideo): string {
       // Slim server product: name/image fallback chains and pt-BR price
       // formatting are already resolved server-side.
       var product = video.product || null;
@@ -2654,7 +2710,7 @@ import { prepareLazyVideos } from "./hls.js";
     primeInlineVideos(root);
 
     root.onclick = function (event) {
-      var target = event.target;
+      var target = event.target as HTMLElement | null;
       if (target && target.nodeType === 3) target = target.parentElement;
       var button = target && target.closest ? target.closest("[data-video]") : null;
       if (!button) return;
@@ -2704,11 +2760,13 @@ import { prepareLazyVideos } from "./hls.js";
           if (statusKeyAfterRefresh === statusKeyBeforeRefresh) return;
           if (root && root.parentNode) renderCarousel(root, store, videos);
         })
-        .catch(function () {});
+        .catch(function (error: unknown) {
+          debugLog("carousel: upzero status refresh failed", error);
+        });
     }
   }
 
-  function render(root, store, videos) {
+  function render(root: HTMLElement, store: StorePayload, videos: SlimVideo[]): void {
     if (
       !videos.length &&
       (widgetType === "floating_launcher" || widgetType === "floating_video")
@@ -2743,7 +2801,7 @@ import { prepareLazyVideos } from "./hls.js";
   watchUrlChanges(root);
   watchUpzeroCustomerState(root);
 
-  function startWidget() {
+  function startWidget(): void {
     if (shouldUseBootstrap()) {
       // Single round trip: context mode returns the store, the fully
       // evaluated display/config block and the page's filtered, ordered
@@ -2775,7 +2833,7 @@ import { prepareLazyVideos } from "./hls.js";
             }
           }
           applyContextConfig(payload.config);
-          contextDisplay = asRecord(payload.display);
+          contextDisplay = payload.display || {};
           var display = contextDisplay;
           if (display.show === false) {
             debugLog("abort: server display rules", {

@@ -1,32 +1,29 @@
 "use strict";
 (() => {
-  // widget-src/utils.js
-  function debugLog() {
+  // widget-src/utils.ts
+  function debugLog(...args) {
     try {
       if (!window.__LUUP_DEBUG__) return;
-      var args = ["[Luup:debug]"];
-      for (var argIndex = 0; argIndex < arguments.length; argIndex += 1) {
-        args.push(arguments[argIndex]);
-      }
-      console.log.apply(console, args);
+      console.log("[Luup:debug]", ...args);
     } catch (_) {
     }
   }
   function emitWidgetLifecycleEvent(name, detail) {
     try {
-      var event;
+      let event;
       if (typeof window.CustomEvent === "function") {
         event = new CustomEvent(name, { detail: detail || {} });
       } else {
-        event = document.createEvent("CustomEvent");
-        event.initCustomEvent(name, false, false, detail || {});
+        const legacyEvent = document.createEvent("CustomEvent");
+        legacyEvent.initCustomEvent(name, false, false, detail || {});
+        event = legacyEvent;
       }
       document.dispatchEvent(event);
     } catch (_) {
     }
   }
   function emitWidgetAborted(reason, detail) {
-    var payload = detail || {};
+    const payload = detail || {};
     payload.reason = reason;
     emitWidgetLifecycleEvent("luup:widget-aborted", payload);
   }
@@ -34,7 +31,7 @@
     emitWidgetLifecycleEvent("luup:widget-rendered", detail || {});
   }
   function createAnchor(url) {
-    var anchor = document.createElement("a");
+    const anchor = document.createElement("a");
     anchor.href = url || window.location.href;
     return anchor;
   }
@@ -44,8 +41,8 @@
     } catch (_) {
     }
     try {
-      var anchor = createAnchor(base || window.location.href);
-      var resolver = document.createElement("a");
+      const anchor = createAnchor(base || window.location.href);
+      const resolver = document.createElement("a");
       resolver.href = anchor.href;
       resolver.href = value || "";
       return resolver.href;
@@ -58,12 +55,14 @@
       if (typeof URL !== "undefined") return new URL(value).origin;
     } catch (_) {
     }
-    var anchor = createAnchor(value);
+    const anchor = createAnchor(value);
     return anchor.protocol + "//" + anchor.hostname + (anchor.port ? ":" + anchor.port : "");
   }
   function getUrlHostname(value) {
     try {
-      if (typeof URL !== "undefined") return new URL(value, window.location.href).hostname;
+      if (typeof URL !== "undefined") {
+        return new URL(value, window.location.href).hostname;
+      }
     } catch (_) {
     }
     return createAnchor(resolveUrl(value, window.location.href)).hostname;
@@ -85,13 +84,16 @@
     return createAnchor(resolveUrl(value, base || window.location.href)).pathname || "/";
   }
   function readQueryValue(url, name) {
-    var queryIndex = String(url || "").indexOf("?");
+    const queryIndex = String(url || "").indexOf("?");
     if (queryIndex === -1) return null;
-    var hashIndex = String(url).indexOf("#", queryIndex);
-    var query = String(url).slice(queryIndex + 1, hashIndex === -1 ? void 0 : hashIndex);
-    var parts = query.split("&");
-    for (var index = 0; index < parts.length; index += 1) {
-      var pair = parts[index].split("=");
+    const hashIndex = String(url).indexOf("#", queryIndex);
+    const query = String(url).slice(
+      queryIndex + 1,
+      hashIndex === -1 ? void 0 : hashIndex
+    );
+    const parts = query.split("&");
+    for (let index = 0; index < parts.length; index += 1) {
+      const pair = parts[index].split("=");
       try {
         if (decodeURIComponent(pair[0] || "") === name) {
           return decodeURIComponent((pair[1] || "").replace(/\+/g, " "));
@@ -101,15 +103,16 @@
     }
     return null;
   }
+  var HTML_ESCAPES = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;"
+  };
   function escapeHtml(value) {
     return String(value || "").replace(/[&<>"']/g, function(char) {
-      return {
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#039;"
-      }[char];
+      return HTML_ESCAPES[char];
     });
   }
   function emitCartEvent(eventName, detail) {
@@ -123,7 +126,7 @@
     }
   }
 
-  // widget-src/hls.js
+  // widget-src/hls.ts
   var hlsScriptPromise = null;
   function isHlsUrl(value) {
     return /\.m3u8(?:$|\?)/i.test(String(value || ""));
@@ -135,7 +138,7 @@
     if (window.Hls) return Promise.resolve(window.Hls);
     if (hlsScriptPromise) return hlsScriptPromise;
     hlsScriptPromise = new Promise(function(resolve, reject) {
-      var hlsScript = document.createElement("script");
+      const hlsScript = document.createElement("script");
       hlsScript.async = true;
       hlsScript.src = "https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js";
       hlsScript.onload = function() {
@@ -150,7 +153,7 @@
   }
   function attachVideoSource(video) {
     if (!video || video.getAttribute("data-lupp-video-loaded") === "true") return;
-    var src = video.getAttribute("data-lupp-video-src");
+    const src = video.getAttribute("data-lupp-video-src");
     if (!src) return;
     video.setAttribute("data-lupp-video-loaded", "true");
     if (!isHlsUrl(src) || canPlayNativeHls(video)) {
@@ -161,8 +164,8 @@
     }
     loadHlsScript().then(function(Hls) {
       if (!Hls || !Hls.isSupported()) return;
-      var previewQuality = video.getAttribute("data-lupp-video-quality") === "preview";
-      var hls = new Hls({
+      const previewQuality = video.getAttribute("data-lupp-video-quality") === "preview";
+      const hls = new Hls({
         capLevelToPlayerSize: true,
         enableWorker: true,
         maxBufferLength: previewQuality ? 6 : 30,
@@ -183,11 +186,12 @@
       video.__luppHls = hls;
       if (video.autoplay) video.play().catch(function() {
       });
-    }).catch(function() {
+    }).catch(function(error) {
+      debugLog("hls: attach failed", src, error);
     });
   }
   function prepareLazyVideos(root) {
-    var videos = Array.prototype.slice.call(
+    const videos = Array.prototype.slice.call(
       root.querySelectorAll("video[data-lupp-video-src]")
     );
     if (!videos.length) return;
@@ -195,14 +199,15 @@
       videos.forEach(attachVideoSource);
       return;
     }
-    var observer = new IntersectionObserver(
+    const observer = new IntersectionObserver(
       function(entries) {
         entries.forEach(function(entry) {
+          const video = entry.target;
           if (entry.isIntersecting) {
-            attachVideoSource(entry.target);
-            observer.unobserve(entry.target);
-          } else if (entry.target.pause) {
-            entry.target.pause();
+            attachVideoSource(video);
+            observer.unobserve(video);
+          } else if (video.pause) {
+            video.pause();
           }
         });
       },
@@ -213,11 +218,12 @@
     });
   }
 
-  // widget-src/main.js
+  // widget-src/main.ts
   (function() {
     "use strict";
-    var script = document.currentScript;
-    if (!script) return;
+    var scriptElement = document.currentScript;
+    if (!scriptElement) return;
+    var script = scriptElement;
     var PROD_API_URL = "https://luup.dzns.net";
     var scriptParams = {
       get: function(name) {
@@ -230,90 +236,77 @@
       }
       return;
     }
-    function readScriptValue(attributeName, queryNames, fallback) {
-      var attributeValue = script.getAttribute(attributeName);
+    var SCRIPT_VALUE_SPECS = {
+      storeId: { attr: "data-store-id", query: ["lupp_store_id", "store_id"], def: "" },
+      storeSlug: { attr: "data-store", query: ["lupp_store", "lupp_store_slug", "store_slug"], def: "" },
+      widgetType: { attr: "data-widget", query: ["lupp_widget", "widget"], def: "floating_launcher" },
+      nubesdkFrameMode: { attr: "data-nubesdk-frame", query: ["lupp_nubesdk_frame"], def: "" },
+      productUrl: { attr: "data-product-url", query: ["lupp_product_url", "product_url"], def: "" },
+      productId: { attr: "data-product-id", query: ["lupp_product_id", "product_id", "external_product_id", "lupp_external_product_id"], def: "" },
+      apiUrl: { attr: "data-api-url", query: ["lupp_api_url", "api_url"], def: "" },
+      luppUrl: { attr: "data-lupp-url", query: ["lupp_url", "lupp_base_url"], def: "" },
+      requireActive: { attr: "data-require-active", query: ["lupp_require_active", "require_active"], def: "false" },
+      externalStoreId: { attr: "data-external-store-id", query: ["external_store_id", "lupp_external_store_id", "nuvemshop_store_id", "store"], def: "" },
+      storeDomain: { attr: "data-store-domain", query: ["store_domain", "lupp_store_domain", "domain", "hostname"], def: "" },
+      position: { attr: "data-position", query: ["lupp_position"], def: "bottom-left" },
+      accentColor: { attr: "data-accent-color", query: ["lupp_accent_color"], def: "#fe2c55" },
+      backgroundColor: { attr: "data-background-color", query: ["lupp_background_color"], def: "#0b0b0f" },
+      textColor: { attr: "data-text-color", query: ["lupp_text_color"], def: "#ffffff" },
+      label: { attr: "data-label", query: ["lupp_label"], def: "Compre pelo vídeo" },
+      fontFamily: { attr: "data-font-family", query: ["lupp_font_family"], def: "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" },
+      bubbleSize: { attr: "data-bubble-size", query: ["lupp_bubble_size"], def: "74" },
+      model: { attr: "data-model", query: ["lupp_model"], def: "circular" },
+      offsetX: { attr: "data-offset-x", query: ["lupp_offset_x"], def: "18" },
+      offsetY: { attr: "data-offset-y", query: ["lupp_offset_y"], def: "18" },
+      hideWithoutVideos: { attr: "data-hide-without-videos", query: ["lupp_hide_without_videos"], def: "false" },
+      homeExperienceEnabled: { attr: "data-home-experience-enabled", query: ["lupp_home_experience_enabled"], def: "true" },
+      carouselTitle: { attr: "data-carousel-title", query: ["lupp_carousel_title"], def: "Descubra cada detalhe e Compre" },
+      carouselDescription: { attr: "data-carousel-description", query: ["lupp_carousel_description"], def: "" },
+      homeCarouselEnabled: { attr: "data-home-carousel-enabled", query: ["lupp_home_carousel_enabled"], def: "true" },
+      carouselBeforeHeading: { attr: "data-carousel-before-heading", query: ["lupp_carousel_before_heading"], def: "Com Capa" },
+      carouselAnchorSelector: { attr: "data-carousel-anchor-selector", query: ["lupp_carousel_anchor_selector"], def: "" },
+      carouselAnchorPlacement: { attr: "data-carousel-anchor-placement", query: ["lupp_carousel_anchor_placement"], def: "before" },
+      carouselMaxItems: { attr: "data-carousel-max-items", query: ["lupp_carousel_max_items"], def: "12" },
+      carouselMobileMaxItems: { attr: "data-carousel-mobile-max-items", query: ["lupp_carousel_mobile_max_items"], def: "6" },
+      loadStrategy: { attr: "data-load-strategy", query: ["lupp_load_strategy"], def: "idle" },
+      previewMode: { attr: "data-preview-mode", query: ["lupp_preview_mode"], def: "balanced" }
+    };
+    function readScriptValue(spec) {
+      var attributeValue = script.getAttribute(spec.attr);
       if (attributeValue !== null && attributeValue !== "") return attributeValue;
-      for (var index = 0; index < queryNames.length; index += 1) {
-        var queryValue = scriptParams.get(queryNames[index]);
+      for (var index = 0; index < spec.query.length; index += 1) {
+        var queryValue = scriptParams.get(spec.query[index]);
         if (queryValue !== null && queryValue !== "") return queryValue;
       }
-      return fallback;
+      return spec.def;
     }
-    function hasExplicitScriptValue(attributeName, queryNames) {
-      var attributeValue = script.getAttribute(attributeName);
+    function hasExplicitScriptValue(spec) {
+      var attributeValue = script.getAttribute(spec.attr);
       if (attributeValue !== null && attributeValue !== "") return true;
-      for (var index = 0; index < queryNames.length; index += 1) {
-        var queryValue = scriptParams.get(queryNames[index]);
+      for (var index = 0; index < spec.query.length; index += 1) {
+        var queryValue = scriptParams.get(spec.query[index]);
         if (queryValue !== null && queryValue !== "") return true;
       }
       return false;
     }
-    var storeId = readScriptValue(
-      "data-store-id",
-      ["lupp_store_id", "store_id"],
-      ""
+    var rawScript = {};
+    Object.keys(SCRIPT_VALUE_SPECS).forEach(
+      function(key) {
+        rawScript[key] = readScriptValue(SCRIPT_VALUE_SPECS[key]);
+      }
     );
-    var storeSlug = readScriptValue(
-      "data-store",
-      ["lupp_store", "lupp_store_slug", "store_slug"],
-      ""
-    );
-    var widgetType = readScriptValue(
-      "data-widget",
-      ["lupp_widget", "widget"],
-      "floating_launcher"
-    ).replace(/-/g, "_");
-    var nubesdkFrameMode = readScriptValue(
-      "data-nubesdk-frame",
-      ["lupp_nubesdk_frame"],
-      ""
-    );
-    var configuredProductUrl = readScriptValue(
-      "data-product-url",
-      ["lupp_product_url", "product_url"],
-      ""
-    );
-    var configuredProductId = readScriptValue(
-      "data-product-id",
-      [
-        "lupp_product_id",
-        "product_id",
-        "external_product_id",
-        "lupp_external_product_id"
-      ],
-      ""
-    );
-    var apiUrl = readScriptValue(
-      "data-api-url",
-      ["lupp_api_url", "api_url"],
-      window.LUPP_API_URL || ""
-    );
-    var luppBaseUrl = readScriptValue(
-      "data-lupp-url",
-      ["lupp_url", "lupp_base_url"],
-      getUrlOrigin(script.src || window.location.href)
-    ).replace(/\/$/, "");
-    var requireActiveWidget = readScriptValue(
-      "data-require-active",
-      ["lupp_require_active", "require_active"],
-      "false"
-    ) === "true";
-    var externalStoreId = readScriptValue(
-      "data-external-store-id",
-      [
-        "external_store_id",
-        "lupp_external_store_id",
-        "nuvemshop_store_id",
-        "store"
-      ],
-      ""
-    );
+    var storeId = rawScript.storeId;
+    var storeSlug = rawScript.storeSlug;
+    var widgetType = rawScript.widgetType.replace(/-/g, "_");
+    var nubesdkFrameMode = rawScript.nubesdkFrameMode;
+    var configuredProductUrl = rawScript.productUrl;
+    var configuredProductId = rawScript.productId;
+    var apiUrl = rawScript.apiUrl || window.LUPP_API_URL || "";
+    var luppBaseUrl = (rawScript.luppUrl || getUrlOrigin(script.src || window.location.href)).replace(/\/$/, "");
+    var requireActiveWidget = rawScript.requireActive === "true";
+    var externalStoreId = rawScript.externalStoreId;
     var storeDomain = normalizedHostname(
-      readScriptValue(
-        "data-store-domain",
-        ["store_domain", "lupp_store_domain", "domain", "hostname"],
-        window.location.hostname || ""
-      )
+      rawScript.storeDomain || window.location.hostname || ""
     );
     var upzeroConfig = {};
     function inferNuvemshopStoreId() {
@@ -368,103 +361,33 @@
     }
     apiUrl = apiUrl.replace(/\/$/, "");
     var launcherConfig = {
-      position: readScriptValue(
-        "data-position",
-        ["lupp_position"],
-        "bottom-left"
-      ),
-      accentColor: readScriptValue(
-        "data-accent-color",
-        ["lupp_accent_color"],
-        "#fe2c55"
-      ),
-      backgroundColor: readScriptValue(
-        "data-background-color",
-        ["lupp_background_color"],
-        "#0b0b0f"
-      ),
-      textColor: readScriptValue(
-        "data-text-color",
-        ["lupp_text_color"],
-        "#ffffff"
-      ),
-      label: readScriptValue("data-label", ["lupp_label"], "Compre pelo vídeo"),
-      fontFamily: readScriptValue(
-        "data-font-family",
-        ["lupp_font_family"],
-        "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-      ),
-      bubbleSize: Number(
-        readScriptValue("data-bubble-size", ["lupp_bubble_size"], 74)
-      ),
-      model: readScriptValue("data-model", ["lupp_model"], "circular"),
-      offsetX: Number(readScriptValue("data-offset-x", ["lupp_offset_x"], 18)),
-      offsetY: Number(readScriptValue("data-offset-y", ["lupp_offset_y"], 18))
+      position: rawScript.position,
+      accentColor: rawScript.accentColor,
+      backgroundColor: rawScript.backgroundColor,
+      textColor: rawScript.textColor,
+      label: rawScript.label,
+      fontFamily: rawScript.fontFamily,
+      bubbleSize: Number(rawScript.bubbleSize),
+      model: rawScript.model,
+      offsetX: Number(rawScript.offsetX),
+      offsetY: Number(rawScript.offsetY)
     };
     var displayConfig = {
-      hideWithoutVideos: readScriptValue(
-        "data-hide-without-videos",
-        ["lupp_hide_without_videos"],
-        "false"
-      ) === "true",
-      homeExperienceEnabled: readScriptValue(
-        "data-home-experience-enabled",
-        ["lupp_home_experience_enabled"],
-        "true"
-      ) !== "false"
+      hideWithoutVideos: rawScript.hideWithoutVideos === "true",
+      homeExperienceEnabled: rawScript.homeExperienceEnabled !== "false"
     };
     var carouselConfig = {
-      title: readScriptValue(
-        "data-carousel-title",
-        ["lupp_carousel_title"],
-        "Descubra cada detalhe e Compre"
-      ),
-      description: readScriptValue(
-        "data-carousel-description",
-        ["lupp_carousel_description"],
-        ""
-      ),
-      enabled: readScriptValue(
-        "data-home-carousel-enabled",
-        ["lupp_home_carousel_enabled"],
-        "true"
-      ) !== "false",
-      beforeHeading: readScriptValue(
-        "data-carousel-before-heading",
-        ["lupp_carousel_before_heading"],
-        "Com Capa"
-      ),
-      anchorSelector: readScriptValue(
-        "data-carousel-anchor-selector",
-        ["lupp_carousel_anchor_selector"],
-        ""
-      ),
-      anchorPlacement: readScriptValue(
-        "data-carousel-anchor-placement",
-        ["lupp_carousel_anchor_placement"],
-        "before"
-      ),
-      maxItems: Number(
-        readScriptValue("data-carousel-max-items", ["lupp_carousel_max_items"], 12)
-      ) || 12,
-      mobileMaxItems: Number(
-        readScriptValue(
-          "data-carousel-mobile-max-items",
-          ["lupp_carousel_mobile_max_items"],
-          6
-        )
-      ) || 6
+      title: rawScript.carouselTitle,
+      description: rawScript.carouselDescription,
+      enabled: rawScript.homeCarouselEnabled !== "false",
+      beforeHeading: rawScript.carouselBeforeHeading,
+      anchorSelector: rawScript.carouselAnchorSelector,
+      anchorPlacement: rawScript.carouselAnchorPlacement,
+      maxItems: Number(rawScript.carouselMaxItems) || 12,
+      mobileMaxItems: Number(rawScript.carouselMobileMaxItems) || 6
     };
-    var loadStrategy = readScriptValue(
-      "data-load-strategy",
-      ["lupp_load_strategy"],
-      "idle"
-    );
-    var previewMode = readScriptValue(
-      "data-preview-mode",
-      ["lupp_preview_mode"],
-      "balanced"
-    );
+    var loadStrategy = rawScript.loadStrategy;
+    var previewMode = rawScript.previewMode;
     var canUseBootstrap = widgetType === "floating_launcher" || widgetType === "floating_video" || isCarouselWidget() || Boolean(externalStoreId) || Boolean(storeDomain) || Boolean(storeSlug);
     debugLog("config", {
       canUseBootstrap,
@@ -493,21 +416,18 @@
     var bootstrapBase = apiUrl + "/api/widget/bootstrap";
     var eventsBase = apiUrl + "/api/widget/events";
     var upzeroProxyBase = apiUrl + "/api/widget/upzero-proxy";
-    function ensureVisitorId() {
-      var key = "lupp_visitor_id";
-      var current = localStorage.getItem(key);
+    function ensureStoredId(storage, key) {
+      var current = storage.getItem(key);
       if (current) return current;
       var id = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
-      localStorage.setItem(key, id);
+      storage.setItem(key, id);
       return id;
     }
+    function ensureVisitorId() {
+      return ensureStoredId(localStorage, "lupp_visitor_id");
+    }
     function ensureSessionId() {
-      var key = "lupp_session_id";
-      var current = sessionStorage.getItem(key);
-      if (current) return current;
-      var id = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
-      sessionStorage.setItem(key, id);
-      return id;
+      return ensureStoredId(sessionStorage, "lupp_session_id");
     }
     function hasUsablePageOrigin() {
       try {
@@ -601,7 +521,7 @@
             window.requestIdleCallback(run, { timeout: 3e3 });
             return;
           }
-          window.setTimeout(run, 1);
+          setTimeout(run, 1);
         }, delay);
       }
       if (document.readyState === "complete") {
@@ -671,18 +591,21 @@
       if (!platform) {
         return Promise.reject(new Error("lupp_adapter_platform_missing"));
       }
-      if (adapterLoadPromises[platform]) return adapterLoadPromises[platform];
-      adapterLoadPromises[platform] = new Promise(function(resolve, reject) {
-        if (widgetBridge.adapters[platform]) {
-          resolve(widgetBridge.adapters[platform]);
+      var pending = adapterLoadPromises[platform];
+      if (pending) return pending;
+      var loadPromise = new Promise(function(resolve, reject) {
+        var registered = widgetBridge.adapters[platform];
+        if (registered) {
+          resolve(registered);
           return;
         }
         var adapterScript = document.createElement("script");
         adapterScript.async = true;
         adapterScript.src = adapterScriptBase + "widget-" + platform + ".js";
         adapterScript.onload = function() {
-          if (widgetBridge.adapters[platform]) {
-            resolve(widgetBridge.adapters[platform]);
+          var adapter = widgetBridge.adapters[platform];
+          if (adapter) {
+            resolve(adapter);
           } else {
             reject(new Error("lupp_adapter_register_failed"));
           }
@@ -694,7 +617,8 @@
           adapterScript
         );
       });
-      return adapterLoadPromises[platform];
+      adapterLoadPromises[platform] = loadPromise;
+      return loadPromise;
     }
     function resolveAdapterPlatform(payload) {
       var platform = String(
@@ -719,7 +643,10 @@
         });
       }
       return loadAdapter("upzero").then(function(adapter) {
-        return adapter.detectUpzeroCustomerStatus(store, options);
+        return adapter.detectUpzeroCustomerStatus(
+          store,
+          options
+        );
       }).catch(function() {
         return {
           approved: false,
@@ -1026,9 +953,14 @@
       }
       return referenceSlug || nameSlug;
     }
-    function repairUpzeroProductUrl(product, fallbackUrl, store) {
-      var url = fallbackUrl || product && product.product_url || "";
-      var base = store && (store.url || store.store_url) || upzeroConfig && upzeroConfig.storefront_url || activeStore && activeStore.url || window.location.origin;
+    function repairUpzeroProductUrl(productInput, fallbackUrl, store) {
+      var product = productInput;
+      var url = String(
+        fallbackUrl || product && product.product_url || ""
+      );
+      var base = String(
+        store && (store.url || store.store_url) || upzeroConfig && upzeroConfig.storefront_url || activeStore && activeStore.url || window.location.origin
+      );
       var handle = upzeroProductHandleFromProduct(product, url);
       if (!handle) return url;
       try {
@@ -1062,67 +994,67 @@
       return widgetType;
     }
     function applyContextConfig(config) {
-      var launcher = asRecord(config && config.launcher);
-      var display = asRecord(config && config.display);
-      var carousel = asRecord(config && config.carousel);
-      if (launcher.position && !hasExplicitScriptValue("data-position", ["lupp_position"])) {
+      var launcher = config && config.launcher || {};
+      var display = config && config.display || {};
+      var carousel = config && config.carousel || {};
+      if (launcher.position && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.position)) {
         launcherConfig.position = launcher.position;
       }
-      if (launcher.accent_color && !hasExplicitScriptValue("data-accent-color", ["lupp_accent_color"])) {
+      if (launcher.accent_color && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.accentColor)) {
         launcherConfig.accentColor = launcher.accent_color;
       }
-      if (launcher.background_color && !hasExplicitScriptValue("data-background-color", ["lupp_background_color"])) {
+      if (launcher.background_color && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.backgroundColor)) {
         launcherConfig.backgroundColor = launcher.background_color;
       }
-      if (launcher.text_color && !hasExplicitScriptValue("data-text-color", ["lupp_text_color"])) {
+      if (launcher.text_color && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.textColor)) {
         launcherConfig.textColor = launcher.text_color;
       }
-      if (typeof launcher.label === "string" && !hasExplicitScriptValue("data-label", ["lupp_label"])) {
+      if (typeof launcher.label === "string" && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.label)) {
         launcherConfig.label = launcher.label;
       }
-      if (launcher.font_family && !hasExplicitScriptValue("data-font-family", ["lupp_font_family"])) {
+      if (launcher.font_family && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.fontFamily)) {
         launcherConfig.fontFamily = launcher.font_family;
       }
-      if (launcher.bubble_size && !hasExplicitScriptValue("data-bubble-size", ["lupp_bubble_size"])) {
+      if (launcher.bubble_size && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.bubbleSize)) {
         launcherConfig.bubbleSize = Number(launcher.bubble_size) || launcherConfig.bubbleSize;
       }
-      if (launcher.model && !hasExplicitScriptValue("data-model", ["lupp_model"])) {
+      if (launcher.model && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.model)) {
         launcherConfig.model = launcher.model;
       }
-      if (launcher.offset_x && !hasExplicitScriptValue("data-offset-x", ["lupp_offset_x"])) {
+      if (launcher.offset_x && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.offsetX)) {
         launcherConfig.offsetX = Number(launcher.offset_x) || launcherConfig.offsetX;
       }
-      if (launcher.offset_y && !hasExplicitScriptValue("data-offset-y", ["lupp_offset_y"])) {
+      if (launcher.offset_y && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.offsetY)) {
         launcherConfig.offsetY = Number(launcher.offset_y) || launcherConfig.offsetY;
       }
-      if ("hide_without_videos" in display && !hasExplicitScriptValue("data-hide-without-videos", ["lupp_hide_without_videos"])) {
+      if ("hide_without_videos" in display && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.hideWithoutVideos)) {
         displayConfig.hideWithoutVideos = display.hide_without_videos === true;
       }
-      if ("home_experience_enabled" in display && !hasExplicitScriptValue("data-home-experience-enabled", ["lupp_home_experience_enabled"])) {
+      if ("home_experience_enabled" in display && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.homeExperienceEnabled)) {
         displayConfig.homeExperienceEnabled = display.home_experience_enabled !== false;
       }
-      if ("enabled" in carousel && !hasExplicitScriptValue("data-home-carousel-enabled", ["lupp_home_carousel_enabled"])) {
+      if ("enabled" in carousel && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.homeCarouselEnabled)) {
         carouselConfig.enabled = carousel.enabled !== false;
       }
-      if (typeof carousel.title === "string" && !hasExplicitScriptValue("data-carousel-title", ["lupp_carousel_title"])) {
+      if (typeof carousel.title === "string" && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.carouselTitle)) {
         carouselConfig.title = carousel.title || carouselConfig.title;
       }
-      if (typeof carousel.description === "string" && !hasExplicitScriptValue("data-carousel-description", ["lupp_carousel_description"])) {
+      if (typeof carousel.description === "string" && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.carouselDescription)) {
         carouselConfig.description = carousel.description;
       }
-      if (typeof carousel.before_heading === "string" && !hasExplicitScriptValue("data-carousel-before-heading", ["lupp_carousel_before_heading"])) {
+      if (typeof carousel.before_heading === "string" && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.carouselBeforeHeading)) {
         carouselConfig.beforeHeading = carousel.before_heading || carouselConfig.beforeHeading;
       }
-      if (carousel.anchor_selector && !hasExplicitScriptValue("data-carousel-anchor-selector", ["lupp_carousel_anchor_selector"])) {
+      if (carousel.anchor_selector && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.carouselAnchorSelector)) {
         carouselConfig.anchorSelector = carousel.anchor_selector;
       }
-      if (carousel.anchor_placement && !hasExplicitScriptValue("data-carousel-anchor-placement", ["lupp_carousel_anchor_placement"])) {
+      if (carousel.anchor_placement && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.carouselAnchorPlacement)) {
         carouselConfig.anchorPlacement = carousel.anchor_placement;
       }
-      if ("max_items" in carousel && !hasExplicitScriptValue("data-carousel-max-items", ["lupp_carousel_max_items"])) {
+      if ("max_items" in carousel && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.carouselMaxItems)) {
         carouselConfig.maxItems = Number(carousel.max_items) || carouselConfig.maxItems;
       }
-      if ("mobile_max_items" in carousel && !hasExplicitScriptValue("data-carousel-mobile-max-items", ["lupp_carousel_mobile_max_items"])) {
+      if ("mobile_max_items" in carousel && !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.carouselMobileMaxItems)) {
         carouselConfig.mobileMaxItems = Number(carousel.mobile_max_items) || carouselConfig.mobileMaxItems;
       }
     }
@@ -1583,7 +1515,7 @@
         applyContextConfig(payload.config);
         activeVideos = payload.videos || [];
         hasLoadedVideoList = true;
-        contextDisplay = asRecord(payload.display);
+        contextDisplay = payload.display || {};
         var display = contextDisplay;
         if (display.show === false) {
           debugLog("render skipped: server display rules", {
@@ -1610,7 +1542,10 @@
         var original = history[method];
         if (typeof original !== "function") return;
         history[method] = function() {
-          var result = original.apply(this, arguments);
+          var result = original.apply(
+            this,
+            arguments
+          );
           scheduleRender();
           return result;
         };
@@ -1725,12 +1660,14 @@
       root2.style.bottom = "auto";
     }
     function installLauncherDrag(root2, button, store) {
-      if (!root2 || !button || button.__luppDragInstalled) return;
-      button.__luppDragInstalled = true;
+      var flaggedButton = button;
+      if (!root2 || !flaggedButton || flaggedButton.__luppDragInstalled) return;
+      flaggedButton.__luppDragInstalled = true;
       var state = null;
       var previousUserSelect = "";
       function pointFromEvent(event) {
-        var source = event.touches && event.touches.length ? event.touches[0] : event.changedTouches && event.changedTouches.length ? event.changedTouches[0] : event;
+        var touchEvent = event;
+        var source = touchEvent.touches && touchEvent.touches.length ? touchEvent.touches[0] : touchEvent.changedTouches && touchEvent.changedTouches.length ? touchEvent.changedTouches[0] : event;
         return {
           x: Number(source.clientX || 0),
           y: Number(source.clientY || 0)
@@ -1788,7 +1725,9 @@
         document.removeEventListener("touchcancel", onEnd);
       }
       function onStart(event) {
-        if (event.type === "mousedown" && event.button !== 0) return;
+        if (event.type === "mousedown" && event.button !== 0) {
+          return;
+        }
         var point = pointFromEvent(event);
         var rect = root2.getBoundingClientRect();
         previousUserSelect = document.body.style.userSelect;
@@ -1802,8 +1741,8 @@
         };
         addListeners();
       }
-      button.addEventListener("mousedown", onStart);
-      button.addEventListener("touchstart", onStart, { passive: true });
+      flaggedButton.addEventListener("mousedown", onStart);
+      flaggedButton.addEventListener("touchstart", onStart, { passive: true });
     }
     function previewVideoFor(videoId, fallbackVideo) {
       if (fallbackVideo && (fallbackVideo.media_url || fallbackVideo.thumbnail_url))
@@ -1938,7 +1877,8 @@
         renderOptions();
         feedback.addEventListener("click", function(event) {
           event.stopPropagation();
-          var starButton = event.target.closest("[data-lupp-feedback-star]");
+          var eventTarget = event.target;
+          var starButton = eventTarget.closest("[data-lupp-feedback-star]");
           if (starButton) {
             selectedRating = Number(
               starButton.getAttribute("data-lupp-feedback-star") || 0
@@ -1946,14 +1886,16 @@
             renderStars();
             return;
           }
-          var optionButton = event.target.closest("[data-lupp-feedback-option]");
+          var optionButton = eventTarget.closest("[data-lupp-feedback-option]");
           if (optionButton) {
             selected = optionButton.getAttribute("data-lupp-feedback-option") || "";
             renderOptions();
             return;
           }
-          if (event.target.closest("[data-lupp-feedback-submit]")) {
-            var text = feedback.querySelector("[data-lupp-feedback-text]").value || "";
+          if (eventTarget.closest("[data-lupp-feedback-submit]")) {
+            var text = feedback.querySelector(
+              "[data-lupp-feedback-text]"
+            ).value || "";
             track(store.id, "widget_view", videoId || null, null, {
               action: "feedback_submit",
               feedback_option: selected,
@@ -1963,7 +1905,7 @@
             destroyOverlay("feedback_submit");
             return;
           }
-          if (event.target.closest("[data-lupp-feedback-skip]")) {
+          if (eventTarget.closest("[data-lupp-feedback-skip]")) {
             track(store.id, "widget_view", videoId || null, null, {
               action: "feedback_skip"
             });
@@ -2032,7 +1974,9 @@
         primeInlineVideos(root2);
       }
       trackLauncherImpression(root2, store, video);
-      var launcherButton = root2.querySelector("[data-lupp-launcher]");
+      var launcherButton = root2.querySelector(
+        "[data-lupp-launcher]"
+      );
       var storedPosition = readLauncherDragPosition(store);
       if (storedPosition) {
         applyLauncherDragPosition(
@@ -2113,7 +2057,8 @@
           var statusKeyAfterRefresh = sharedState.upzeroCustomerStatusCache ? String(sharedState.upzeroCustomerStatusCache.status) + ":" + String(sharedState.upzeroCustomerStatusCache.approved) : "";
           if (statusKeyAfterRefresh === statusKeyBeforeRefresh) return;
           if (root2 && root2.parentNode) renderCarousel(root2, store, videos);
-        }).catch(function() {
+        }).catch(function(error) {
+          debugLog("carousel: upzero status refresh failed", error);
         });
       }
     }
@@ -2170,7 +2115,7 @@
             }
           }
           applyContextConfig(payload.config);
-          contextDisplay = asRecord(payload.display);
+          contextDisplay = payload.display || {};
           var display = contextDisplay;
           if (display.show === false) {
             debugLog("abort: server display rules", {

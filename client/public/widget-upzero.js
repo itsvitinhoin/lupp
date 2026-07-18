@@ -1,10 +1,13 @@
 "use strict";
 (() => {
-  // widget-src/platforms/upzero.js
+  // widget-src/platforms/upzero.ts
   (function() {
     "use strict";
-    var bridge = window.__LUPP_WIDGET_BRIDGE__;
-    if (!bridge || !bridge.adapters || bridge.adapters.upzero) return;
+    var bridgeInstance = window.__LUPP_WIDGET_BRIDGE__;
+    if (!bridgeInstance || !bridgeInstance.adapters || bridgeInstance.adapters.upzero) {
+      return;
+    }
+    var bridge = bridgeInstance;
     var state = bridge.state;
     var externalStoreId = bridge.config.externalStoreId;
     var upzeroProxyBase = bridge.config.upzeroProxyBase;
@@ -33,7 +36,9 @@
         ];
         for (var index = 0; index < candidates.length; index += 1) {
           var candidate = candidates[index];
-          if (candidate && typeof candidate === "object") return candidate;
+          if (candidate && typeof candidate === "object") {
+            return candidate;
+          }
         }
       } catch (_) {
       }
@@ -59,6 +64,7 @@
     }
     function tokenFromObject(value) {
       if (!value || typeof value !== "object") return "";
+      var record = value;
       var keys = [
         "clientAuthToken",
         "client_auth_token",
@@ -69,13 +75,13 @@
         "jwt"
       ];
       for (var index = 0; index < keys.length; index += 1) {
-        var token = cleanBearerToken(value[keys[index]]);
+        var token = cleanBearerToken(record[keys[index]]);
         if (token && isLikelyJwt(token)) return token;
       }
-      for (var nestedKey in value) {
-        if (!Object.prototype.hasOwnProperty.call(value, nestedKey)) continue;
-        if (typeof value[nestedKey] === "object") {
-          var nestedToken = tokenFromObject(value[nestedKey]);
+      for (var nestedKey in record) {
+        if (!Object.prototype.hasOwnProperty.call(record, nestedKey)) continue;
+        if (typeof record[nestedKey] === "object") {
+          var nestedToken = tokenFromObject(record[nestedKey]);
           if (nestedToken) return nestedToken;
         }
       }
@@ -177,8 +183,9 @@
     function statusFromToken(token) {
       var payload = decodeJwtPayload(token);
       if (!payload || typeof payload !== "object") return "";
+      var record = payload;
       return normalizeCustomerStatus(
-        payload.status || payload.client_status || payload.customer_status || payload.account_status || ""
+        record.status || record.client_status || record.customer_status || record.account_status || ""
       );
     }
     function pageTextWithoutLuppWidgets() {
@@ -225,7 +232,9 @@
       return null;
     }
     function isLoggedOutUpzeroStatus(status) {
-      return status && (status.loggedIn === false || normalizeCustomerStatus(status.status) === "UNAUTHENTICATED");
+      return Boolean(
+        status && (status.loggedIn === false || normalizeCustomerStatus(status.status) === "UNAUTHENTICATED")
+      );
     }
     function upzeroProxyHeaders() {
       var headers = {
@@ -372,9 +381,10 @@
           return null;
         }
         if (typeof value === "object") {
-          for (var key in value) {
-            if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
-            var objectResult = findResult(value[key], depth + 1);
+          var record = value;
+          for (var key in record) {
+            if (!Object.prototype.hasOwnProperty.call(record, key)) continue;
+            var objectResult = findResult(record[key], depth + 1);
             if (objectResult) return objectResult;
           }
         }
@@ -397,7 +407,9 @@
       return null;
     }
     function isRecoverableUpzeroCartError(error) {
-      var message = String(error && error.message || error || "");
+      var message = String(
+        error && error.message || error || ""
+      );
       return /server action not found|failed to find server action|upzero_cart_action_not_found|upzero_product_page_unavailable|upzero_cart_request_failed|failed to fetch|networkerror|load failed|cors/i.test(
         message
       );
@@ -463,6 +475,7 @@
     }
     function findUpzeroStoreIdInObject(value, depth) {
       if (!value || typeof value !== "object" || depth > 8) return null;
+      var record = value;
       var directKeys = [
         "storefrontStoreId",
         "storefront_store_id",
@@ -472,19 +485,20 @@
         "upzero_store_id"
       ];
       for (var index = 0; index < directKeys.length; index += 1) {
-        var directValue = Number(value[directKeys[index]]);
+        var directValue = Number(record[directKeys[index]]);
         if (Number.isFinite(directValue) && directValue > 0) {
           return Math.trunc(directValue);
         }
       }
-      var nestedStore = value.store || value.storefront || value.storefrontStore;
+      var nestedStore = record.store || record.storefront || record.storefrontStore;
       if (nestedStore && typeof nestedStore === "object") {
-        var nestedId = Number(nestedStore.id || nestedStore.storeId);
+        var nestedRecord = nestedStore;
+        var nestedId = Number(nestedRecord.id || nestedRecord.storeId);
         if (Number.isFinite(nestedId) && nestedId > 0) return Math.trunc(nestedId);
       }
-      for (var key in value) {
-        if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
-        var child = value[key];
+      for (var key in record) {
+        if (!Object.prototype.hasOwnProperty.call(record, key)) continue;
+        var child = record[key];
         if (!child || typeof child !== "object") continue;
         var found = findUpzeroStoreIdInObject(child, depth + 1);
         if (found) return found;
@@ -513,7 +527,7 @@
         state.activeStore && state.activeStore.external_store_id,
         state.activeStore && state.activeStore.storefront_store_id,
         state.activeStore && state.activeStore.upzero_store_id,
-        state.activeStore && state.activeStore.settings && state.activeStore.settings.store_id,
+        state.activeStore && state.activeStore.settings ? state.activeStore.settings.store_id : null,
         readUpzeroStorefrontStoreIdFromWindow(),
         window.UPZERO_STORE_ID,
         window.__UPZERO_STORE_ID__,
@@ -770,7 +784,7 @@
           var payload = parseUpzeroServerActionResult(text);
           if (!payload || !payload.ok) {
             throw new Error(
-              payload && payload.error || "upzero_cart_request_failed"
+              String(payload && payload.error || "upzero_cart_request_failed")
             );
           }
           var cartSessionId = payload.cart && payload.cart.session_id ? String(payload.cart.session_id) : "";

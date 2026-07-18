@@ -4,11 +4,33 @@
 // needs Upzero customer-status detection). Shares config/state/helpers with
 // the core through window.__LUPP_WIDGET_BRIDGE__ and answers the feed
 // iframe's LUPP_UPZERO_ADD_TO_CART_REQUEST messages.
+import type {
+  CustomerStatus,
+  StorePayload,
+  UpzeroCartItem,
+  WidgetBridge,
+} from "../types";
+
+// Loose view of the Next.js server-action cart result.
+type UpzeroActionResult = {
+  ok?: unknown;
+  error?: unknown;
+  cart?: Record<string, unknown> | null;
+  [key: string]: unknown;
+};
+
 (function () {
   "use strict";
 
-  var bridge = window.__LUPP_WIDGET_BRIDGE__;
-  if (!bridge || !bridge.adapters || bridge.adapters.upzero) return;
+  var bridgeInstance = window.__LUPP_WIDGET_BRIDGE__;
+  if (
+    !bridgeInstance ||
+    !bridgeInstance.adapters ||
+    bridgeInstance.adapters.upzero
+  ) {
+    return;
+  }
+  var bridge: WidgetBridge = bridgeInstance;
 
   var state = bridge.state;
   var externalStoreId = bridge.config.externalStoreId;
@@ -22,18 +44,18 @@
   var postFrameResponse = bridge.postFrameResponse;
   var updateUpzeroCartCounters = bridge.updateUpzeroCartCounters;
 
-  function normalizeCustomerStatus(value) {
+  function normalizeCustomerStatus(value: unknown): string {
     return String(value || "")
       .trim()
       .toUpperCase();
   }
 
-  function isApprovedCustomerStatus(status) {
+  function isApprovedCustomerStatus(status: unknown): boolean {
     var normalized = normalizeCustomerStatus(status);
     return normalized === "APPROVED" || normalized === "ACTIVE";
   }
 
-  function readKnownUpzeroCustomer() {
+  function readKnownUpzeroCustomer(): Record<string, unknown> | null {
     try {
       var candidates = [
         window.UPZERO_CLIENT,
@@ -43,35 +65,38 @@
       ];
       for (var index = 0; index < candidates.length; index += 1) {
         var candidate = candidates[index];
-        if (candidate && typeof candidate === "object") return candidate;
+        if (candidate && typeof candidate === "object") {
+          return candidate as Record<string, unknown>;
+        }
       }
     } catch (_) {}
     return null;
   }
 
-  function parseJsonSafe(value) {
+  function parseJsonSafe(value: unknown): unknown {
     try {
-      return JSON.parse(value);
+      return JSON.parse(value as string);
     } catch (_) {
       return null;
     }
   }
 
-  function isLikelyJwt(value) {
+  function isLikelyJwt(value: unknown): boolean {
     return /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(
       String(value || "").trim(),
     );
   }
 
-  function cleanBearerToken(value) {
+  function cleanBearerToken(value: unknown): string {
     var token = String(value || "").trim();
     if (!token) return "";
     token = token.replace(/^Bearer\s+/i, "").trim();
     return token;
   }
 
-  function tokenFromObject(value) {
+  function tokenFromObject(value: unknown): string {
     if (!value || typeof value !== "object") return "";
+    var record = value as Record<string, unknown>;
     var keys = [
       "clientAuthToken",
       "client_auth_token",
@@ -82,20 +107,20 @@
       "jwt",
     ];
     for (var index = 0; index < keys.length; index += 1) {
-      var token = cleanBearerToken(value[keys[index]]);
+      var token = cleanBearerToken(record[keys[index]]);
       if (token && isLikelyJwt(token)) return token;
     }
-    for (var nestedKey in value) {
-      if (!Object.prototype.hasOwnProperty.call(value, nestedKey)) continue;
-      if (typeof value[nestedKey] === "object") {
-        var nestedToken = tokenFromObject(value[nestedKey]);
+    for (var nestedKey in record) {
+      if (!Object.prototype.hasOwnProperty.call(record, nestedKey)) continue;
+      if (typeof record[nestedKey] === "object") {
+        var nestedToken = tokenFromObject(record[nestedKey]);
         if (nestedToken) return nestedToken;
       }
     }
     return "";
   }
 
-  function readStorageToken(storage) {
+  function readStorageToken(storage: Storage | null | undefined): string {
     if (!storage) return "";
     var preferredKeys = [
       "clientAuthToken",
@@ -186,7 +211,7 @@
     return readCookieToken();
   }
 
-  function decodeBase64Url(value) {
+  function decodeBase64Url(value: string): string {
     try {
       var normalized = String(value || "")
         .replace(/-/g, "+")
@@ -204,7 +229,7 @@
     }
   }
 
-  function decodeJwtPayload(token) {
+  function decodeJwtPayload(token: string): unknown {
     try {
       var payload = String(token || "").split(".")[1];
       if (!payload) return null;
@@ -214,14 +239,15 @@
     }
   }
 
-  function statusFromToken(token) {
+  function statusFromToken(token: string): string {
     var payload = decodeJwtPayload(token);
     if (!payload || typeof payload !== "object") return "";
+    var record = payload as Record<string, unknown>;
     return normalizeCustomerStatus(
-      payload.status ||
-        payload.client_status ||
-        payload.customer_status ||
-        payload.account_status ||
+      record.status ||
+        record.client_status ||
+        record.customer_status ||
+        record.account_status ||
         "",
     );
   }
@@ -232,19 +258,19 @@
     if (!body.querySelector("[data-lupp-widget-root],[data-lupp-feed-overlay]")) {
       return String(body.innerText || "");
     }
-    var clone = body.cloneNode(true);
+    var clone = body.cloneNode(true) as HTMLElement;
     var ownNodes = clone.querySelectorAll(
       "[data-lupp-widget-root],[data-lupp-feed-overlay],script,style",
     );
     for (var index = 0; index < ownNodes.length; index += 1) {
       if (ownNodes[index].parentNode) {
-        ownNodes[index].parentNode.removeChild(ownNodes[index]);
+        ownNodes[index].parentNode!.removeChild(ownNodes[index]);
       }
     }
     return String(clone.textContent || "");
   }
 
-  function inferUpzeroCustomerStatusFromPage() {
+  function inferUpzeroCustomerStatusFromPage(): CustomerStatus | null {
     try {
       // Widget-rendered copy ("Entre ou cadastre-se para visualizar valores")
       // must not feed this inference, or render -> infer -> re-render loops.
@@ -290,16 +316,16 @@
   }
 
 
-  function isLoggedOutUpzeroStatus(status) {
-    return (
+  function isLoggedOutUpzeroStatus(status: CustomerStatus | null): boolean {
+    return Boolean(
       status &&
-      (status.loggedIn === false ||
-        normalizeCustomerStatus(status.status) === "UNAUTHENTICATED")
+        (status.loggedIn === false ||
+          normalizeCustomerStatus(status.status) === "UNAUTHENTICATED"),
     );
   }
 
-  function upzeroProxyHeaders() {
-    var headers = {
+  function upzeroProxyHeaders(): Record<string, string> {
+    var headers: Record<string, string> = {
       Accept: "application/json",
       "Content-Type": "application/json",
     };
@@ -308,7 +334,11 @@
     return headers;
   }
 
-  function upzeroProxyRequest(action, body, signal) {
+  function upzeroProxyRequest(
+    action: string,
+    body: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<Response> {
     if (!state.activeStore || !state.activeStore.id) {
       return Promise.reject(new Error("upzero_store_not_ready"));
     }
@@ -326,7 +356,10 @@
     });
   }
 
-  function detectUpzeroCustomerStatus(store, options) {
+  function detectUpzeroCustomerStatus(
+    store: StorePayload | null,
+    options?: { forceRefresh?: boolean },
+  ): Promise<CustomerStatus> {
     var forceRefresh = Boolean(options && options.forceRefresh);
     if (!isUpzeroStore(store)) {
       return Promise.resolve({
@@ -341,7 +374,9 @@
     if (isLoggedOutUpzeroStatus(inferredCustomer)) {
       state.upzeroCustomerStatusCache = inferredCustomer;
       state.upzeroCustomerStatusLastRefreshAt = Date.now();
-      return Promise.resolve(state.upzeroCustomerStatusCache);
+      // isLoggedOutUpzeroStatus is only true for a non-null status, so the
+      // cache is a CustomerStatus here (tsc cannot see through the helper).
+      return Promise.resolve(state.upzeroCustomerStatusCache as CustomerStatus);
     }
 
     if (state.upzeroCustomerStatusCache && !forceRefresh) {
@@ -375,7 +410,9 @@
       return Promise.resolve(state.upzeroCustomerStatusCache);
     }
 
-    function fetchUpzeroCustomerStatus(authToken) {
+    function fetchUpzeroCustomerStatus(
+      authToken: string,
+    ): Promise<CustomerStatus> {
       var controller =
         typeof AbortController !== "undefined" ? new AbortController() : null;
       var timeout = window.setTimeout(function () {
@@ -457,14 +494,16 @@
       });
   }
 
-  function parseUpzeroServerActionResult(text) {
-    function findResult(value, depth) {
+  function parseUpzeroServerActionResult(
+    text: string,
+  ): UpzeroActionResult | null {
+    function findResult(value: unknown, depth: number): UpzeroActionResult | null {
       if (!value || depth > 4) return null;
       if (
         typeof value === "object" &&
         ("ok" in value || "cart" in value || "error" in value)
       ) {
-        return value;
+        return value as UpzeroActionResult;
       }
       if (Array.isArray(value)) {
         for (var arrayIndex = 0; arrayIndex < value.length; arrayIndex += 1) {
@@ -474,9 +513,10 @@
         return null;
       }
       if (typeof value === "object") {
-        for (var key in value) {
-          if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
-          var objectResult = findResult(value[key], depth + 1);
+        var record = value as Record<string, unknown>;
+        for (var key in record) {
+          if (!Object.prototype.hasOwnProperty.call(record, key)) continue;
+          var objectResult = findResult(record[key], depth + 1);
           if (objectResult) return objectResult;
         }
       }
@@ -500,14 +540,16 @@
     return null;
   }
 
-  function isRecoverableUpzeroCartError(error) {
-    var message = String((error && error.message) || error || "");
+  function isRecoverableUpzeroCartError(error: unknown): boolean {
+    var message = String(
+      (error && (error as { message?: unknown }).message) || error || "",
+    );
     return /server action not found|failed to find server action|upzero_cart_action_not_found|upzero_product_page_unavailable|upzero_cart_request_failed|failed to fetch|networkerror|load failed|cors/i.test(
       message,
     );
   }
 
-  function normalizeUpzeroActionUrl(url) {
+  function normalizeUpzeroActionUrl(url: string | undefined): string {
     var fallback =
       (state.upzeroConfig && state.upzeroConfig.storefront_url) ||
       (state.activeStore && state.activeStore.url) ||
@@ -543,7 +585,10 @@
   // upzero_config.cart_action_ids, and the upzero-proxy exposes a
   // discover_cart_context action (the server scrapes and caches per store)
   // for when they are missing or stale.
-  function getServerCartContext(productPath, forceRefresh) {
+  function getServerCartContext(
+    productPath: string,
+    forceRefresh: boolean,
+  ): Promise<{ actionIds: string[]; storeId: number | null }> {
     var configuredIds =
       state.upzeroConfig && Array.isArray(state.upzeroConfig.cart_action_ids)
         ? state.upzeroConfig.cart_action_ids.filter(Boolean)
@@ -595,8 +640,12 @@
     });
   }
 
-  function findUpzeroStoreIdInObject(value, depth) {
+  function findUpzeroStoreIdInObject(
+    value: unknown,
+    depth: number,
+  ): number | null {
     if (!value || typeof value !== "object" || depth > 8) return null;
+    var record = value as Record<string, unknown>;
 
     var directKeys = [
       "storefrontStoreId",
@@ -608,21 +657,23 @@
     ];
 
     for (var index = 0; index < directKeys.length; index += 1) {
-      var directValue = Number(value[directKeys[index]]);
+      var directValue = Number(record[directKeys[index]]);
       if (Number.isFinite(directValue) && directValue > 0) {
         return Math.trunc(directValue);
       }
     }
 
-    var nestedStore = value.store || value.storefront || value.storefrontStore;
+    var nestedStore =
+      record.store || record.storefront || record.storefrontStore;
     if (nestedStore && typeof nestedStore === "object") {
-      var nestedId = Number(nestedStore.id || nestedStore.storeId);
+      var nestedRecord = nestedStore as Record<string, unknown>;
+      var nestedId = Number(nestedRecord.id || nestedRecord.storeId);
       if (Number.isFinite(nestedId) && nestedId > 0) return Math.trunc(nestedId);
     }
 
-    for (var key in value) {
-      if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
-      var child = value[key];
+    for (var key in record) {
+      if (!Object.prototype.hasOwnProperty.call(record, key)) continue;
+      var child = record[key];
       if (!child || typeof child !== "object") continue;
       var found = findUpzeroStoreIdInObject(child, depth + 1);
       if (found) return found;
@@ -631,7 +682,7 @@
     return null;
   }
 
-  function readUpzeroStorefrontStoreIdFromWindow() {
+  function readUpzeroStorefrontStoreIdFromWindow(): number | null {
     var globals = [
       window.__NEXT_DATA__,
       window.__UPZERO_DATA__,
@@ -647,7 +698,7 @@
     return null;
   }
 
-  function inferUpzeroStorefrontStoreId() {
+  function inferUpzeroStorefrontStoreId(): number | null {
     var candidates = [
       state.upzeroConfig && state.upzeroConfig.storefront_store_id,
       state.upzeroConfig && state.upzeroConfig.store_id,
@@ -656,7 +707,9 @@
       state.activeStore && state.activeStore.external_store_id,
       state.activeStore && state.activeStore.storefront_store_id,
       state.activeStore && state.activeStore.upzero_store_id,
-      state.activeStore && state.activeStore.settings && state.activeStore.settings.store_id,
+      state.activeStore && state.activeStore.settings
+        ? (state.activeStore.settings as { store_id?: unknown }).store_id
+        : null,
       readUpzeroStorefrontStoreIdFromWindow(),
       window.UPZERO_STORE_ID,
       window.__UPZERO_STORE_ID__,
@@ -686,11 +739,14 @@
     return null;
   }
 
-  function upzeroCartSessionKey(storefrontStoreId) {
+  function upzeroCartSessionKey(storefrontStoreId: number | string): string {
     return "storefront_cart_session_" + storefrontStoreId;
   }
 
-  function getUpzeroCartQuantity(cart, fallbackItems) {
+  function getUpzeroCartQuantity(
+    cart: Record<string, unknown> | null,
+    fallbackItems?: unknown[],
+  ): number {
     var directCandidates = [
       cart && cart.total_quantity,
       cart && cart.totalQuantity,
@@ -715,7 +771,7 @@
       (Array.isArray(fallbackItems) && fallbackItems) ||
       [];
 
-    return items.reduce(function (total, item) {
+    return items.reduce(function (total: number, item) {
       var quantity = Number(
         (item && item.quantity) || (item && item.qty) || (item && item.amount),
       );
@@ -723,7 +779,10 @@
     }, 0);
   }
 
-  function persistUpzeroCartSession(sessionId, storefrontStoreId) {
+  function persistUpzeroCartSession(
+    sessionId: unknown,
+    storefrontStoreId: number | string,
+  ): void {
     var normalizedSessionId = String(sessionId || "").trim();
     if (!normalizedSessionId) return;
 
@@ -753,7 +812,11 @@
     } catch (_) {}
   }
 
-  function notifyUpzeroCartUpdated(cart, storefrontStoreId, fallbackItems) {
+  function notifyUpzeroCartUpdated(
+    cart: Record<string, unknown> | null,
+    storefrontStoreId: number | string,
+    fallbackItems?: unknown[],
+  ): void {
     if (cart && cart.session_id) {
       persistUpzeroCartSession(cart.session_id, storefrontStoreId);
     }
@@ -803,9 +866,13 @@
     state.pendingStorefrontCartDetail = detail;
   }
 
-  function addUpzeroItemsToCartApi(items, storefrontStoreId, sessionId) {
+  function addUpzeroItemsToCartApi(
+    items: UpzeroCartItem[],
+    storefrontStoreId: number | string,
+    sessionId: string | null,
+  ): Promise<Record<string, unknown>> {
     var snakeItems = items.map(function (item) {
-      var payload = {
+      var payload: Record<string, unknown> = {
         product_variant_id: item.productVariantId,
         quantity: item.quantity,
       };
@@ -813,7 +880,7 @@
       return payload;
     });
     var camelItems = items.map(function (item) {
-      var payload = {
+      var payload: Record<string, unknown> = {
         productVariantId: item.productVariantId,
         quantity: item.quantity,
       };
@@ -841,7 +908,9 @@
       },
     ];
 
-    function postPayload(payload) {
+    function postPayload(
+      payload: Record<string, unknown>,
+    ): Promise<Record<string, unknown>> {
       return upzeroProxyRequest("cart_batch", {
         payloads: [payload],
         session_id: sessionId || null,
@@ -875,7 +944,10 @@
       });
     }
 
-    function tryPayload(index, lastError) {
+    function tryPayload(
+      index: number,
+      lastError: Error | null,
+    ): Promise<Record<string, unknown>> {
       if (index >= payloads.length) {
         throw lastError || new Error("upzero_cart_api_failed");
       }
@@ -888,7 +960,10 @@
     return tryPayload(0, null);
   }
 
-  function addUpzeroItemsToCart(items, options) {
+  function addUpzeroItemsToCart(
+    items: unknown,
+    options?: { productUrl?: string },
+  ): Promise<unknown> {
     if (!isUpzeroStore(state.activeStore)) {
       return Promise.reject(new Error("upzero_store_not_detected"));
     }
@@ -908,7 +983,7 @@
           quantity: Math.trunc(quantity),
         };
       })
-      .filter(Boolean);
+      .filter(Boolean) as UpzeroCartItem[];
 
     if (!validItems.length) {
       return Promise.reject(new Error("empty_cart_items"));
@@ -917,11 +992,11 @@
     var actionUrl = normalizeUpzeroActionUrl(options && options.productUrl);
     var actionPath = getUrlPathname(actionUrl, window.location.href);
     var storefrontStoreId = inferUpzeroStorefrontStoreId();
-    var sessionId = null;
-    var knownActionIds = [];
+    var sessionId: string | null = null;
+    var knownActionIds: string[] = [];
     var retriedWithFreshContext = false;
 
-    function appendKnownActionIds(ids) {
+    function appendKnownActionIds(ids: unknown): boolean {
       var appended = false;
       (Array.isArray(ids) ? ids : []).forEach(function (id) {
         var normalized = String(id || "").toLowerCase();
@@ -932,7 +1007,7 @@
       return appended;
     }
 
-    function sendWithAction(actionId) {
+    function sendWithAction(actionId: string): Promise<Response> {
       if (!actionId) return Promise.reject(new Error("upzero_cart_action_not_found"));
       return fetch(actionUrl, {
         body: JSON.stringify([
@@ -953,7 +1028,9 @@
       });
     }
 
-    function parseCartResponse(response) {
+    function parseCartResponse(
+      response: Response,
+    ): Promise<Record<string, unknown>> {
       if (!response.ok) {
         return response
           .text()
@@ -970,7 +1047,7 @@
         var payload = parseUpzeroServerActionResult(text);
         if (!payload || !payload.ok) {
           throw new Error(
-            (payload && payload.error) || "upzero_cart_request_failed",
+            String((payload && payload.error) || "upzero_cart_request_failed"),
           );
         }
         var cartSessionId =
@@ -978,18 +1055,23 @@
             ? String(payload.cart.session_id)
             : "";
         if (cartSessionId) {
-          persistUpzeroCartSession(cartSessionId, storefrontStoreId);
+          // Guarded upstream: cart requests only run once the storefront
+          // store id resolved (see prepareUpzeroCartContext).
+          persistUpzeroCartSession(cartSessionId, storefrontStoreId as number);
         }
         notifyUpzeroCartUpdated(
           payload.cart || null,
-          storefrontStoreId,
+          storefrontStoreId as number,
           validItems,
         );
         return payload;
       });
     }
 
-    function tryKnownActions(index, lastError) {
+    function tryKnownActions(
+      index: number,
+      lastError: Error | null,
+    ): Promise<Record<string, unknown>> {
       if (index >= knownActionIds.length) {
         if (retriedWithFreshContext) {
           throw lastError || new Error("upzero_cart_action_not_found");

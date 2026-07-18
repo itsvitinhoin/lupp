@@ -1,10 +1,13 @@
 "use strict";
 (() => {
-  // widget-src/platforms/shopify.js
+  // widget-src/platforms/shopify.ts
   (function() {
     "use strict";
-    var bridge = window.__LUPP_WIDGET_BRIDGE__;
-    if (!bridge || !bridge.adapters || bridge.adapters.shopify) return;
+    var bridgeInstance = window.__LUPP_WIDGET_BRIDGE__;
+    if (!bridgeInstance || !bridgeInstance.adapters || bridgeInstance.adapters.shopify) {
+      return;
+    }
+    var bridge = bridgeInstance;
     var state = bridge.state;
     var createAnchor = bridge.utils.createAnchor;
     var resolveUrl = bridge.utils.resolveUrl;
@@ -55,7 +58,9 @@
       var candidates = [];
       addShopifyProductJsonCandidate(candidates, productUrl);
       try {
-        var canonical = document.querySelector('link[rel="canonical"]');
+        var canonical = document.querySelector(
+          'link[rel="canonical"]'
+        );
         if (canonical && canonical.href) {
           addShopifyProductJsonCandidate(candidates, canonical.href);
         }
@@ -100,23 +105,23 @@
       return amount;
     }
     function getShopifyOptionName(product, index) {
-      var options = Array.isArray(product && product.options) ? product.options : [];
+      var options = product && Array.isArray(product.options) ? product.options : [];
       var option = options[index];
       if (typeof option === "string") return option;
       if (option && option.name) return String(option.name);
       return "";
     }
     function getShopifyVariantOptionValue(variant, index) {
-      if (Array.isArray(variant && variant.options)) {
+      if (variant && Array.isArray(variant.options)) {
         return variant.options[index] == null ? "" : String(variant.options[index]);
       }
       var key = "option" + String(index + 1);
       return variant && variant[key] == null ? "" : String(variant[key]);
     }
     function normalizeShopifyProductForLupp(product) {
-      var variants = Array.isArray(product && product.variants) ? product.variants : [];
+      var variants = product && Array.isArray(product.variants) ? product.variants : [];
       var options = [];
-      var rawOptions = Array.isArray(product && product.options) ? product.options : [];
+      var rawOptions = product && Array.isArray(product.options) ? product.options : [];
       for (var optionIndex = 0; optionIndex < rawOptions.length; optionIndex += 1) {
         var optionName = getShopifyOptionName(product, optionIndex);
         if (optionName) options.push(optionName);
@@ -170,7 +175,7 @@
     }
     function resolveShopifyDefaultCartItem(productUrl) {
       return fetchShopifyProductJson(productUrl).then(function(product) {
-        var variants = Array.isArray(product && product.variants) ? product.variants : [];
+        var variants = product && Array.isArray(product.variants) ? product.variants : [];
         var variant = variants.find(function(item) {
           return item && item.available !== false;
         }) || variants[0];

@@ -1,10 +1,13 @@
 "use strict";
 (() => {
-  // widget-src/platforms/nuvemshop.js
+  // widget-src/platforms/nuvemshop.ts
   (function() {
     "use strict";
-    var bridge = window.__LUPP_WIDGET_BRIDGE__;
-    if (!bridge || !bridge.adapters || bridge.adapters.nuvemshop) return;
+    var bridgeInstance = window.__LUPP_WIDGET_BRIDGE__;
+    if (!bridgeInstance || !bridgeInstance.adapters || bridgeInstance.adapters.nuvemshop) {
+      return;
+    }
+    var bridge = bridgeInstance;
     var state = bridge.state;
     var emitCartEvent = bridge.utils.emitCartEvent;
     var isNuvemshopStore = bridge.isNuvemshopStore;
