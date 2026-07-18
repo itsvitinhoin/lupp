@@ -1,3 +1,4 @@
+import { asRecord } from "@/lib/utils";
 import { apiGet, apiPost } from "@/lib/api";
 import type {
   DashboardCapabilities,
@@ -24,12 +25,6 @@ export function getOrCreateSessionId() {
   const sessionId = crypto.randomUUID();
   sessionStorage.setItem(key, sessionId);
   return sessionId;
-}
-
-function asRecord(value: unknown): Record<string, any> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, any>)
-    : {};
 }
 
 function numberFromMetadata(metadata: unknown) {

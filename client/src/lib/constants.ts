@@ -1,3 +1,4 @@
+import { asRecord } from "@/lib/utils";
 export const LUPP_BRAND = {
   name: "Lupp",
   slogan: "O feed que vende dentro da sua loja.",
@@ -30,12 +31,6 @@ type WidgetLike = {
   status?: string | null;
   type?: string | null;
 };
-
-function asRecord(value: unknown): Record<string, any> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, any>)
-    : {};
-}
 
 export function isLuupPlanId(value: unknown): value is LuupPlanId {
   return typeof value === "string" && value in PLAN_LIMITS;

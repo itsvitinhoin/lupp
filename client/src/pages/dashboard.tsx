@@ -1,3 +1,4 @@
+import { formatBRL } from "@/lib/utils";
 import React from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -41,12 +42,6 @@ function formatNumber(value?: number | null) {
   return new Intl.NumberFormat("pt-BR").format(Number(value || 0));
 }
 
-function formatCurrency(value?: number | null) {
-  return new Intl.NumberFormat("pt-BR", {
-    currency: "BRL",
-    style: "currency",
-  }).format(Number(value || 0));
-}
 
 function formatPercent(value?: number | null) {
   return `${(Number(value || 0) * 100).toFixed(1)}%`;
@@ -187,7 +182,7 @@ export default function Dashboard() {
         <MetricCard
           icon={DollarSign}
           label="Receita atribuída"
-          value={formatCurrency(metrics?.attributedRevenue)}
+          value={formatBRL(metrics?.attributedRevenue)}
           detail={
             capabilities.supportsAttributedRevenue
               ? "Receita de pedidos confirmados."

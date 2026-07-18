@@ -1,3 +1,4 @@
+import { formatBRL } from "@/lib/utils";
 import React from "react";
 import { LuppLogo } from "@/components/shared/LuppLogo";
 import { Badge } from "@/components/ui/badge";
@@ -40,12 +41,6 @@ import {
   Sparkles,
 } from "lucide-react";
 
-function formatCurrency(value?: number | null) {
-  return new Intl.NumberFormat("pt-BR", {
-    currency: "BRL",
-    style: "currency",
-  }).format(Number(value || 0));
-}
 
 function formatNumber(value?: number | null) {
   return new Intl.NumberFormat("pt-BR").format(Number(value || 0));
@@ -253,8 +248,8 @@ function MasterDashboard({
         <MasterMetric
           icon={DollarSign}
           label="MRR"
-          value={formatCurrency(snapshotQuery.data?.metrics.mrr)}
-          detail={`ARR ${formatCurrency(snapshotQuery.data?.metrics.arr)}`}
+          value={formatBRL(snapshotQuery.data?.metrics.mrr)}
+          detail={`ARR ${formatBRL(snapshotQuery.data?.metrics.arr)}`}
         />
         <MasterMetric
           icon={Building2}
@@ -633,7 +628,7 @@ function StoreRow({
       <td className="px-5 py-4">
         <p className="font-black text-slate-950">{store.plan_name}</p>
         <p className="text-xs font-bold text-emerald-600">
-          {formatCurrency(store.mrr)}/mês
+          {formatBRL(store.mrr)}/mês
         </p>
         <p className="mt-1 text-xs text-slate-500">
           Trial: {store.trial_days_left ?? "?"} dias

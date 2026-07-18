@@ -1,12 +1,7 @@
+import { asRecord } from "@/lib/utils";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { env } from "@/lib/env";
 import type { TableUpdate } from "@/types/database";
-
-function asRecord(value: unknown): Record<string, any> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, any>)
-    : {};
-}
 
 function uniqueValues(values: unknown[]) {
   return Array.from(

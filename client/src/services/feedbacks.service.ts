@@ -1,10 +1,5 @@
+import { asRecord } from "@/lib/utils";
 import { apiGet } from "@/lib/api";
-
-function asRecord(value: unknown): Record<string, any> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, any>)
-    : {};
-}
 
 export type VideoFeedback = {
   id: string;

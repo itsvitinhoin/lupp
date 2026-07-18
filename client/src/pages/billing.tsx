@@ -1,3 +1,4 @@
+import { formatBRL } from "@/lib/utils";
 import React from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -107,12 +108,6 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat("pt-BR").format(value);
 }
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", {
-    currency: "BRL",
-    style: "currency",
-  }).format(value);
-}
 
 function formatDate(value?: string | null) {
   if (!value) return "Ainda não definida";
@@ -205,6 +200,14 @@ export default function Billing() {
     queryFn: () => billingService.getCurrentSubscription(store!.id),
     enabled: isApiConfigured && Boolean(store?.id),
   });
+  // Every billing mutation refreshes the same three caches.
+  const refreshBillingCaches = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["billing-subscription", store?.id] }),
+      queryClient.invalidateQueries({ queryKey: ["billing-usage", store?.id] }),
+      queryClient.invalidateQueries({ queryKey: ["stores"] }),
+    ]);
+
   const usageQuery = useQuery({
     queryKey: ["billing-usage", store?.id],
     queryFn: () => billingService.getUsage(store!.id),
@@ -364,15 +367,7 @@ export default function Billing() {
         title: "Plano liberado no teste",
         description: `Você pode usar os recursos do plano ${targetPlan.name} até o fim do trial.`,
       });
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: ["billing-subscription", store.id],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["billing-usage", store.id],
-        }),
-        queryClient.invalidateQueries({ queryKey: ["stores"] }),
-      ]);
+      await refreshBillingCaches();
     } catch (error) {
       toast({
         title: "Não foi possível liberar o plano",
@@ -406,15 +401,7 @@ export default function Billing() {
         title: isDowngrade ? "Downgrade realizado" : "Plano alterado",
         description: `A assinatura agora está no plano ${targetPlan.name}.`,
       });
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: ["billing-subscription", store.id],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["billing-usage", store.id],
-        }),
-        queryClient.invalidateQueries({ queryKey: ["stores"] }),
-      ]);
+      await refreshBillingCaches();
     } catch (error) {
       toast({
         title: "Não foi possível alterar o plano",
@@ -466,15 +453,7 @@ export default function Billing() {
         title: "Assinatura cancelada",
         description: `A Luup continua ativa até ${formatDate(result.access_until)}.`,
       });
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: ["billing-subscription", store.id],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["billing-usage", store.id],
-        }),
-        queryClient.invalidateQueries({ queryKey: ["stores"] }),
-      ]);
+      await refreshBillingCaches();
     } catch (error) {
       toast({
         title: "Não foi possível cancelar",
@@ -602,7 +581,7 @@ export default function Billing() {
             </div>
             <CardTitle className="text-2xl">{currentPlan.name}</CardTitle>
             <p className="mt-2 text-3xl font-bold text-slate-950">
-              {formatCurrency(currentPlan.priceMonthly)}
+              {formatBRL(currentPlan.priceMonthly)}
               <span className="text-sm font-normal text-slate-500">/mês</span>
             </p>
           </CardHeader>
@@ -1078,7 +1057,7 @@ export default function Billing() {
                     por{" "}
                     <strong className="text-slate-950">
                       {checkoutPlan
-                        ? formatCurrency(
+                        ? formatBRL(
                             checkoutDiscount?.finalPrice ??
                               PLAN_LIMITS[checkoutPlan.id].priceMonthly,
                           )
