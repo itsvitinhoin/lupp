@@ -260,37 +260,13 @@ export default function Widgets() {
   s.async = true;
   s.src = ${jsStringLiteral(env.widgetCdnUrl)};
 
+  // Apenas identidade: aparência, exibição e carrossel vêm das configurações
+  // salvas neste painel, resolvidas pelo servidor a cada página. Atributos
+  // extras no snippet SOBRESCREVEM o painel — não adicione a menos que queira
+  // fixar um valor para sempre.
   s.setAttribute('data-store-id', ${jsStringLiteral(store.id)});
   s.setAttribute('data-store', ${jsStringLiteral(store.slug)});
-  s.setAttribute('data-store-name', ${jsStringLiteral(store.name || store.slug)});
-  s.setAttribute('data-store-url', ${jsStringLiteral(store.url || "")});
   s.setAttribute('data-widget', ${jsStringLiteral(launcherWidget.type)});
-  s.setAttribute('data-position', ${jsStringLiteral(launcherPosition)});
-  s.setAttribute('data-accent-color', ${jsStringLiteral(launcherAccent)});
-  s.setAttribute('data-background-color', ${jsStringLiteral(launcherBackground)});
-  s.setAttribute('data-text-color', ${jsStringLiteral(launcherTextColor)});
-  s.setAttribute('data-label', ${jsStringLiteral(launcherLabel)});
-  s.setAttribute('data-font-family', ${jsStringLiteral(launcherFont)});
-  s.setAttribute('data-bubble-size', ${jsStringLiteral(launcherSize)});
-  s.setAttribute('data-model', ${jsStringLiteral(launcherModel)});
-  s.setAttribute('data-display-mode', 'all');
-  s.setAttribute('data-exclude-paths', ${jsStringLiteral(pathsFromText(excludePaths).join(","))});
-  s.setAttribute('data-product-mode', 'linked_or_all');
-  s.setAttribute('data-hide-without-videos', 'false');
-  s.setAttribute('data-home-experience-enabled', ${jsStringLiteral(String(homeExperienceEnabled))});
-  s.setAttribute('data-home-ordering', ${jsStringLiteral(homeOrdering)});
-  s.setAttribute('data-home-carousel-enabled', ${jsStringLiteral(String(carouselEnabled))});
-  s.setAttribute('data-carousel-title', ${jsStringLiteral(carouselTitle)});
-  s.setAttribute('data-carousel-description', ${jsStringLiteral(carouselDescription)});
-  s.setAttribute('data-carousel-before-heading', ${jsStringLiteral(carouselBeforeHeading)});
-  s.setAttribute('data-carousel-max-items', ${jsStringLiteral(carouselDesktopCount)});
-  s.setAttribute('data-carousel-mobile-max-items', ${jsStringLiteral(carouselMobileCount)});
-  s.setAttribute('data-custom-installments-enabled', ${jsStringLiteral(String(customInstallmentsEnabled))});
-  s.setAttribute('data-custom-installments-count', ${jsStringLiteral(customInstallmentsCount)});
-  s.setAttribute('data-custom-installments-interest-free', ${jsStringLiteral(String(customInstallmentsInterestFree))});
-  s.setAttribute('data-custom-pix-discount-enabled', ${jsStringLiteral(String(customPixDiscountEnabled))});
-  s.setAttribute('data-custom-pix-discount-percent', ${jsStringLiteral(customPixDiscountPercent)});
-  s.setAttribute('data-custom-payment-note', ${jsStringLiteral(customPaymentNote)});
   s.setAttribute('data-require-active', 'true');
   s.setAttribute('data-lupp-url', ${jsStringLiteral(env.appUrl)});
   s.setAttribute('data-api-url', ${jsStringLiteral(env.apiUrl)});
@@ -311,18 +287,11 @@ export default function Widgets() {
   s.async = true;
   s.src = ${jsStringLiteral(env.widgetCdnUrl)};
 
+  // Apenas identidade: título, textos e limites do carrossel vêm das
+  // configurações salvas neste painel, resolvidas pelo servidor.
   s.setAttribute('data-store-id', ${jsStringLiteral(store.id)});
   s.setAttribute('data-store', ${jsStringLiteral(store.slug)});
-  s.setAttribute('data-store-name', ${jsStringLiteral(store.name || store.slug)});
-  s.setAttribute('data-store-url', ${jsStringLiteral(store.url || "")});
   s.setAttribute('data-widget', 'home_carousel');
-  s.setAttribute('data-home-carousel-enabled', ${jsStringLiteral(String(carouselEnabled))});
-  s.setAttribute('data-carousel-title', ${jsStringLiteral(carouselTitle)});
-  s.setAttribute('data-carousel-description', ${jsStringLiteral(carouselDescription)});
-  s.setAttribute('data-carousel-before-heading', ${jsStringLiteral(carouselBeforeHeading)});
-  s.setAttribute('data-carousel-max-items', ${jsStringLiteral(carouselDesktopCount)});
-  s.setAttribute('data-carousel-mobile-max-items', ${jsStringLiteral(carouselMobileCount)});
-  s.setAttribute('data-home-experience-enabled', ${jsStringLiteral(String(homeExperienceEnabled))});
   s.setAttribute('data-require-active', 'true');
   s.setAttribute('data-lupp-url', ${jsStringLiteral(env.appUrl)});
   s.setAttribute('data-api-url', ${jsStringLiteral(env.apiUrl)});
