@@ -7,6 +7,7 @@ import { asaasRequest } from "@/lib/asaas";
 import { isPlanId, PLAN_IDS, PLANS } from "@/lib/plans";
 import { findStoreMembership } from "@/lib/store-membership";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
+import { asRecord, clean } from "@/lib/text";
 
 // Ported from supabase/functions/asaas-create-subscription. Field checks stay
 // in the handler (not strict zod types) so the machine-readable error codes
@@ -94,18 +95,8 @@ type UsableCoupon = {
   is_active: boolean;
 };
 
-function clean(value: unknown) {
-  return String(value || "").trim();
-}
-
 function digits(value: unknown) {
   return String(value || "").replace(/\D/g, "");
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
 }
 
 function isCouponUsable(coupon: UsableCoupon) {

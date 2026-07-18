@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { PLAN_VIDEO_LIMITS } from "@/lib/plans";
 import { findStoreMembership } from "@/lib/store-membership";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
+import { clean } from "@/lib/text";
 import {
   BUNNY_TUS_ENDPOINT,
   BunnyVideo,
@@ -67,10 +68,6 @@ export const UploadVideoSchema = {
     },
   },
 };
-
-function clean(value: unknown) {
-  return String(value || "").trim();
-}
 
 function cleanHeader(value: unknown) {
   const text = clean(value);

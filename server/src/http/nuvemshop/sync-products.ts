@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { findStoreMembership } from "@/lib/store-membership";
 import { nuvemshopApiBase, nuvemshopRequest } from "@/lib/nuvemshop";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
+import { asRecord } from "@/lib/text";
 
 // Ported from supabase/functions/nuvemshop-sync-products: paginates the
 // Nuvemshop products API (max 10 pages), normalizes products + variants
@@ -383,12 +384,6 @@ function buildProductUrl(storefrontDomain: string, product: NuvemshopProduct) {
   const handle = pickLocalized(product.handle);
   if (!handle) return null;
   return `https://${storefrontDomain}/produtos/${handle}/`;
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
 }
 
 export async function nuvemshopSyncProductsHandler(

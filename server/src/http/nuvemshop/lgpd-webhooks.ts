@@ -5,6 +5,7 @@ import { Prisma } from "../../../generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { env } from "@/env";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
+import { asRecord } from "@/lib/text";
 
 // Ported from supabase/functions/nuvemshop-lgpd-webhooks. Public route —
 // Nuvemshop signs the RAW request body with HMAC-SHA256 (client secret), so
@@ -88,12 +89,6 @@ function verifyNuvemshopSignature(
 function getStoreId(payload: WebhookPayload) {
   if (payload.store_id === undefined || payload.store_id === null) return null;
   return String(payload.store_id);
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
 }
 
 export async function nuvemshopLgpdWebhookHandler(

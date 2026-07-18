@@ -10,6 +10,7 @@ import {
   verifyNuvemshopState,
 } from "@/lib/nuvemshop";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
+import { asRecord } from "@/lib/text";
 
 // Ported from supabase/functions/nuvemshop-oauth-callback. Public route hit
 // by the Nuvemshop redirect; every outcome is a 302 back to the SPA with
@@ -45,12 +46,6 @@ function redirectWith(
   const nextUrl = new URL(url);
   Object.entries(params).forEach(([key, value]) => nextUrl.searchParams.set(key, value));
   return reply.redirect(nextUrl.toString(), 302);
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
 }
 
 export async function nuvemshopOauthCallbackHandler(

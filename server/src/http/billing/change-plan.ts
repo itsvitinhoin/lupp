@@ -7,6 +7,7 @@ import { asaasRequest } from "@/lib/asaas";
 import { isPlanId, PLAN_IDS, PLANS } from "@/lib/plans";
 import { findStoreMembership } from "@/lib/store-membership";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
+import { asRecord, clean } from "@/lib/text";
 
 // Ported from supabase/functions/asaas-change-plan. Field checks stay in the
 // handler so the machine-readable error codes the SPA switches on are
@@ -52,16 +53,6 @@ export const ChangePlanSchema = {
     },
   },
 };
-
-function clean(value: unknown) {
-  return String(value || "").trim();
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
 
 export async function changePlanHandler(
   request: FastifyRequest,

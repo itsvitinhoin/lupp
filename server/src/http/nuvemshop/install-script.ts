@@ -5,6 +5,7 @@ import { env } from "@/env";
 import { findStoreMembership } from "@/lib/store-membership";
 import { nuvemshopRequest, nuvemshopScriptsApiBase } from "@/lib/nuvemshop";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
+import { asRecord } from "@/lib/text";
 
 // Ported from supabase/functions/nuvemshop-install-script. Talks to the
 // Tiendanube Scripts API (list/POST/PUT + read-back verification) and keeps
@@ -192,12 +193,6 @@ async function tryInstallScript(
     payload_name: last?.payload_name || "payload",
     status: last?.status || 0,
   };
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
 }
 
 export async function nuvemshopInstallScriptHandler(

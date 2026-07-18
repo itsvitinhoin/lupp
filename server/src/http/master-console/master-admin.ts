@@ -1,11 +1,9 @@
 import { env } from "@/env";
 import { prisma } from "@/lib/prisma";
+import { clean } from "@/lib/text";
+export { clean } from "@/lib/text";
 
-export function clean(value: unknown) {
-  return String(value || "").trim();
-}
-
-function adminEmails() {
+export function adminEmails() {
   return new Set(
     env.MASTER_ADMIN_EMAILS.split(",")
       .map((email) => email.trim().toLowerCase())

@@ -6,6 +6,7 @@ import { env } from "@/env";
 import { deleteAsaasSubscription } from "@/lib/asaas";
 import { findStoreMembership } from "@/lib/store-membership";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
+import { asRecord } from "@/lib/text";
 
 // Ported from supabase/functions/asaas-cancel-subscription. Field checks stay
 // in the handler so the machine-readable error codes the SPA switches on are
@@ -50,12 +51,6 @@ export const CancelSubscriptionSchema = {
     },
   },
 };
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
 
 export async function cancelSubscriptionHandler(
   request: FastifyRequest,

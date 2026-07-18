@@ -11,6 +11,7 @@ import {
 } from "@/lib/shopify";
 import { findStoreMembership } from "@/lib/store-membership";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
+import { asRecord } from "@/lib/text";
 
 type ShopifyMoney = string | number | null | undefined;
 
@@ -183,12 +184,6 @@ function errorDetails(error: unknown) {
     message:
       typeof payload.message === "string" ? payload.message : String(error),
   };
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
 }
 
 function isExpiredOrMissing(value: unknown, skewMs = 120_000) {

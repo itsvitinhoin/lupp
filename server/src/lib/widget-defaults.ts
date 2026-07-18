@@ -1,14 +1,9 @@
+import { asRecord } from "@/lib/text";
 /**
  * Widget defaults ported from the SPA (src/lib/constants.ts +
  * widgets.service.ts): the widgets a new store is seeded with, and the
  * settings merge applied when ensuring the floating widget for product pages.
  */
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
 
 function uniqueValues(values: unknown[]) {
   return Array.from(

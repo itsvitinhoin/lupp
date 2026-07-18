@@ -7,6 +7,7 @@ import { asaasCheckoutBaseUrl, asaasFetch, readAsaasError } from "@/lib/asaas";
 import { isPlanId, PLAN_IDS, PLANS } from "@/lib/plans";
 import { findStoreMembership } from "@/lib/store-membership";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
+import { clean } from "@/lib/text";
 
 // Ported from supabase/functions/asaas-create-checkout. Field checks stay in
 // the handler so the machine-readable error codes the SPA switches on are
@@ -72,10 +73,6 @@ export const CreateCheckoutSchema = {
     },
   },
 };
-
-function clean(value: unknown) {
-  return String(value || "").trim();
-}
 
 function digits(value: unknown) {
   return String(value || "").replace(/\D/g, "");
