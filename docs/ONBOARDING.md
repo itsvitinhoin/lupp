@@ -54,14 +54,24 @@ A instalação é automatizada pelo app do partner portal (app id **36726**).
    um script ativo já é sucesso terminal (`AUTO_INSTALL_VERIFIED`): a
    Nuvemshop injeta o script sozinha em toda loja com o app instalado.
 
+**Modos do script no portal (escolha um):**
+
+| | Arquivo a subir | "Use NubeSDK" | Quando usar |
+|---|---|---|---|
+| **NubeSDK** (obrigatório p/ novas instalações a partir de 30/08/2026) | `nuvemshop-nubesdk-app.js` | **Ligado** | Lojas no tema **Patagonia** (os UI slots do NubeSDK só existem nele) |
+| **Clássico** | `nuvemshop-nubesdk.js` | Desligado | Qualquer tema; comportamento do app legado |
+
+No modo NubeSDK o app roda no web worker da Nuvemshop e renderiza o widget
+dentro de um iframe (`nuvemshop-widget-frame.html`) no canto configurado no
+painel; o add-to-cart usa o evento nativo `cart:add` do SDK.
+
 **O que NÃO fazer:**
 
 - Não colar o snippet manual em lojas com o app instalado — o widget
   carregaria duas vezes.
-- Não ligar "Use NubeSDK" no script do portal: nosso loader precisa do DOM e
-  em modo NubeSDK (web worker) ele não executa. Atenção: NubeSDK passa a ser
-  obrigatório para **novas instalações** em 30/08/2026 — o port está no
-  roadmap.
+- Não subir o arquivo de um modo com o toggle do outro: `nuvemshop-nubesdk.js`
+  precisa do DOM (não roda no worker) e `nuvemshop-nubesdk-app.js` só roda no
+  worker.
 
 **Verificação:** na vitrine, DevTools → Network:
 `apps-scripts.tiendanube.com/.../luup-video-experience/...js` →

@@ -67,11 +67,24 @@ cd client && npm run build:widget   # esbuild widget-src/*.ts -> public/widget*.
 - **Nuvemshop script install**: the Scripts API rejects association writes for
   auto-installed scripts (POST 422, PUT 404), so when `install-script` finds
   an active auto-installed Luup script, that listing IS terminal success
-  (`AUTO_INSTALL_VERIFIED`) — don't "fix" it by retrying writes. Portal note:
-  with "Use NubeSDK" enabled, portal scripts run in web workers (no DOM); our
-  loader needs the DOM, so the toggle stays off. NubeSDK becomes mandatory
-  for new installations on 2026-08-30 (`nuvemshop-nubesdk.js` is the
-  NubeSDK-mode loader).
+  (`AUTO_INSTALL_VERIFIED`) — don't "fix" it by retrying writes.
+- **Two Nuvemshop script modes** (NubeSDK is mandatory for new installations
+  from 2026-08-30):
+  - *NubeSDK mode* (portal toggle ON): upload `public/nuvemshop-nubesdk-app.js`
+    — built from `client/nubesdk-src/main.ts` via `npm run build:nubesdk`
+    (esbuild ESM bundle, committed, deterministic). It runs in Nuvemshop's
+    web worker (no DOM): renders `nuvemshop-widget-frame.html` through the
+    SDK iframe component in the corner slot matching the dashboard position,
+    relies on iframe `autoresize` for the frame's `{type:"resize"}` messages,
+    and relays `LUPP_NUBESDK_CART_ADD` → `nube.send("cart:add")` →
+    `LUPP_NUBESDK_CART_RESULT`. The frame installs
+    `window.__LUUP_NUVEMSHOP_ADD_TO_CART__` as that relay — the widget's
+    nuvemshop adapter prefers it over the form-POST fallback, so widget.js
+    needs no changes. Caveat: NubeSDK storefront UI slots only work on the
+    Patagonia theme.
+  - *Classic mode* (toggle OFF): upload `public/nuvemshop-nubesdk.js`, the
+    DOM loader that chain-loads `nuvemshop-script.js` → `widget.js` directly
+    on the page (works on any theme; used by the legacy app).
 - **Default hosts**: app/widget `https://luup.dzns.com.br`, API
   `https://luup.dzns.net` (client `env.ts` fallbacks, widget `PROD_API_URL`).
   API CORS is currently `origin: true` (allow-all; the old allowlist is

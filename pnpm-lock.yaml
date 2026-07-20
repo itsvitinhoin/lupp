@@ -211,6 +211,12 @@ importers:
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.100.9(react@19.1.0)
+      '@tiendanube/nube-sdk-types':
+        specifier: ^0.86.0
+        version: 0.86.0
+      '@tiendanube/nube-sdk-ui':
+        specifier: ^0.19.0
+        version: 0.19.0(@tiendanube/nube-sdk-types@0.86.0)
       '@types/node':
         specifier: 'catalog:'
         version: 25.6.2
@@ -1245,6 +1251,14 @@ packages:
     resolution: {integrity: sha512-Oa44XkaI3kCNN6ME0KByU3xT3SEUNOMfZpHxL6+wFoTm+OeUFYHKdeYVe0aOXlRDm/f15sgLwEt2HDorIdW8+A==}
     peerDependencies:
       react: ^18 || ^19
+
+  '@tiendanube/nube-sdk-types@0.86.0':
+    resolution: {integrity: sha512-Lc7RwzqzhChkRCZLKtXmnCNbp2OJWH9xR/ERg7U/Oy/cplq86B7fmGgMP/sgYkBakEpyUrTA3HrdvyVQBwj49A==}
+
+  '@tiendanube/nube-sdk-ui@0.19.0':
+    resolution: {integrity: sha512-IFsCmLCPr/mnk3YXj5W4CDAl8WZRvjgzHMT+gITvgq858Pzz1g3i0ssYno9MiD8Z9RrIVfxe/z70h+lWis0AZg==}
+    peerDependencies:
+      '@tiendanube/nube-sdk-types': '*'
 
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
@@ -4361,6 +4375,14 @@ snapshots:
     dependencies:
       '@tanstack/query-core': 5.100.9
       react: 19.1.0
+
+  '@tiendanube/nube-sdk-types@0.86.0':
+    dependencies:
+      csstype: 3.2.3
+
+  '@tiendanube/nube-sdk-ui@0.19.0(@tiendanube/nube-sdk-types@0.86.0)':
+    dependencies:
+      '@tiendanube/nube-sdk-types': 0.86.0
 
   '@types/babel__core@7.20.5':
     dependencies:

@@ -37,6 +37,45 @@
           window.parent.postMessage(message, "*");
         }
 
+        // ── NubeSDK cart bridge ─────────────────────────────────────────
+        // The widget's nuvemshop adapter prefers this global over its native
+        // form-POST fallback (which cannot work from this cross-origin
+        // frame). Each call relays the items to the NubeSDK worker, which
+        // performs the real `cart:add` and answers back through
+        // postMessageToIframe with the matching requestId.
+        var pendingCartRequests = {};
+        var cartRequestSeq = 0;
+
+        window.addEventListener("message", function (event) {
+          var data = event.data || {};
+          if (data.type !== "LUPP_NUBESDK_CART_RESULT" || !data.requestId) return;
+          var pending = pendingCartRequests[data.requestId];
+          if (!pending) return;
+          delete pendingCartRequests[data.requestId];
+          window.clearTimeout(pending.timeout);
+          if (data.ok) pending.resolve({ method: "nubesdk" });
+          else pending.reject(new Error(data.error || "nuvemshop_cart_add_failed"));
+        });
+
+        window.__LUUP_NUVEMSHOP_ADD_TO_CART__ = function (items) {
+          return new Promise(function (resolve, reject) {
+            cartRequestSeq += 1;
+            var requestId = "luup-cart-" + Date.now() + "-" + cartRequestSeq;
+            pendingCartRequests[requestId] = {
+              resolve: resolve,
+              reject: reject,
+              timeout: window.setTimeout(function () {
+                delete pendingCartRequests[requestId];
+                reject(new Error("nuvemshop_cart_timeout"));
+              }, 15000),
+            };
+            send({ type: "LUPP_NUBESDK_CART_ADD", requestId: requestId, items: items });
+          });
+        };
+
+        // ── Size reporting ──────────────────────────────────────────────
+        // `{type:"resize"}` is understood both by the legacy sandbox parent
+        // and by the NubeSDK iframe host (`autoresize: true`).
         function reportSize() {
           var root = document.querySelector("[data-lupp-widget-root]");
           if (!root) return;
@@ -53,6 +92,32 @@
           window.setTimeout(reportSize, 600);
         });
 
+        // The feed overlay renders fixed/fullscreen inside this frame. The
+        // widget emits no open/close events, so watch the DOM for its
+        // [data-lupp-feed-overlay] node: grow the frame to the viewport while
+        // it exists, shrink back to the launcher when it goes away.
+        var overlayOpen = false;
+        function syncOverlaySize() {
+          var isOpen = Boolean(document.querySelector("[data-lupp-feed-overlay]"));
+          if (isOpen === overlayOpen) return;
+          overlayOpen = isOpen;
+          if (isOpen) {
+            send({
+              type: "resize",
+              width: Math.ceil(window.screen.width || 1280),
+              height: Math.ceil(window.screen.height || 800),
+            });
+          } else {
+            window.setTimeout(reportSize, 50);
+          }
+        }
+        if (window.MutationObserver) {
+          new MutationObserver(syncOverlaySize).observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+          });
+        }
+
         var script = document.createElement("script");
         script.async = true;
         script.src = "https://luup.dzns.com.br/widget.js";
@@ -62,7 +127,7 @@
         script.setAttribute("data-product-url", pageUrl);
         script.setAttribute("data-nubesdk-frame", mode);
         script.setAttribute("data-lupp-url", "https://luup.dzns.com.br");
-        script.setAttribute("data-api-url", "https://api.playluup.com.br");
+        script.setAttribute("data-api-url", "https://luup.dzns.net");
         script.setAttribute("data-require-active", "true");
         script.setAttribute("data-offset-x", "0");
         script.setAttribute("data-offset-y", "0");

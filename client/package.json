@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --config vite.config.ts --host 0.0.0.0",
-    "build": "npm run build:widget && vite build --config vite.config.ts",
+    "build": "npm run build:widget && npm run build:nubesdk && vite build --config vite.config.ts",
     "build:widget": "node build-widget.mjs",
+    "build:nubesdk": "node build-nubesdk.mjs",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "start": "serve -s dist/public -l 3040",
     "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck:widget",
@@ -29,6 +30,8 @@
     "@tailwindcss/typography": "^0.5.15",
     "@tailwindcss/vite": "catalog:",
     "@tanstack/react-query": "catalog:",
+    "@tiendanube/nube-sdk-types": "^0.86.0",
+    "@tiendanube/nube-sdk-ui": "^0.19.0",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
@@ -40,13 +43,13 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "recharts": "^2.15.2",
+    "serve": "^14.2.6",
     "tailwind-merge": "catalog:",
     "tailwindcss": "catalog:",
     "tw-animate-css": "^1.4.0",
     "vaul": "^1.1.2",
     "vite": "catalog:",
-    "wouter": "^3.3.5",
-    "serve": "^14.2.6"
+    "wouter": "^3.3.5"
   },
   "dependencies": {
     "@workspace/widget-config": "workspace:*",

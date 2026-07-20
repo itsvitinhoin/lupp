@@ -331,7 +331,8 @@ publish_client_dist() {
   # (caused a real production breakage). Fail loud instead.
   local widget_file
   for widget_file in widget.js widget-nuvemshop.js widget-shopify.js \
-    widget-upzero.js nuvemshop-nubesdk.js nuvemshop-script.js; do
+    widget-upzero.js nuvemshop-nubesdk.js nuvemshop-script.js \
+    nuvemshop-nubesdk-app.js nuvemshop-widget-frame.html; do
     [[ -f "${WEB_ROOT}/${widget_file}" ]] \
       || err "published tree is missing ${widget_file} — client build/publish is incomplete"
   done
