@@ -324,7 +324,19 @@ publish_client_dist() {
     cp -a "${CLIENT_DIST}/." "${WEB_ROOT}/"
   fi
   chmod -R a+rX "$WEB_ROOT"
-  ok "client published to ${WEB_ROOT}"
+
+  # The widget loads its platform adapter lazily from this same tree, and the
+  # SPA fallback serves index.html for ANY missing path — so a missing widget
+  # file ships silently and storefronts receive text/html instead of JS
+  # (caused a real production breakage). Fail loud instead.
+  local widget_file
+  for widget_file in widget.js widget-nuvemshop.js widget-shopify.js \
+    widget-upzero.js nuvemshop-nubesdk.js nuvemshop-script.js; do
+    [[ -f "${WEB_ROOT}/${widget_file}" ]] \
+      || err "published tree is missing ${widget_file} — client build/publish is incomplete"
+  done
+
+  ok "client published to ${WEB_ROOT} (widget files verified)"
   return 0
 }
 
