@@ -181,10 +181,32 @@ export async function createSubscriptionHandler(
   const member = await findStoreMembership(request.user.sub, storeId);
   if (!member) return reply.status(403).send({ error: "store_access_denied" });
 
-  const store = await prisma.store.findUnique({
-    where: { id: storeId },
-    select: { id: true, name: true, slug: true, url: true },
-  });
+  // The store and coupon lookups are independent — fetch both at once.
+  // The original matched the coupon with ilike on the upper-cased code;
+  // Prisma's case-insensitive equals is the same lookup without the
+  // expression index the Supabase schema had.
+  const [store, couponRow] = await Promise.all([
+    prisma.store.findUnique({
+      where: { id: storeId },
+      select: { id: true, name: true, slug: true, url: true },
+    }),
+    couponCode
+      ? prisma.discountCoupon.findFirst({
+          where: { code: { equals: couponCode, mode: "insensitive" } },
+          select: {
+            id: true,
+            code: true,
+            percent_off: true,
+            amount_off: true,
+            max_redemptions: true,
+            redemption_count: true,
+            starts_at: true,
+            expires_at: true,
+            is_active: true,
+          },
+        })
+      : Promise.resolve(null),
+  ]);
 
   if (!store) return reply.status(404).send({ error: "store_not_found" });
 
@@ -194,24 +216,6 @@ export async function createSubscriptionHandler(
   try {
     let coupon: UsableCoupon | null = null;
     if (couponCode) {
-      // The original matched with ilike on the upper-cased code; Prisma's
-      // case-insensitive equals is the same lookup without the expression
-      // index the Supabase schema had.
-      const couponRow = await prisma.discountCoupon.findFirst({
-        where: { code: { equals: couponCode, mode: "insensitive" } },
-        select: {
-          id: true,
-          code: true,
-          percent_off: true,
-          amount_off: true,
-          max_redemptions: true,
-          redemption_count: true,
-          starts_at: true,
-          expires_at: true,
-          is_active: true,
-        },
-      });
-
       const candidate = couponRow
         ? {
             ...couponRow,
