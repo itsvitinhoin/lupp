@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { FastifyReply, FastifyRequest } from "fastify";
+import { CAROUSEL_PLAN_IDS } from "@workspace/widget-config";
 import { prisma } from "@/lib/prisma";
 import {
   buildPageContext,
@@ -235,7 +236,7 @@ function isWidgetType(value: string): value is WidgetType {
 // The horizontal feed (carousel) is a paid-tier feature: growth/pro/scale only.
 function allowsHorizontalFeed(planId: unknown) {
   const normalized = clean(planId).toLowerCase();
-  return ["growth", "pro", "scale"].includes(normalized);
+  return (CAROUSEL_PLAN_IDS as readonly string[]).includes(normalized);
 }
 
 type WidgetRow = {

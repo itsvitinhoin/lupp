@@ -13,22 +13,24 @@ export default function TestStore() {
   const widgetHostRef = React.useRef<HTMLDivElement | null>(null);
   const searchParams = new URLSearchParams(window.location.search);
   const widgetType = searchParams.get('widget') || 'floating_launcher';
+  // lupp_* params on this page's URL ride along on the script src, where the
+  // widget reads them with the same precedence as data-* attributes. Without
+  // overrides the widget renders the store's SAVED dashboard settings —
+  // never hardcode appearance attrs here, they would mask the real config.
+  const overrideQuery = Array.from(searchParams.entries())
+    .filter(([key]) => key.startsWith('lupp_'))
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+    .join('&');
 
   React.useEffect(() => {
     if (!widgetHostRef.current || !storeSlug || !isApiConfigured) return;
 
     widgetHostRef.current.innerHTML = '';
     const script = document.createElement('script');
-    script.src = env.widgetCdnUrl;
+    script.src = overrideQuery ? `${env.widgetCdnUrl}?${overrideQuery}` : env.widgetCdnUrl;
     script.async = true;
     script.dataset.store = storeSlug;
     script.dataset.widget = widgetType;
-    script.dataset.position = 'bottom-left';
-    script.dataset.label = 'Compre pelo vídeo';
-    script.dataset.accentColor = '#fe2c55';
-    script.dataset.backgroundColor = '#0b0b0f';
-    script.dataset.textColor = '#ffffff';
-    script.dataset.bubbleSize = '74';
     script.dataset.apiUrl = env.apiUrl;
     script.dataset.luppUrl = env.appUrl;
     script.dataset.productUrl = `${window.location.origin}/test-store/${storeSlug}/produto-demo`;
@@ -37,7 +39,7 @@ export default function TestStore() {
     return () => {
       script.remove();
     };
-  }, [storeSlug, widgetType]);
+  }, [storeSlug, widgetType, overrideQuery]);
 
   return (
     <div className="min-h-screen bg-[#f7f7f8] text-slate-950">

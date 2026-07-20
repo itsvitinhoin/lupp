@@ -70,6 +70,7 @@
     "zod": "catalog:"
   },
   "dependencies": {
+    "@workspace/widget-config": "workspace:*",
     "hls.js": "^1.6.16",
     "tus-js-client": "^4.3.1"
   }

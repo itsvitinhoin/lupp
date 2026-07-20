@@ -1,6 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { CodeBlock } from "@/components/shared/CodeBlock";
 import { ArrowLeft, Code2, LockKeyhole, Save, Video } from "lucide-react";
@@ -160,6 +167,41 @@ export function HorizontalFeedEditor(props: {
               <p className="text-xs font-semibold leading-5 text-slate-500">
                 A Luup procura esse título na Home. Se não encontrar, tenta
                 posicionar logo depois da faixa de benefícios da loja.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="font-semibold text-slate-500">
+                Âncora avançada (seletor CSS)
+              </Label>
+              <div className="grid grid-cols-[1fr_auto] gap-3">
+                <Input
+                  value={form.carouselAnchorSelector}
+                  onChange={(event) =>
+                    setField("carouselAnchorSelector", event.target.value)
+                  }
+                  placeholder="#main .products"
+                  className="h-11 rounded-xl border-slate-200 bg-white font-mono text-sm text-slate-950"
+                />
+                <Select
+                  value={form.carouselAnchorPlacement}
+                  onValueChange={(value) =>
+                    setField("carouselAnchorPlacement", value)
+                  }
+                >
+                  <SelectTrigger className="h-11 w-28 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-950">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="before">Antes</SelectItem>
+                    <SelectItem value="after">Depois</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs font-semibold leading-5 text-slate-500">
+                Quando preenchida, a âncora tem prioridade sobre o título: o
+                carrossel é inserido antes ou depois do primeiro elemento que
+                casar com o seletor.
               </p>
             </div>
 

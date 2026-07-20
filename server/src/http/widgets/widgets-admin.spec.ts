@@ -58,6 +58,51 @@ describe("widgets admin (e2e)", () => {
     expect(denied.status).toBe(403);
   });
 
+  it("merges settings PATCHes instead of replacing, and normalizes garbage", async () => {
+    const { owner, store } = await createStore();
+    const token = app.jwt.sign({ sub: owner.id, role: "agent" });
+    const widget = await prisma.widget.create({
+      data: {
+        store_id: store.id,
+        name: "Config",
+        type: "floating_video",
+        settings: {
+          appearance: { accent_color: "#123456", label: "Persistente" },
+          carousel: { title: "Título salvo", custom_key: "kept" },
+        },
+      },
+    });
+
+    // Patch touching only appearance.position: everything else must survive.
+    const response = await request(app.server)
+      .patch(`/api/widgets/${widget.id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        settings: {
+          appearance: {
+            position: "top-right",
+            bubble_size: 9999, // out of range -> clamped
+            model: "not-a-model", // invalid enum -> default
+            background_color: "blue", // invalid hex -> default
+          },
+        },
+      });
+
+    expect(response.status).toBe(200);
+    const settings = response.body.widget.settings;
+    expect(settings.appearance).toMatchObject({
+      position: "top-right",
+      accent_color: "#123456", // preserved from stored
+      label: "Persistente", // preserved from stored
+      bubble_size: 120, // clamped to BUBBLE_SIZE_RANGE.max
+      model: "circular", // invalid -> default
+      background_color: "#0b0b0f", // invalid -> default
+    });
+    expect(settings.carousel.title).toBe("Título salvo");
+    expect(settings.carousel.custom_key).toBe("kept");
+    expect(settings.display.exclude_paths).toEqual(["/checkout", "/carrinho", "/cart"]);
+  });
+
   it("ensure-floating creates the widget with normalized settings", async () => {
     const { owner, store } = await createStore();
     const token = app.jwt.sign({ sub: owner.id, role: "agent" });

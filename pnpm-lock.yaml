@@ -159,6 +159,9 @@ importers:
 
   client:
     dependencies:
+      '@workspace/widget-config':
+        specifier: workspace:*
+        version: link:../lib/widget-config
       hls.js:
         specifier: ^1.6.16
         version: 1.6.16
@@ -334,6 +337,8 @@ importers:
 
   lib/api-client: {}
 
+  lib/widget-config: {}
+
   server:
     dependencies:
       '@fastify/cookie':
@@ -360,6 +365,9 @@ importers:
       '@prisma/client':
         specifier: ^7.8.0
         version: 7.8.0(prisma@7.8.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(typescript@6.0.3))(typescript@6.0.3)
+      '@workspace/widget-config':
+        specifier: workspace:*
+        version: link:../lib/widget-config
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3

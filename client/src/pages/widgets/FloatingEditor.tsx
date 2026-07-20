@@ -75,6 +75,10 @@ export function FloatingEditor(props: {
   const currentSizeLabel =
     sizeOptions.find((option) => option.value === form.launcherSize)?.label ??
     "Média";
+  const [previewMode, setPreviewMode] = React.useState<"instant" | "real">(
+    "instant",
+  );
+  const realPreviewSrc = useDebouncedRealPreviewSrc(props.storeSlug, form);
 
   return (
     <>
@@ -143,7 +147,7 @@ export function FloatingEditor(props: {
               </div>
               <div className="grid grid-cols-2 gap-5">
                 <ColorField
-                  label="Cor do fundo"
+                  label="Cor de destaque"
                   value={form.launcherAccent}
                   onChange={(value) => setField("launcherAccent", value)}
                 />
@@ -151,6 +155,11 @@ export function FloatingEditor(props: {
                   label="Cor do texto"
                   value={form.launcherTextColor}
                   onChange={(value) => setField("launcherTextColor", value)}
+                />
+                <ColorField
+                  label="Cor do fundo"
+                  value={form.launcherBackground}
+                  onChange={(value) => setField("launcherBackground", value)}
                 />
               </div>
               <div className="mt-5 grid gap-3">
@@ -230,9 +239,41 @@ export function FloatingEditor(props: {
                   <SelectItem value="top-right">Superior direita</SelectItem>
                 </SelectContent>
               </Select>
+              <div className="mt-4 grid grid-cols-2 gap-5">
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-slate-500">
+                    Margem horizontal (px)
+                  </Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={120}
+                    value={form.launcherOffsetX}
+                    onChange={(event) =>
+                      setField("launcherOffsetX", event.target.value)
+                    }
+                    className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-950"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-slate-500">
+                    Margem vertical (px)
+                  </Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={120}
+                    value={form.launcherOffsetY}
+                    onChange={(event) =>
+                      setField("launcherOffsetY", event.target.value)
+                    }
+                    className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-950"
+                  />
+                </div>
+              </div>
               <div className="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-center text-sm font-medium leading-tight text-slate-500">
-                Você pode mover a miniatura para a posição desejada e salvar a
-                regra para a loja.
+                As margens afastam a miniatura do canto escolhido — útil para
+                não sobrepor botões de WhatsApp ou cookies da loja.
               </div>
             </section>
 
@@ -344,6 +385,67 @@ export function FloatingEditor(props: {
                     <SelectItem value="automatic">Automática</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <AdvancedSwitch
+                checked={form.hideWithoutVideos}
+                description="A miniatura só aparece em páginas que têm vídeo para mostrar."
+                label="Ocultar quando não houver vídeos"
+                onChange={(value) => setField("hideWithoutVideos", value)}
+              />
+              <div className="space-y-2">
+                <Label className="font-semibold text-slate-500">
+                  Onde exibir
+                </Label>
+                <Select
+                  value={form.displayMode}
+                  onValueChange={(value) => setField("displayMode", value)}
+                >
+                  <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-950">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Loja inteira</SelectItem>
+                    <SelectItem value="product">
+                      Apenas páginas de produto
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="font-semibold text-slate-500">
+                  Vídeo nas páginas de produto
+                </Label>
+                <Select
+                  value={form.productMode}
+                  onValueChange={(value) => setField("productMode", value)}
+                >
+                  <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-950">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="linked_or_all">
+                      Vídeo vinculado, ou todos se não houver
+                    </SelectItem>
+                    <SelectItem value="linked_only">
+                      Somente vídeo vinculado ao produto
+                    </SelectItem>
+                    <SelectItem value="all">Todos os vídeos</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="font-semibold text-slate-500">
+                  URLs incluídas (vazio = todas)
+                </Label>
+                <Textarea
+                  value={form.includePaths}
+                  onChange={(event) =>
+                    setField("includePaths", event.target.value)
+                  }
+                  rows={2}
+                  placeholder={"/colecoes/verao\n/produto"}
+                  className="rounded-xl border-slate-200 bg-white text-sm text-slate-950"
+                />
               </div>
               <div className="space-y-2">
                 <Label className="font-semibold text-slate-500">
@@ -471,20 +573,92 @@ export function FloatingEditor(props: {
           </div>
         </aside>
 
-        <PreviewPanel
-          accent={form.launcherAccent}
-          background={form.launcherBackground}
-          font={form.launcherFont}
-          label={form.launcherLabel}
-          model={form.launcherModel}
-          position={form.launcherPosition}
-          size={form.launcherSize}
-          sizeLabel={currentSizeLabel}
-          textColor={form.launcherTextColor}
-        />
+        <div className="flex min-h-[560px] flex-col gap-3">
+          <div className="flex justify-end">
+            <div className="flex rounded-xl bg-[#f2f4f5] p-1 text-sm font-semibold">
+              <button
+                type="button"
+                onClick={() => setPreviewMode("instant")}
+                className={cn(
+                  "rounded-lg px-4 py-2 text-slate-500",
+                  previewMode === "instant" && "bg-white text-slate-950 shadow-sm",
+                )}
+              >
+                Prévia instantânea
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewMode("real")}
+                disabled={!props.storeSlug}
+                className={cn(
+                  "rounded-lg px-4 py-2 text-slate-500 disabled:opacity-50",
+                  previewMode === "real" && "bg-white text-slate-950 shadow-sm",
+                )}
+              >
+                Widget real
+              </button>
+            </div>
+          </div>
+          {previewMode === "real" && props.storeSlug ? (
+            <iframe
+              key={realPreviewSrc}
+              src={realPreviewSrc}
+              title="Prévia real do widget"
+              className="min-h-[560px] w-full flex-1 rounded-2xl border border-slate-200 bg-white shadow-sm"
+            />
+          ) : (
+            <PreviewPanel
+              accent={form.launcherAccent}
+              background={form.launcherBackground}
+              font={form.launcherFont}
+              label={form.launcherLabel}
+              model={form.launcherModel}
+              position={form.launcherPosition}
+              size={form.launcherSize}
+              sizeLabel={currentSizeLabel}
+              textColor={form.launcherTextColor}
+            />
+          )}
+        </div>
       </div>
     </>
   );
+}
+
+/**
+ * The real preview embeds /test-store with the CURRENT (unsaved) form as
+ * lupp_* query overrides — the widget runtime reads them from its script src
+ * with the same precedence as data-* attributes, so what renders is the real
+ * production bundle styled exactly like the pending edits.
+ */
+function buildRealPreviewSrc(storeSlug: string, form: WidgetSettingsForm) {
+  const params = new URLSearchParams({
+    widget: "floating_launcher",
+    lupp_position: form.launcherPosition,
+    lupp_accent_color: form.launcherAccent,
+    lupp_background_color: form.launcherBackground,
+    lupp_text_color: form.launcherTextColor,
+    lupp_label: form.launcherLabel,
+    lupp_font_family: form.launcherFont,
+    lupp_bubble_size: form.launcherSize,
+    lupp_model: form.launcherModel,
+    lupp_offset_x: form.launcherOffsetX,
+    lupp_offset_y: form.launcherOffsetY,
+  });
+  return `/test-store/${storeSlug}?${params.toString()}`;
+}
+
+function useDebouncedRealPreviewSrc(
+  storeSlug: string | undefined,
+  form: WidgetSettingsForm,
+) {
+  const target = storeSlug ? buildRealPreviewSrc(storeSlug, form) : "";
+  const [src, setSrc] = React.useState(target);
+  React.useEffect(() => {
+    const handle = window.setTimeout(() => setSrc(target), 600);
+    return () => window.clearTimeout(handle);
+  }, [target]);
+  return src;
 }
 
 function SectionDivider() {

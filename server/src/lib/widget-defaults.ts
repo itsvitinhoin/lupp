@@ -1,9 +1,12 @@
+import { WIDGET_SETTINGS_DEFAULTS } from "@workspace/widget-config";
 import { asRecord } from "@/lib/text";
 /**
- * Widget defaults ported from the SPA (src/lib/constants.ts +
- * widgets.service.ts): the widgets a new store is seeded with, and the
- * settings merge applied when ensuring the floating widget for product pages.
+ * Widget seeding + the "ensure floating widget" merge. All literal defaults
+ * come from the shared contract (@workspace/widget-config) so the dashboard,
+ * this module and the bootstrap resolver can never drift apart again.
  */
+
+const DEFAULTS = WIDGET_SETTINGS_DEFAULTS;
 
 function uniqueValues(values: unknown[]) {
   return Array.from(
@@ -26,22 +29,18 @@ export function withDefaultFloatingWidgetSettings(settingsValue?: unknown) {
   return {
     ...settings,
     display: {
-      mode: "all",
-      include_paths: [],
-      exclude_paths: ["/checkout", "/carrinho", "/cart"],
-      product_mode: "linked_or_all",
-      hide_without_videos: false,
-      home_experience_enabled: true,
-      home_ordering: "manual",
+      ...DEFAULTS.display,
+      include_paths: [...DEFAULTS.display.include_paths],
+      exclude_paths: [...DEFAULTS.display.exclude_paths],
       ...display,
     },
     carousel: {
-      enabled: true,
-      title: "Descubra cada detalhe e Compre",
-      description: "",
-      before_heading: "Com Capa",
-      max_items: 12,
-      mobile_max_items: 6,
+      enabled: DEFAULTS.carousel.enabled,
+      title: DEFAULTS.carousel.title,
+      description: DEFAULTS.carousel.description,
+      before_heading: DEFAULTS.carousel.before_heading,
+      max_items: DEFAULTS.carousel.max_items,
+      mobile_max_items: DEFAULTS.carousel.mobile_max_items,
       ...carousel,
     },
   };
@@ -65,26 +64,27 @@ export function buildFloatingEnsureSettings(settingsValue?: unknown) {
     appearance,
     display: {
       ...display,
-      mode: "all",
-      include_paths: [],
+      mode: DEFAULTS.display.mode,
+      include_paths: [...DEFAULTS.display.include_paths],
       exclude_paths: uniqueValues(
         Array.isArray(display.exclude_paths)
           ? display.exclude_paths
-          : ["/checkout", "/carrinho", "/cart"],
+          : [...DEFAULTS.display.exclude_paths],
       ),
-      product_mode: "linked_or_all",
-      hide_without_videos: false,
-      home_experience_enabled: display.home_experience_enabled ?? true,
-      home_ordering: display.home_ordering || "manual",
+      product_mode: DEFAULTS.display.product_mode,
+      hide_without_videos: DEFAULTS.display.hide_without_videos,
+      home_experience_enabled:
+        display.home_experience_enabled ?? DEFAULTS.display.home_experience_enabled,
+      home_ordering: display.home_ordering || DEFAULTS.display.home_ordering,
     },
     carousel: {
       ...carousel,
-      before_heading: carousel.before_heading ?? "Com Capa",
-      description: carousel.description ?? "",
-      enabled: carousel.enabled ?? true,
-      max_items: carousel.max_items ?? 12,
-      mobile_max_items: carousel.mobile_max_items ?? 6,
-      title: carousel.title ?? "Descubra cada detalhe e Compre",
+      before_heading: carousel.before_heading ?? DEFAULTS.carousel.before_heading,
+      description: carousel.description ?? DEFAULTS.carousel.description,
+      enabled: carousel.enabled ?? DEFAULTS.carousel.enabled,
+      max_items: carousel.max_items ?? DEFAULTS.carousel.max_items,
+      mobile_max_items: carousel.mobile_max_items ?? DEFAULTS.carousel.mobile_max_items,
+      title: carousel.title ?? DEFAULTS.carousel.title,
     },
   };
 }

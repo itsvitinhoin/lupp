@@ -1,3 +1,4 @@
+import { WIDGET_SETTINGS_DEFAULTS } from "@workspace/widget-config";
 import { asRecord } from "@/lib/utils";
 export const LUPP_BRAND = {
   name: "Lupp",
@@ -76,25 +77,23 @@ export function withDefaultFloatingWidgetSettings(settingsValue?: unknown) {
   const display = asRecord(settings.display);
   const carousel = asRecord(settings.carousel);
 
+  // Literal defaults live in the shared contract — the server's
+  // widget-defaults.ts applies the same merge from the same values.
   return {
     ...settings,
     display: {
-      mode: "all",
-      include_paths: [],
-      exclude_paths: ["/checkout", "/carrinho", "/cart"],
-      product_mode: "linked_or_all",
-      hide_without_videos: false,
-      home_experience_enabled: true,
-      home_ordering: "manual",
+      ...WIDGET_SETTINGS_DEFAULTS.display,
+      include_paths: [...WIDGET_SETTINGS_DEFAULTS.display.include_paths],
+      exclude_paths: [...WIDGET_SETTINGS_DEFAULTS.display.exclude_paths],
       ...display,
     },
     carousel: {
-      enabled: true,
-      title: "Descubra cada detalhe e Compre",
-      description: "",
-      before_heading: "Com Capa",
-      max_items: 12,
-      mobile_max_items: 6,
+      enabled: WIDGET_SETTINGS_DEFAULTS.carousel.enabled,
+      title: WIDGET_SETTINGS_DEFAULTS.carousel.title,
+      description: WIDGET_SETTINGS_DEFAULTS.carousel.description,
+      before_heading: WIDGET_SETTINGS_DEFAULTS.carousel.before_heading,
+      max_items: WIDGET_SETTINGS_DEFAULTS.carousel.max_items,
+      mobile_max_items: WIDGET_SETTINGS_DEFAULTS.carousel.mobile_max_items,
       ...carousel,
     },
   };

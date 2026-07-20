@@ -103,6 +103,67 @@ describe("GET /api/widget/bootstrap context mode (e2e)", () => {
     expect(response.headers["cache-control"]).toBe("public, max-age=60");
   });
 
+  it("resolves the full launcher/display/carousel surface with shared defaults", async () => {
+    const store = await seedContextStore(
+      {
+        appearance: {
+          background_color: "#101010",
+          font_family: "Poppins, sans-serif",
+          model: "square",
+          bubble_size: 92,
+          offset_x: 32,
+          offset_y: 0,
+        },
+        display: { home_ordering: "automatic" },
+        carousel: { anchor_selector: "#main .products", anchor_placement: "after" },
+      },
+      { plan_id: "growth" },
+    );
+    await seedVideo(store.id);
+
+    const response = await request(app.server).get(
+      contextUrl(store.id, "https://loja.example.com/"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.config.launcher).toMatchObject({
+      background_color: "#101010",
+      font_family: "Poppins, sans-serif",
+      model: "square",
+      bubble_size: 92,
+      offset_x: 32,
+      offset_y: 0,
+    });
+    expect(response.body.config.display.home_ordering).toBe("automatic");
+    expect(response.body.config.carousel).toMatchObject({
+      anchor_selector: "#main .products",
+      anchor_placement: "after",
+    });
+
+    // Unset keys resolve to the shared contract defaults.
+    const bare = await seedContextStore({}, { plan_id: "growth" });
+    await seedVideo(bare.id);
+    const defaults = await request(app.server).get(
+      contextUrl(bare.id, "https://loja.example.com/"),
+    );
+    expect(defaults.body.config.launcher).toMatchObject({
+      accent_color: "#fe2c55",
+      background_color: "#0b0b0f",
+      label: "Compre pelo vídeo",
+      model: "circular",
+      bubble_size: 74,
+      offset_x: 18,
+      offset_y: 18,
+    });
+    expect(defaults.body.config.display.home_ordering).toBe("manual");
+    expect(defaults.body.config.carousel).toMatchObject({
+      anchor_selector: "",
+      anchor_placement: "before",
+      max_items: 12,
+      mobile_max_items: 6,
+    });
+  });
+
   it("orders product-page matches first and resolves the price label", async () => {
     const store = await seedContextStore();
     await seedVideo(store.id, { title: "Generic feed video" });

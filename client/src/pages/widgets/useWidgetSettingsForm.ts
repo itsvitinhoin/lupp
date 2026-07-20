@@ -1,4 +1,5 @@
 import React from "react";
+import { WIDGET_SETTINGS_DEFAULTS } from "@workspace/widget-config";
 
 export type WidgetSettingsForm = {
   launcherLabel: string;
@@ -9,7 +10,13 @@ export type WidgetSettingsForm = {
   launcherFont: string;
   launcherSize: string;
   launcherModel: string;
+  launcherOffsetX: string;
+  launcherOffsetY: string;
+  displayMode: string;
+  productMode: string;
+  includePaths: string;
   excludePaths: string;
+  hideWithoutVideos: boolean;
   homeExperienceEnabled: boolean;
   homeOrdering: string;
   fixedVideo: boolean;
@@ -25,6 +32,8 @@ export type WidgetSettingsForm = {
   carouselTitle: string;
   carouselDescription: string;
   carouselBeforeHeading: string;
+  carouselAnchorSelector: string;
+  carouselAnchorPlacement: string;
   carouselDesktopCount: string;
   carouselMobileCount: string;
 };
@@ -34,18 +43,26 @@ export type SetWidgetSettingsField = <K extends keyof WidgetSettingsForm>(
   value: WidgetSettingsForm[K],
 ) => void;
 
+const DEFAULTS = WIDGET_SETTINGS_DEFAULTS;
+
 const defaultForm: WidgetSettingsForm = {
-  launcherLabel: "VIDEO DO PRODUTO",
-  launcherPosition: "bottom-left",
-  launcherAccent: "#176BFF",
-  launcherBackground: "#0F172A",
-  launcherTextColor: "#ffffff",
-  launcherFont: "Inter, system-ui, sans-serif",
-  launcherSize: "74",
-  launcherModel: "circular",
-  excludePaths: "/checkout\n/carrinho\n/cart",
-  homeExperienceEnabled: true,
-  homeOrdering: "manual",
+  launcherLabel: DEFAULTS.appearance.label,
+  launcherPosition: DEFAULTS.appearance.position,
+  launcherAccent: DEFAULTS.appearance.accent_color,
+  launcherBackground: DEFAULTS.appearance.background_color,
+  launcherTextColor: DEFAULTS.appearance.text_color,
+  launcherFont: DEFAULTS.appearance.font_family,
+  launcherSize: String(DEFAULTS.appearance.bubble_size),
+  launcherModel: DEFAULTS.appearance.model,
+  launcherOffsetX: String(DEFAULTS.appearance.offset_x),
+  launcherOffsetY: String(DEFAULTS.appearance.offset_y),
+  displayMode: DEFAULTS.display.mode,
+  productMode: DEFAULTS.display.product_mode,
+  includePaths: DEFAULTS.display.include_paths.join("\n"),
+  excludePaths: DEFAULTS.display.exclude_paths.join("\n"),
+  hideWithoutVideos: DEFAULTS.display.hide_without_videos,
+  homeExperienceEnabled: DEFAULTS.display.home_experience_enabled,
+  homeOrdering: DEFAULTS.display.home_ordering,
   fixedVideo: false,
   allowClose: true,
   randomizeThumbnail: false,
@@ -55,12 +72,14 @@ const defaultForm: WidgetSettingsForm = {
   customPixDiscountEnabled: false,
   customPixDiscountPercent: "0",
   customPaymentNote: "",
-  carouselEnabled: true,
-  carouselTitle: "Descubra cada detalhe e Compre",
-  carouselDescription: "",
-  carouselBeforeHeading: "Com Capa",
-  carouselDesktopCount: "12",
-  carouselMobileCount: "6",
+  carouselEnabled: DEFAULTS.carousel.enabled,
+  carouselTitle: DEFAULTS.carousel.title,
+  carouselDescription: DEFAULTS.carousel.description,
+  carouselBeforeHeading: DEFAULTS.carousel.before_heading,
+  carouselAnchorSelector: DEFAULTS.carousel.anchor_selector,
+  carouselAnchorPlacement: DEFAULTS.carousel.anchor_placement,
+  carouselDesktopCount: String(DEFAULTS.carousel.max_items),
+  carouselMobileCount: String(DEFAULTS.carousel.mobile_max_items),
 };
 
 export function asSettings(value: unknown): Record<string, any> {
@@ -83,7 +102,9 @@ function pathsToText(value: unknown) {
  * Single source of truth for the widget personalization form: one state
  * object for every field, hydration from the saved floating widget row and
  * the plan-based carousel auto-disable, plus the `buildLauncherSettings`
- * payload builder (server contract — key names must not change).
+ * payload builder (server contract — key names must not change). Defaults
+ * come from @workspace/widget-config so the panel, the API and the widget
+ * runtime always agree on what an untouched store renders.
  */
 export function useWidgetSettingsForm({
   floatingWidget,
@@ -107,40 +128,50 @@ export function useWidgetSettingsForm({
     const carousel = asSettings(settings.carousel);
 
     setForm({
-      launcherPosition: String(appearance.position || "bottom-left"),
-      launcherAccent: String(appearance.accent_color || "#176BFF"),
-      launcherBackground: String(appearance.background_color || "#0F172A"),
-      launcherTextColor: String(appearance.text_color || "#ffffff"),
-      launcherLabel: String(appearance.label ?? "VIDEO DO PRODUTO"),
-      launcherFont: String(
-        appearance.font_family || "Inter, system-ui, sans-serif",
+      launcherPosition: String(appearance.position || DEFAULTS.appearance.position),
+      launcherAccent: String(appearance.accent_color || DEFAULTS.appearance.accent_color),
+      launcherBackground: String(
+        appearance.background_color || DEFAULTS.appearance.background_color,
       ),
-      launcherSize: String(appearance.bubble_size || "74"),
-      launcherModel: String(appearance.model || "circular"),
+      launcherTextColor: String(appearance.text_color || DEFAULTS.appearance.text_color),
+      launcherLabel: String(appearance.label ?? DEFAULTS.appearance.label),
+      launcherFont: String(appearance.font_family || DEFAULTS.appearance.font_family),
+      launcherSize: String(appearance.bubble_size || DEFAULTS.appearance.bubble_size),
+      launcherModel: String(appearance.model || DEFAULTS.appearance.model),
+      launcherOffsetX: String(appearance.offset_x ?? DEFAULTS.appearance.offset_x),
+      launcherOffsetY: String(appearance.offset_y ?? DEFAULTS.appearance.offset_y),
       fixedVideo: Boolean(appearance.fixed_video),
       allowClose: appearance.allow_close !== false,
       randomizeThumbnail: Boolean(appearance.randomize_thumbnail),
+      displayMode: String(display.mode || DEFAULTS.display.mode),
+      productMode: String(display.product_mode || DEFAULTS.display.product_mode),
+      includePaths: pathsToText(display.include_paths),
       excludePaths:
-        pathsToText(display.exclude_paths) || "/checkout\n/carrinho\n/cart",
+        pathsToText(display.exclude_paths) || DEFAULTS.display.exclude_paths.join("\n"),
+      hideWithoutVideos: Boolean(display.hide_without_videos),
       homeExperienceEnabled: display.home_experience_enabled !== false,
-      homeOrdering: String(display.home_ordering || "manual"),
+      homeOrdering: String(display.home_ordering || DEFAULTS.display.home_ordering),
       customInstallmentsEnabled: Boolean(commerce.custom_installments_enabled),
-      customInstallmentsCount: String(
-        commerce.custom_installments_count || "6",
-      ),
+      customInstallmentsCount: String(commerce.custom_installments_count || "6"),
       customInstallmentsInterestFree:
         commerce.custom_installments_interest_free !== false,
       customPixDiscountEnabled: Boolean(commerce.custom_pix_discount_enabled),
-      customPixDiscountPercent: String(
-        commerce.custom_pix_discount_percent || "0",
-      ),
+      customPixDiscountPercent: String(commerce.custom_pix_discount_percent || "0"),
       customPaymentNote: String(commerce.custom_payment_note || ""),
       carouselEnabled: carousel.enabled !== false,
-      carouselTitle: String(carousel.title || "Descubra cada detalhe e Compre"),
+      carouselTitle: String(carousel.title || DEFAULTS.carousel.title),
       carouselDescription: String(carousel.description || ""),
-      carouselBeforeHeading: String(carousel.before_heading || "Com Capa"),
-      carouselDesktopCount: String(carousel.max_items || "12"),
-      carouselMobileCount: String(carousel.mobile_max_items || "6"),
+      carouselBeforeHeading: String(
+        carousel.before_heading || DEFAULTS.carousel.before_heading,
+      ),
+      carouselAnchorSelector: String(carousel.anchor_selector || ""),
+      carouselAnchorPlacement: String(
+        carousel.anchor_placement || DEFAULTS.carousel.anchor_placement,
+      ),
+      carouselDesktopCount: String(carousel.max_items || DEFAULTS.carousel.max_items),
+      carouselMobileCount: String(
+        carousel.mobile_max_items || DEFAULTS.carousel.mobile_max_items,
+      ),
     });
   }, [floatingWidget?.id, floatingWidget?.updated_at]);
 
@@ -156,23 +187,25 @@ export function useWidgetSettingsForm({
       accent_color: form.launcherAccent,
       allow_close: form.allowClose,
       background_color: form.launcherBackground,
-      bubble_size: Number(form.launcherSize) || 74,
+      bubble_size: Number(form.launcherSize) || DEFAULTS.appearance.bubble_size,
       fixed_video: form.fixedVideo,
       font_family: form.launcherFont,
       label: form.launcherLabel,
       model: form.launcherModel,
+      offset_x: Number(form.launcherOffsetX ?? DEFAULTS.appearance.offset_x) || 0,
+      offset_y: Number(form.launcherOffsetY ?? DEFAULTS.appearance.offset_y) || 0,
       position: form.launcherPosition,
       randomize_thumbnail: form.randomizeThumbnail,
       text_color: form.launcherTextColor,
     },
     display: {
       exclude_paths: pathsFromText(form.excludePaths),
-      hide_without_videos: false,
+      hide_without_videos: form.hideWithoutVideos,
       home_experience_enabled: form.homeExperienceEnabled,
       home_ordering: form.homeOrdering,
-      include_paths: [],
-      mode: "all",
-      product_mode: "linked_or_all",
+      include_paths: pathsFromText(form.includePaths),
+      mode: form.displayMode,
+      product_mode: form.productMode,
     },
     commerce: {
       custom_installments_enabled: form.customInstallmentsEnabled,
@@ -183,12 +216,14 @@ export function useWidgetSettingsForm({
       custom_payment_note: form.customPaymentNote.trim(),
     },
     carousel: {
+      anchor_placement: form.carouselAnchorPlacement,
+      anchor_selector: form.carouselAnchorSelector.trim(),
       enabled: canUseHorizontalFeed && form.carouselEnabled,
-      title: form.carouselTitle.trim() || "Descubra cada detalhe e Compre",
+      title: form.carouselTitle.trim() || DEFAULTS.carousel.title,
       description: form.carouselDescription.trim(),
-      before_heading: form.carouselBeforeHeading.trim() || "Com Capa",
-      max_items: Number(form.carouselDesktopCount) || 12,
-      mobile_max_items: Number(form.carouselMobileCount) || 6,
+      before_heading: form.carouselBeforeHeading.trim() || DEFAULTS.carousel.before_heading,
+      max_items: Number(form.carouselDesktopCount) || DEFAULTS.carousel.max_items,
+      mobile_max_items: Number(form.carouselMobileCount) || DEFAULTS.carousel.mobile_max_items,
     },
   });
 

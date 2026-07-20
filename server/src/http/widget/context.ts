@@ -51,6 +51,7 @@ export type ResolvedWidgetConfig = {
     exclude_paths: string[];
     hide_without_videos: boolean;
     home_experience_enabled: boolean;
+    home_ordering: string;
   };
   carousel: {
     enabled: boolean;
@@ -65,6 +66,7 @@ export type ResolvedWidgetConfig = {
   };
 };
 
+import { CAROUSEL_PLAN_IDS, WIDGET_SETTINGS_DEFAULTS } from "@workspace/widget-config";
 import { clean as text, asRecord as record } from "@/lib/text";
 
 // ---------------------------------------------------------------------------
@@ -203,7 +205,8 @@ export function buildPageContext(query: {
 // Config resolution (widget.js defaults + applyWidgetSettings)
 // ---------------------------------------------------------------------------
 
-const PLANS_WITH_HORIZONTAL_FEED = ["growth", "pro", "scale"];
+const PLANS_WITH_HORIZONTAL_FEED: readonly string[] = CAROUSEL_PLAN_IDS;
+const DEFAULTS = WIDGET_SETTINGS_DEFAULTS;
 
 function parsePathList(value: unknown): string[] {
   if (Array.isArray(value)) return value.map(text).filter(Boolean);
@@ -224,43 +227,50 @@ export function resolveWidgetConfig(
 
   const resolved: ResolvedWidgetConfig = {
     launcher: {
-      position: text(appearance.position) || "bottom-left",
-      accent_color: text(appearance.accent_color) || "#fe2c55",
-      background_color: text(appearance.background_color) || "#0b0b0f",
-      text_color: text(appearance.text_color) || "#ffffff",
-      label: typeof appearance.label === "string" ? appearance.label : "Compre pelo vídeo",
-      font_family:
-        text(appearance.font_family) ||
-        "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      bubble_size: Number(appearance.bubble_size) || 74,
-      model: text(appearance.model) || "circular",
+      position: text(appearance.position) || DEFAULTS.appearance.position,
+      accent_color: text(appearance.accent_color) || DEFAULTS.appearance.accent_color,
+      background_color:
+        text(appearance.background_color) || DEFAULTS.appearance.background_color,
+      text_color: text(appearance.text_color) || DEFAULTS.appearance.text_color,
+      label:
+        typeof appearance.label === "string" ? appearance.label : DEFAULTS.appearance.label,
+      font_family: text(appearance.font_family) || DEFAULTS.appearance.font_family,
+      bubble_size: Number(appearance.bubble_size) || DEFAULTS.appearance.bubble_size,
+      model: text(appearance.model) || DEFAULTS.appearance.model,
       offset_x: Number.isFinite(Number(appearance.offset_x)) && appearance.offset_x !== undefined
         ? Number(appearance.offset_x)
-        : 18,
+        : DEFAULTS.appearance.offset_x,
       offset_y: Number.isFinite(Number(appearance.offset_y)) && appearance.offset_y !== undefined
         ? Number(appearance.offset_y)
-        : 18,
+        : DEFAULTS.appearance.offset_y,
     },
     display: {
-      mode: text(display.mode) || "all",
-      product_mode: text(display.product_mode) || "linked_or_all",
+      mode: text(display.mode) || DEFAULTS.display.mode,
+      product_mode: text(display.product_mode) || DEFAULTS.display.product_mode,
       include_paths: parsePathList(display.include_paths),
       exclude_paths: parsePathList(display.exclude_paths),
       hide_without_videos: Boolean(display.hide_without_videos),
       home_experience_enabled:
         "home_experience_enabled" in display ? display.home_experience_enabled !== false : true,
+      home_ordering: text(display.home_ordering) || DEFAULTS.display.home_ordering,
     },
     carousel: {
       enabled: "enabled" in carousel ? carousel.enabled !== false : true,
       title:
-        (typeof carousel.title === "string" && carousel.title) || "Descubra cada detalhe e Compre",
-      description: typeof carousel.description === "string" ? carousel.description : "",
+        (typeof carousel.title === "string" && carousel.title) || DEFAULTS.carousel.title,
+      description:
+        typeof carousel.description === "string"
+          ? carousel.description
+          : DEFAULTS.carousel.description,
       before_heading:
-        (typeof carousel.before_heading === "string" && carousel.before_heading) || "Com Capa",
+        (typeof carousel.before_heading === "string" && carousel.before_heading) ||
+        DEFAULTS.carousel.before_heading,
       anchor_selector: text(carousel.anchor_selector),
-      anchor_placement: text(carousel.anchor_placement) || "before",
-      max_items: Number(carousel.max_items) || 12,
-      mobile_max_items: Number(carousel.mobile_max_items) || 6,
+      anchor_placement:
+        text(carousel.anchor_placement) || DEFAULTS.carousel.anchor_placement,
+      max_items: Number(carousel.max_items) || DEFAULTS.carousel.max_items,
+      mobile_max_items:
+        Number(carousel.mobile_max_items) || DEFAULTS.carousel.mobile_max_items,
     },
   };
 
