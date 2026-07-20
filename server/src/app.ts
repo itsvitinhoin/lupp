@@ -58,22 +58,22 @@ export const app = fastify({
     ...(isProduction
       ? {}
       : {
-          transport: {
-            targets: [
-              {
-                target: "pino-pretty",
-                level: "error",
-                options: {
-                  name: "dev-terminal",
-                  colorize: true,
-                  levelFirst: true,
-                  include: "level,time,msg,err",
-                  translateTime: "yyyy-mm-dd HH:MM:ss Z",
-                },
+        transport: {
+          targets: [
+            {
+              target: "pino-pretty",
+              level: "error",
+              options: {
+                name: "dev-terminal",
+                colorize: true,
+                levelFirst: true,
+                include: "level,time,msg,err",
+                translateTime: "yyyy-mm-dd HH:MM:ss Z",
               },
-            ],
-          },
-        }),
+            },
+          ],
+        },
+      }),
   },
   disableRequestLogging: true, // Disable Fastify's default request logs
   // Behind one reverse-proxy hop request.ip follows X-Forwarded-For, which the
@@ -86,18 +86,18 @@ loggerHandlers(app)
 app.setValidatorCompiler(validatorCompiler)
 app.setSerializerCompiler(serializerCompiler)
 
-const corsOrigins: (string | RegExp)[] = [
-  "https://playluup.com.br",
-  "https://luup.dzns.com.br",
-  "https://luup.dzns.net",
-]
-if (!isProduction) {
-  corsOrigins.push(/^http:\/\/localhost:\d+$/)
-  corsOrigins.push(/^http:\/\/127\.0\.0\.1:\d+$/)
-}
+// const corsOrigins: (string | RegExp)[] = [
+//   "https://playluup.com.br",
+//   "https://luup.dzns.com.br",
+//   "https://luup.dzns.net",
+// ]
+// if (!isProduction) {
+//   corsOrigins.push(/^http:\/\/localhost:\d+$/)
+//   corsOrigins.push(/^http:\/\/127\.0\.0\.1:\d+$/)
+// }
 
 app.register(fastifyCors, {
-  origin: corsOrigins,
+  origin: true,
   methods: ["GET", "PUT", "POST", "PATCH", "DELETE"],
   credentials: true,
 })
