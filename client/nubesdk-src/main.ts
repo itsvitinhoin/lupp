@@ -32,21 +32,28 @@ type FrameMessage =
   | { type: "resize"; width?: number; height?: number }
   | { type: "LUPP_NUBESDK_CART_ADD"; requestId: string; items: CartAddItem[] };
 
-type LauncherPlacement = {
-  slot: "corner_bottom_left" | "corner_bottom_right" | "corner_top_left" | "corner_top_right";
-};
+// The docs' corner_* "fixed slots" are not rendered by current themes (their
+// server-side slot sets carry only content-anchored slots), so the launcher
+// mounts in `before_main_content` — present on every storefront page — and
+// floats to the configured corner via fixed positioning on the iframe itself.
+const LAUNCHER_SLOT = "before_main_content";
 
-function placementFor(position: string): LauncherPlacement {
-  switch (position) {
-    case "bottom-right":
-      return { slot: "corner_bottom_right" };
-    case "top-left":
-      return { slot: "corner_top_left" };
-    case "top-right":
-      return { slot: "corner_top_right" };
-    default:
-      return { slot: "corner_bottom_left" };
-  }
+type LauncherStyle = Record<string, string | number>;
+
+function launcherStyleFor(
+  position: string,
+  offsetX: number,
+  offsetY: number,
+): LauncherStyle {
+  const style: LauncherStyle = {
+    position: "fixed",
+    zIndex: 2147483000,
+    border: "none",
+    background: "transparent",
+  };
+  style[position.includes("top") ? "top" : "bottom"] = `${offsetY}px`;
+  style[position.includes("right") ? "right" : "left"] = `${offsetX}px`;
+  return style;
 }
 
 function frameSrc(state: NubeSDKState): `https://${string}` {
@@ -66,7 +73,6 @@ export function App(nube: NubeSDK) {
   }> = [];
 
   let launcherFrame: ReturnType<typeof iframe> | null = null;
-  let renderedSlot: LauncherPlacement["slot"] | null = null;
 
   function replyToFrame(requestId: string, ok: boolean, error?: string) {
     if (!launcherFrame) return;
@@ -138,6 +144,8 @@ export function App(nube: NubeSDK) {
     // at all (billing gate + display rules for this page) and where the
     // launcher sits. Any failure → render nothing (never break the store).
     let position = "bottom-left";
+    let offsetX = 18;
+    let offsetY = 18;
     try {
       const query = new URLSearchParams({
         widget: "floating_launcher",
@@ -149,26 +157,30 @@ export function App(nube: NubeSDK) {
       const payload = (await response.json()) as {
         active?: boolean;
         display?: { show?: boolean };
-        config?: { launcher?: { position?: string } };
+        config?: { launcher?: { position?: string; offset_x?: number; offset_y?: number } };
       };
       if (payload.active === false || payload.display?.show === false) return;
       position = payload.config?.launcher?.position || position;
+      if (Number.isFinite(payload.config?.launcher?.offset_x)) {
+        offsetX = Number(payload.config?.launcher?.offset_x);
+      }
+      if (Number.isFinite(payload.config?.launcher?.offset_y)) {
+        offsetY = Number(payload.config?.launcher?.offset_y);
+      }
     } catch {
       return;
     }
 
-    const placement = placementFor(position);
     launcherFrame = iframe({
       id: "luup-widget-frame",
       src: frameSrc(state),
       width: "150px",
       height: "190px",
       autoresize: true,
+      style: launcherStyleFor(position, offsetX, offsetY),
       onMessage: onFrameMessage,
     });
-    if (renderedSlot && renderedSlot !== placement.slot) nube.clearSlot(renderedSlot);
-    renderedSlot = placement.slot;
-    nube.render(placement.slot, launcherFrame);
+    nube.render(LAUNCHER_SLOT, launcherFrame);
   }
 
   void renderLauncher(nube.getState());
