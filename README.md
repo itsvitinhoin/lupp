@@ -34,6 +34,9 @@ client only renders; SPA navigations refetch per URL. Platform-specific code
 (carts, Upzero customer status) loads on demand as adapter bundles from the
 same origin as `widget.js`.
 
+Per-platform installation steps (Nuvemshop app, Shopify, Upzero, GTM, manual
+embed) live in [`docs/ONBOARDING.md`](docs/ONBOARDING.md).
+
 ## Development
 
 ```bash
