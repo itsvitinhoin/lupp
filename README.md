@@ -10,9 +10,10 @@ that opens a fullscreen, TikTok-style shopping feed on their store.
 | --- | --- |
 | `server/` | Fastify 5 API — auth, stores, videos, widgets, billing, analytics, platform integrations (Nuvemshop, Shopify, Upzero), public widget endpoints. Prisma 7 + PostgreSQL. |
 | `client/` | Vite + React SPA — merchant dashboard (`/app/*`), public feed pages (`/s/:slug/feed`), landing. Serves the built widget from `public/`. |
-| `client/widget-src/` | The embeddable storefront widget, written in strict TypeScript, bundled by esbuild (`client/build-widget.mjs`) into `client/public/widget.js` plus lazily-loaded platform adapters (`widget-upzero.js`, `widget-shopify.js`, `widget-nuvemshop.js`). |
-| `lib/api-client-react/` | Shared REST client used by the SPA (`customFetch`, base-url + bearer-token wiring). |
-| `deploy.sh` | Production deploy (VPS): build server+client, prisma migrate, systemd unit for the API, publish the SPA to `/var/www`, nginx vhost + TLS. |
+| `client/widget-src/` | The embeddable storefront widget, written in strict TypeScript, bundled by esbuild (`client/build-widget.mjs`) into `client/public/widget.js` plus lazily-loaded platform adapters (`widget-upzero.js`, `widget-shopify.js`, `widget-nuvemshop.js`). The `nuvemshop-*` loader scripts in `client/public/` are hand-maintained sources, not build outputs. |
+| `lib/api-client/` | Shared REST client used by the SPA (`customFetch`, base-url + bearer-token wiring). |
+| `lib/widget-config/` | Shared widget settings contract — types, enums, canonical defaults and normalize/merge helpers — consumed by the dashboard form, the server's widget PATCH merge and the bootstrap config resolver. |
+| `deploy.sh` | Production deploy (VPS): build server+client, prisma migrate, systemd unit for the API, publish the SPA to `/var/www` (verifying the widget/loader files actually landed), nginx vhost + TLS. |
 | `backup.sh` | Snapshot-syncs production data into the local dev database. |
 
 ## Widget architecture (one request, server-side logic)

@@ -1,8 +1,9 @@
 # CLAUDE.md — agent guide for the Lupp repo
 
 Shoppable-video widget platform. pnpm monorepo: `server/` (Fastify 5 + Prisma 7
-+ Postgres), `client/` (Vite React SPA + the embeddable widget), and
-`lib/api-client-react` (shared REST client). See `README.md` for the overview.
++ Postgres), `client/` (Vite React SPA + the embeddable widget),
+`lib/api-client` (shared REST client) and `lib/widget-config` (shared widget
+settings contract). See `README.md` for the overview.
 
 ## Commands
 
@@ -20,12 +21,22 @@ cd client && npm run build:widget   # esbuild widget-src/*.ts -> public/widget*.
   `widget-*.js` adapters) by hand — they are esbuild outputs of
   `client/widget-src/*.ts` (strict TS). Rebuild with `build:widget`; outputs
   are committed. `widget-src/types.ts` pins the server payload contract and
-  the core↔adapter `window.__LUPP_WIDGET_BRIDGE__` bridge.
+  the core↔adapter `window.__LUPP_WIDGET_BRIDGE__` bridge. The `nuvemshop-*`
+  files in `client/public/` (script loader, NubeSDK loader, cart bridge,
+  widget frame) are hand-maintained sources, NOT build outputs.
 - **One bootstrap request (context mode)**: `GET /api/widget/bootstrap` with
-  `url=` returns display rules, resolved config and slim video cards — all
+  `url=` returns display rules, resolved config (incl.
+  `display.home_ordering`) and slim video cards — all
   filtering/matching/price-formatting lives in
   `server/src/http/widget/context.ts` (mirrors old widget.js semantics; keep
   them in lockstep with the legacy no-`url` path used by old cached embeds).
+- **Widget settings live in `lib/widget-config`**: one module owns the types,
+  enums, canonical defaults and normalize/merge helpers, consumed by the
+  dashboard form, the server write path and the bootstrap resolver. Changing
+  a default there changes what un-configured stores render.
+  `PATCH /api/widgets/:id` MERGES settings section-wise and normalizes
+  (enums/colors/ranges) via `mergeWidgetSettings` — it is not a whole-object
+  replace (`server/src/http/widgets/update-widget.ts`).
 - **Embed attribute precedence**: explicit `data-*` attrs on the script tag
   override dashboard settings, which override defaults. Attribute/query names
   and defaults in `widget-src/main.ts` (`SCRIPT_VALUE_SPECS`) are public
@@ -42,16 +53,42 @@ cd client && npm run build:widget   # esbuild widget-src/*.ts -> public/widget*.
   raw `fetch` — routing it through the shared client re-enters the bearer
   token getter and recurses. Don't "simplify" that.
 - **Adapters load lazily** from the same origin as widget.js after bootstrap
-  identifies `store.platform`; deploys must ship all four `widget*.js` files.
+  identifies `store.platform`; deploys must ship all four `widget*.js` files
+  plus the Nuvemshop loaders — `deploy.sh`'s `publish_client_dist` fails loud
+  if any of `widget.js`, the three adapters, `nuvemshop-script.js` or
+  `nuvemshop-nubesdk.js` is missing from the published tree (the SPA fallback
+  otherwise serves index.html as text/html for missing JS paths).
+- **Nuvemshop API access** goes through `server/src/lib/nuvemshop/` (crm-style
+  pattern: `core/` sub-clients Products/Store/Scripts/Oauth + `NuvemshopClient`
+  facade; `BaseClient` keeps capped `lastRequest(s)`/`lastResponse(s)`
+  inspection buffers via `src/lib/http/request-buffer.ts`). The legacy flat
+  helpers are re-exported from its `index.ts`, so `@/lib/nuvemshop` imports
+  still resolve. App id is 36726 (`NUVEMSHOP_APP_ID` default in `env.ts`).
+- **Nuvemshop script install**: the Scripts API rejects association writes for
+  auto-installed scripts (POST 422, PUT 404), so when `install-script` finds
+  an active auto-installed Luup script, that listing IS terminal success
+  (`AUTO_INSTALL_VERIFIED`) — don't "fix" it by retrying writes. Portal note:
+  with "Use NubeSDK" enabled, portal scripts run in web workers (no DOM); our
+  loader needs the DOM, so the toggle stays off. NubeSDK becomes mandatory
+  for new installations on 2026-08-30 (`nuvemshop-nubesdk.js` is the
+  NubeSDK-mode loader).
 - **Default hosts**: app/widget `https://luup.dzns.com.br`, API
   `https://luup.dzns.net` (client `env.ts` fallbacks, widget `PROD_API_URL`).
-  playluup.com.br remains accepted in origin allowlists for old embeds.
+  API CORS is currently `origin: true` (allow-all; the old allowlist is
+  commented out in `server/src/app.ts`). playluup.com.br is still accepted by
+  the widget-side hostname checks (`widget-src/overlay.ts`) for old embeds.
 
 ## Verification rigs
 
 - **Server**: vitest e2e per HTTP domain (`server/src/http/**/**.spec.ts`);
   every spec must run at least one prisma query or the worker hangs ~10s on
-  teardown. Widget context tests: `context.spec.ts`.
+  teardown. Widget context tests: `context.spec.ts`. Nuvemshop live-API specs
+  are gated on `NUVEMSHOP_TEST_ACCESS_TOKEN`/`NUVEMSHOP_TEST_STORE_ID`
+  (`src/lib/nuvemshop/test/env.ts`) and skip when unset.
+- **Real-widget preview**: `/test-store/:storeSlug` renders the live widget
+  against a demo storefront; `lupp_*` query params on the page URL ride along
+  on the script src as overrides (used by the `/app/widgets` editors' live
+  preview — appearance is no longer hardcoded via data-attrs there).
 - **Widget behavior harness**: a happy-dom harness (session scratchpads have
   `run-harness.mjs` + `cart-roundtrip.mjs` + captured fixtures) asserts the
   bootstrap URL, launcher render, adapter injection, overlay iframe URL, SPA
