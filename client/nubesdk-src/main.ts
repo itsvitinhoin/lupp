@@ -26,6 +26,16 @@ const LUUP_APP_URL: `https://${string}` = "https://luup.dzns.com.br";
 const LUUP_API_URL = "https://luup.dzns.net";
 const CART_TIMEOUT_MS = 12000;
 
+// Worker console output surfaces in the storefront DevTools console — the
+// only visibility we have into the sandbox while diagnosing store setups.
+function log(...parts: unknown[]) {
+  try {
+    console.log("[Luup NubeSDK]", ...parts);
+  } catch {
+    // consoles can be stubbed out; never let logging break the app
+  }
+}
+
 type CartAddItem = { product_id: number; variant_id: number; quantity: number };
 
 type FrameMessage =
@@ -138,7 +148,11 @@ export function App(nube: NubeSDK) {
 
   async function renderLauncher(state: NubeSDKState) {
     const externalStoreId = String(state.store?.id ?? "");
-    if (!externalStoreId) return;
+    log("start", { store: externalStoreId || "(none)", url: state.location?.url });
+    if (!externalStoreId) {
+      log("abort: no store id in state");
+      return;
+    }
 
     // The worker has fetch: ask the bootstrap whether the widget should show
     // at all (billing gate + display rules for this page) and where the
@@ -153,12 +167,20 @@ export function App(nube: NubeSDK) {
         url: String(state.location?.url ?? ""),
       });
       const response = await fetch(`${LUUP_API_URL}/api/widget/bootstrap?${query.toString()}`);
-      if (!response.ok) return;
+      if (!response.ok) {
+        log("abort: bootstrap http", response.status);
+        return;
+      }
       const payload = (await response.json()) as {
         active?: boolean;
-        display?: { show?: boolean };
+        display?: { show?: boolean; reason?: string };
         config?: { launcher?: { position?: string; offset_x?: number; offset_y?: number } };
       };
+      log("bootstrap", {
+        active: payload.active,
+        show: payload.display?.show,
+        reason: payload.display?.reason,
+      });
       if (payload.active === false || payload.display?.show === false) return;
       position = payload.config?.launcher?.position || position;
       if (Number.isFinite(payload.config?.launcher?.offset_x)) {
@@ -167,7 +189,8 @@ export function App(nube: NubeSDK) {
       if (Number.isFinite(payload.config?.launcher?.offset_y)) {
         offsetY = Number(payload.config?.launcher?.offset_y);
       }
-    } catch {
+    } catch (error) {
+      log("abort: bootstrap fetch failed", String(error));
       return;
     }
 
@@ -180,7 +203,23 @@ export function App(nube: NubeSDK) {
       style: launcherStyleFor(position, offsetX, offsetY),
       onMessage: onFrameMessage,
     });
-    nube.render(LAUNCHER_SLOT, launcherFrame);
+
+    // `render()` is the modern API; older storefront runtimes only understand
+    // the wire-level `ui:slot:set` event — try both and say which ran.
+    try {
+      nube.render(LAUNCHER_SLOT, launcherFrame);
+      log("rendered via nube.render into", LAUNCHER_SLOT);
+    } catch (error) {
+      log("nube.render failed, falling back to ui:slot:set", String(error));
+      try {
+        nube.send("ui:slot:set", () => ({
+          ui: { slots: { [LAUNCHER_SLOT]: launcherFrame } },
+        }) as never);
+        log("rendered via ui:slot:set into", LAUNCHER_SLOT);
+      } catch (sendError) {
+        log("ui:slot:set also failed", String(sendError));
+      }
+    }
   }
 
   void renderLauncher(nube.getState());
