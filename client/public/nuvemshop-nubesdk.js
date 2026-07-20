@@ -54,6 +54,21 @@ function readStoreDomain() {
   }
 }
 
+// When the app ALSO ships its NubeSDK-mode script (Patagonia theme), the
+// worker renders the widget inside a nuvemshop-widget-frame.html iframe.
+// This classic loader must yield to it or the launcher shows twice. The
+// worker renders within ~1s of page load; our own injection is idle-delayed
+// past that, so a presence check at injection time is sufficient.
+function nubesdkWidgetFrameActive() {
+  try {
+    return Boolean(
+      document.querySelector('iframe[src*="nuvemshop-widget-frame.html"]'),
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
 function scheduleLuupLoader(callback) {
   const run = () => {
     if (typeof window.requestIdleCallback === "function") {
@@ -105,6 +120,7 @@ function loadLuupLoader(nube, attempt = 0) {
   );
 
   scheduleLuupLoader(() => {
+    if (nubesdkWidgetFrameActive()) return;
     const script = document.createElement("script");
     script.async = true;
     if ("fetchPriority" in script) script.fetchPriority = "low";

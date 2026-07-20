@@ -249,8 +249,24 @@
     }, 160);
   }
 
+  function nubesdkWidgetFrameActive() {
+    try {
+      return Boolean(
+        document.querySelector('iframe[src*="nuvemshop-widget-frame.html"]'),
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
   function requestWidget() {
     if (widgetRequested) return;
+    // The NubeSDK-mode app (Patagonia theme) already rendered the widget in
+    // its own iframe — the classic chain yields to avoid a double launcher.
+    if (nubesdkWidgetFrameActive()) {
+      removeLauncherSoon(0);
+      return;
+    }
     widgetRequested = true;
     if (autoRequestTimer) {
       window.clearTimeout(autoRequestTimer);
