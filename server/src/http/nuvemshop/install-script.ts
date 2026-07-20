@@ -246,9 +246,6 @@ export async function nuvemshopInstallScriptHandler(
     lupp_external_store_id: externalStoreId,
     lupp_store_domain: store.url || "",
     lupp_store: store.slug,
-    // The original passed SUPABASE_URL here for the widget loader; kept for
-    // compatibility while storefront scripts still read it.
-    lupp_supabase_url: process.env.SUPABASE_URL || "",
     lupp_url: appUrl,
     lupp_widget: "floating_launcher",
     lupp_require_active: "true",

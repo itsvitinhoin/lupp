@@ -237,10 +237,10 @@ export function resolveWidgetConfig(
       font_family: text(appearance.font_family) || DEFAULTS.appearance.font_family,
       bubble_size: Number(appearance.bubble_size) || DEFAULTS.appearance.bubble_size,
       model: text(appearance.model) || DEFAULTS.appearance.model,
-      offset_x: Number.isFinite(Number(appearance.offset_x)) && appearance.offset_x !== undefined
+      offset_x: Number.isFinite(Number(appearance.offset_x))
         ? Number(appearance.offset_x)
         : DEFAULTS.appearance.offset_x,
-      offset_y: Number.isFinite(Number(appearance.offset_y)) && appearance.offset_y !== undefined
+      offset_y: Number.isFinite(Number(appearance.offset_y))
         ? Number(appearance.offset_y)
         : DEFAULTS.appearance.offset_y,
     },

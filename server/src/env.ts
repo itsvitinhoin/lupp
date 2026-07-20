@@ -26,7 +26,6 @@ const envSchema = z
     // MAILER (auth confirmation/reset emails). "log" prints messages to the
     // server log instead of sending; swap for a real driver in production.
     MAIL_DRIVER: z.enum(["log"]).default("log"),
-    MAIL_FROM: z.string().default("Luup <no-reply@playluup.com.br>"),
     // Max sign-in attempts per IP per minute (the brute-force surface).
     RATE_LIMIT_LOGIN_MAX: z.coerce.number().default(10),
     // ASAAS BILLING (integration off when the API key is unset)
