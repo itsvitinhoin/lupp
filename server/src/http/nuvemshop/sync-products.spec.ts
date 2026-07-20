@@ -56,7 +56,7 @@ async function seedConnectedStore(externalStoreId: string) {
       provider: "nuvemshop",
       status: "active",
       external_store_id: externalStoreId,
-      settings: { app_id: "34355" },
+      settings: { app_id: "36726" },
     },
   });
   await prisma.integrationSecret.create({
@@ -234,7 +234,7 @@ describe("POST /api/integrations/nuvemshop/sync-products (e2e)", () => {
     });
     expect(updatedIntegration.last_sync_at).not.toBeNull();
     expect(updatedIntegration.settings).toMatchObject({
-      app_id: "34355",
+      app_id: "36726",
       last_product_sync_count: 2,
       last_product_sync_pages: 1,
       nuvemshop_domains: ["https://loja.example.com/"],

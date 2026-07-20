@@ -12,7 +12,7 @@ describe("POST /api/integrations/nuvemshop/oauth/start (e2e)", () => {
   beforeAll(async () => {
     env.NUVEMSHOP_STATE_SECRET = STATE_SECRET;
     env.NUVEMSHOP_CLIENT_ID = "";
-    env.NUVEMSHOP_APP_ID = "34355";
+    env.NUVEMSHOP_APP_ID = "36726";
     env.NUVEMSHOP_AUTHORIZE_BASE_URL = "https://www.nuvemshop.com.br";
     await app.ready();
   });
@@ -69,7 +69,7 @@ describe("POST /api/integrations/nuvemshop/oauth/start (e2e)", () => {
 
     const authorizeUrl = new URL(response.body.authorize_url);
     expect(authorizeUrl.origin).toBe("https://www.nuvemshop.com.br");
-    expect(authorizeUrl.pathname).toBe("/apps/34355/authorize");
+    expect(authorizeUrl.pathname).toBe("/apps/36726/authorize");
 
     const state = authorizeUrl.searchParams.get("state");
     expect(state).toBeTruthy();

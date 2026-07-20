@@ -60,7 +60,7 @@ describe("GET /api/integrations/nuvemshop/oauth/callback (e2e)", () => {
     env.NUVEMSHOP_STATE_SECRET = STATE_SECRET;
     env.NUVEMSHOP_CLIENT_SECRET = "test-client-secret";
     env.NUVEMSHOP_CLIENT_ID = "";
-    env.NUVEMSHOP_APP_ID = "34355";
+    env.NUVEMSHOP_APP_ID = "36726";
     await app.ready();
   });
 
@@ -134,7 +134,7 @@ describe("GET /api/integrations/nuvemshop/oauth/callback (e2e)", () => {
       token_type: "bearer",
     });
     expect(integration.settings).toMatchObject({
-      app_id: "34355",
+      app_id: "36726",
       connected_via: "oauth",
       nuvemshop_store_id: "987654",
       nuvemshop_domains: ["loja.example.com"],
@@ -147,7 +147,7 @@ describe("GET /api/integrations/nuvemshop/oauth/callback (e2e)", () => {
     expect(secret.access_token).toBe("nuvemshop-token-123");
     expect(secret.external_store_id).toBe("987654");
     expect(secret.provider).toBe("nuvemshop");
-    expect(secret.metadata).toMatchObject({ app_id: "34355" });
+    expect(secret.metadata).toMatchObject({ app_id: "36726" });
 
     const updatedStore = await prisma.store.findUniqueOrThrow({
       where: { id: store.id },
@@ -161,7 +161,7 @@ describe("GET /api/integrations/nuvemshop/oauth/callback (e2e)", () => {
     );
     expect(tokenCall).toBeTruthy();
     expect(JSON.parse(String(tokenCall![1]?.body))).toMatchObject({
-      client_id: "34355",
+      client_id: "36726",
       client_secret: "test-client-secret",
       code: "abc",
       grant_type: "authorization_code",

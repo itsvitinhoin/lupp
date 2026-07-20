@@ -30,7 +30,7 @@ async function seedConnectedStore(externalStoreId: string) {
       status: "active",
       external_store_id: externalStoreId,
       credentials: { token_type: "bearer" },
-      settings: { app_id: "34355" },
+      settings: { app_id: "36726" },
     },
   });
   await prisma.integrationSecret.create({
@@ -100,7 +100,7 @@ describe("POST /api/webhooks/nuvemshop-lgpd/:event (e2e)", () => {
     expect(redacted.status).toBe("redacted");
     expect(redacted.credentials).toEqual({});
     expect(redacted.settings).toMatchObject({
-      app_id: "34355",
+      app_id: "36726",
       redaction_event: "store/redact",
     });
     expect((redacted.settings as { redacted_at: string }).redacted_at).toBeTruthy();

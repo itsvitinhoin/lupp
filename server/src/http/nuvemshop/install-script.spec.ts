@@ -23,7 +23,7 @@ async function seedConnectedStore(externalStoreId: string) {
       provider: "nuvemshop",
       status: "active",
       external_store_id: externalStoreId,
-      settings: { app_id: "34355" },
+      settings: { app_id: "36726" },
     },
   });
   await prisma.integrationSecret.create({
@@ -162,7 +162,7 @@ describe("POST /api/integrations/nuvemshop/install-script (e2e)", () => {
       app_id: string;
       script_install: Record<string, unknown>;
     };
-    expect(settings.app_id).toBe("34355");
+    expect(settings.app_id).toBe("36726");
     expect(settings.script_install).toMatchObject({
       auto_installed: false,
       external_store_id: "424101",
