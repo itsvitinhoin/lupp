@@ -369,6 +369,29 @@ export async function nuvemshopInstallScriptHandler(
     });
   }
 
+  if (existing?.is_auto_install) {
+    // Auto-installed scripts reject association writes outright (POST 422
+    // "Script is auto installed. Does not support store association"; PUT 404
+    // — no association row exists), so an active listing IS the terminal
+    // success state. Per-store query_params don't exist in this mode; the
+    // storefront loader reads its config from the page at runtime instead.
+    await saveScriptInstall({
+      installation_id: String(existing.id || "nuvemshop-auto-install"),
+      source: "nuvemshop_app_auto_install",
+      status: "active",
+      verified: true,
+    });
+    return reply.status(200).send({
+      auto_installed: true,
+      existing_script: publicScriptSnapshot(existing),
+      installed: true,
+      method: "AUTO_INSTALL_VERIFIED",
+      ok: true,
+      script_id: String(existing.id),
+      verified: true,
+    });
+  }
+
   const method = existing ? "PUT" : "POST";
   const installationId = existing?.id ? String(existing.id) : scriptIdForApi;
   const endpoint = existing ? `${scriptApiBase}/${installationId}` : scriptApiBase;

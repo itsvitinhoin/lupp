@@ -208,6 +208,81 @@ describe("POST /api/integrations/nuvemshop/install-script (e2e)", () => {
     });
   });
 
+  it("treats an active auto-installed script as terminal success without write attempts", async () => {
+    // Real-world shape: portal script with "Instalação automática" ON. The
+    // Scripts API rejects POST (422 "Does not support store association") and
+    // PUT (404 — no association row), so the active listing must be enough.
+    process.env.NUVEMSHOP_SCRIPT_ID = "8514";
+    const { owner, store, integration } = await seedConnectedStore("424104");
+    const base = scriptsBase("424104");
+    const token = app.jwt.sign({ sub: owner.id, role: "agent" });
+
+    const fetchMock = vi.fn(async (input: unknown, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      if (url.startsWith(`${base}?`) && method === "GET") {
+        return new Response(
+          JSON.stringify({
+            result: [
+              {
+                id: 8514,
+                name: "Luup Video Experience",
+                event: "onfirstinteraction",
+                location: "store",
+                is_auto_install: true,
+                status: "active",
+              },
+            ],
+            total: 1,
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          message: "Script is auto installed. Does not support store association ",
+          error: "Unprocessable Entity",
+          statusCode: 422,
+        }),
+        { status: 422 },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await request(app.server)
+      .post(INSTALL_PATH)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ store_id: store.id });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      auto_installed: true,
+      installed: true,
+      method: "AUTO_INSTALL_VERIFIED",
+      ok: true,
+      script_id: "8514",
+      verified: true,
+    });
+    expect(response.body.existing_script).toMatchObject({ id: 8514, is_auto_install: true });
+
+    // Only the list call — no POST/PUT was attempted.
+    const writeCalls = fetchMock.mock.calls.filter(
+      ([, init]) => ((init as RequestInit)?.method ?? "GET") !== "GET",
+    );
+    expect(writeCalls).toHaveLength(0);
+
+    const updated = await prisma.integration.findUniqueOrThrow({
+      where: { id: integration.id },
+      select: { settings: true },
+    });
+    expect((updated.settings as { script_install: Record<string, unknown> }).script_install).toMatchObject({
+      installation_id: "8514",
+      source: "nuvemshop_app_auto_install",
+      status: "active",
+      verified: true,
+    });
+  });
+
   it("reports auto-install as not confirmed (409) when Nuvemshop lists no script", async () => {
     const { owner, store, integration } = await seedConnectedStore("424103");
     const token = app.jwt.sign({ sub: owner.id, role: "agent" });
