@@ -1,33 +1,31 @@
-import { iframe } from "@tiendanube/nube-sdk-ui";
-import type { NubeSDK, NubeSDKState } from "@tiendanube/nube-sdk-types";
+import { Iframe } from "@tiendanube/nube-sdk-jsx";
+import type {
+  JsonObject,
+  NubeComponent,
+  NubeSDK,
+  NubeSDKState,
+} from "@tiendanube/nube-sdk-types";
 
 /**
  * Luup NubeSDK app (worker entry — upload the built
  * `public/nuvemshop-nubesdk-app.js` to the Partners portal script with
- * "Use NubeSDK" ENABLED). Runs in Nuvemshop's sandboxed web worker: no DOM.
+ * "Use NubeSDK" ENABLED). Port of the proven canonical integration from the
+ * legacy app (main branch `artifacts/nuvemshop-partners`), retargeted at the
+ * current hosts. Architecture:
  *
- * All rendering happens inside `nuvemshop-widget-frame.html` (our origin),
- * embedded via the SDK's iframe component in the corner slot matching the
- * dashboard's launcher position. The frame hosts the real widget.js, so
- * appearance/display rules keep coming from the widget bootstrap. Contracts:
- *
- * - frame → worker `{type:"resize", width, height}`: handled by the SDK
- *   itself (`autoresize: true`) — the same message the frame has always
- *   posted for the legacy sandbox integration.
- * - frame → worker `{type:"LUPP_NUBESDK_CART_ADD", requestId, items}`:
- *   relayed to `nube.send("cart:add")`; the outcome returns to the frame as
- *   `{type:"LUPP_NUBESDK_CART_RESULT", requestId, ok, error?}` via
- *   `postMessageToIframe`. The frame exposes this relay as
- *   `window.__LUUP_NUVEMSHOP_ADD_TO_CART__`, which the widget's nuvemshop
- *   adapter already prefers over its native form-POST fallback.
+ * - launcher iframe (`nuvemshop-widget-frame.html?mode=launcher`) rendered
+ *   into `corner_bottom_left`, re-rendered on `page:loaded`/`location:updated`;
+ * - home carousel iframe (`mode=carousel`) into `before_section_products_sale`;
+ * - the feed opens as a separate SPA iframe (`/s/{slug}/feed?embed=1`) in
+ *   `modal_content` when a frame posts `LUPP_NUBESDK_OPEN_FEED`;
+ * - `LUPP_NUVEMSHOP_ADD_TO_CART_REQUEST` from the feed relays to the native
+ *   `cart:add` event, answered with `LUPP_NUVEMSHOP_ADD_TO_CART_RESPONSE`;
+ * - `LUPP_OPEN_PRODUCT_PAGE_REQUEST` navigates the storefront.
  */
 
-const LUUP_APP_URL: `https://${string}` = "https://luup.dzns.com.br";
-const LUUP_API_URL = "https://luup.dzns.net";
-const CART_TIMEOUT_MS = 12000;
+const APP_URL = "https://luup.dzns.com.br";
+const BOOTSTRAP_URL = "https://luup.dzns.net/api/widget/bootstrap";
 
-// Worker console output surfaces in the storefront DevTools console — the
-// only visibility we have into the sandbox while diagnosing store setups.
 function log(...parts: unknown[]) {
   try {
     console.log("[Luup NubeSDK]", ...parts);
@@ -36,191 +34,271 @@ function log(...parts: unknown[]) {
   }
 }
 
-type CartAddItem = { product_id: number; variant_id: number; quantity: number };
+type CartItemInput = {
+  product_id: number;
+  quantity: number;
+  variant_id: number;
+};
 
-type FrameMessage =
-  | { type: "resize"; width?: number; height?: number }
-  | { type: "LUPP_NUBESDK_CART_ADD"; requestId: string; items: CartAddItem[] };
+type LuupBootstrap = {
+  active?: boolean;
+  error?: string | null;
+  store?: { id?: string | null; slug?: string | null } | null;
+};
 
-// The docs' corner_* "fixed slots" are not rendered by current themes (their
-// server-side slot sets carry only content-anchored slots), so the launcher
-// mounts in `before_main_content` — present on every storefront page — and
-// floats to the configured corner via fixed positioning on the iframe itself.
-const LAUNCHER_SLOT = "before_main_content";
+type LuupMessage = JsonObject & {
+  type?: string;
+  requestId?: string;
+  videoId?: string;
+  productUrl?: string;
+  previewVideoUrl?: string;
+  previewPosterUrl?: string;
+  items?: unknown;
+};
 
-type LauncherStyle = Record<string, string | number>;
-
-function launcherStyleFor(
-  position: string,
-  offsetX: number,
-  offsetY: number,
-): LauncherStyle {
-  const style: LauncherStyle = {
-    position: "fixed",
-    zIndex: 2147483000,
-    border: "none",
-    background: "transparent",
-  };
-  style[position.includes("top") ? "top" : "bottom"] = `${offsetY}px`;
-  style[position.includes("right") ? "right" : "left"] = `${offsetX}px`;
-  return style;
+function normalizeHostname(value: unknown) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/\/.*$/, "");
 }
 
-function frameSrc(state: NubeSDKState): `https://${string}` {
+function normalizeItems(items: unknown): CartItemInput[] {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((item) => {
+      const value = item as Partial<CartItemInput>;
+      const productId = Number(value.product_id);
+      const variantId = Number(value.variant_id);
+      const quantity = Number(value.quantity);
+      if (
+        !Number.isFinite(productId) ||
+        !Number.isFinite(variantId) ||
+        !Number.isFinite(quantity) ||
+        productId <= 0 ||
+        variantId <= 0 ||
+        quantity <= 0
+      ) {
+        return null;
+      }
+      return {
+        product_id: Math.trunc(productId),
+        variant_id: Math.trunc(variantId),
+        quantity: Math.trunc(quantity),
+      };
+    })
+    .filter((item): item is CartItemInput => Boolean(item));
+}
+
+function frameUrl(
+  mode: "carousel" | "launcher",
+  state: Readonly<NubeSDKState>,
+) {
   const params = new URLSearchParams({
-    mode: "launcher",
-    external_store_id: String(state.store?.id ?? ""),
-    store_domain: String(state.store?.domain ?? ""),
-    page_url: String(state.location?.url ?? ""),
+    mode,
+    external_store_id: String(state.store.id),
+    store_domain: normalizeHostname(state.store.domain),
+    page_url: state.location.url,
   });
-  return `${LUUP_APP_URL}/nuvemshop-widget-frame.html?${params.toString()}`;
+  return `${APP_URL}/nuvemshop-widget-frame.html?${params.toString()}` as `https://${string}`;
+}
+
+function feedUrl(
+  storeSlug: string,
+  message: LuupMessage,
+  state: Readonly<NubeSDKState>,
+) {
+  const params = new URLSearchParams({
+    embed: "1",
+    autoplay_sound: "1",
+    customer_logged_in: state.customer?.id ? "1" : "0",
+    customer_approved: "1",
+    customer_status: state.customer?.id ? "logged_in" : "not_applicable",
+    product_url: String(message.productUrl || state.location.url || ""),
+  });
+  if (message.videoId) params.set("v", String(message.videoId));
+  if (message.previewVideoUrl) {
+    params.set("preview_video_url", String(message.previewVideoUrl));
+  }
+  if (message.previewPosterUrl) {
+    params.set("preview_poster_url", String(message.previewPosterUrl));
+  }
+  return `${APP_URL}/s/${encodeURIComponent(storeSlug)}/feed?${params.toString()}` as `https://${string}`;
+}
+
+async function fetchBootstrap(state: Readonly<NubeSDKState>) {
+  const params = new URLSearchParams({
+    widget: "floating_video",
+    provider: "nuvemshop",
+    external_store_id: String(state.store.id),
+    store_domain: normalizeHostname(state.store.domain),
+    url: String(state.location.url || ""),
+  });
+  const response = await fetch(`${BOOTSTRAP_URL}?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error(`luup_bootstrap_${response.status}`);
+  }
+  return (await response.json()) as LuupBootstrap;
 }
 
 export function App(nube: NubeSDK) {
-  const pendingCartRequests: Array<{
-    requestId: string;
-    timeout: ReturnType<typeof setTimeout>;
-  }> = [];
+  const browser = nube.getBrowserAPIs();
+  let bootstrap: LuupBootstrap | null = null;
+  let bootstrapStoreId = "";
+  let feedIframe: NubeComponent | null = null;
+  const pendingCartRequests: string[] = [];
 
-  let launcherFrame: ReturnType<typeof iframe> | null = null;
+  async function getBootstrap(state: Readonly<NubeSDKState>) {
+    const storeId = String(state.store.id || "");
+    if (bootstrap && bootstrapStoreId === storeId) return bootstrap;
+    bootstrap = await fetchBootstrap(state);
+    bootstrapStoreId = storeId;
+    return bootstrap;
+  }
 
-  function replyToFrame(requestId: string, ok: boolean, error?: string) {
-    if (!launcherFrame) return;
-    nube.getBrowserAPIs().postMessageToIframe(launcherFrame, {
-      type: "LUPP_NUBESDK_CART_RESULT",
-      requestId,
-      ok,
-      ...(error ? { error } : {}),
+  function replyToFeed(message: JsonObject) {
+    if (!feedIframe) return;
+    browser.postMessageToIframe(feedIframe, message);
+  }
+
+  function navigateToProduct(url: string, state: Readonly<NubeSDKState>) {
+    try {
+      const target = new URL(url, state.location.url);
+      const current = new URL(state.location.url);
+      if (target.hostname !== current.hostname) return;
+      browser.navigate(`${target.pathname}${target.search}${target.hash}` as `/${string}`);
+    } catch (_) {
+      // Ignore malformed or cross-store product URLs.
+    }
+  }
+
+  async function openFeed(message: LuupMessage) {
+    const state = nube.getState();
+    const payload = await getBootstrap(state);
+    log("openFeed", { active: payload.active, slug: payload.store?.slug });
+    if (!payload.active || !payload.store?.slug) return;
+
+    feedIframe = Iframe({
+      id: "luup-nuvemshop-feed",
+      src: feedUrl(String(payload.store.slug), message, state),
+      width: state.device.type === "mobile" ? "100%" : "430px",
+      height: Math.max(
+        520,
+        Math.round(
+          state.device.screen.innerHeight *
+            (state.device.type === "mobile" ? 0.92 : 0.96),
+        ),
+      ),
+      style: {
+        border: "0",
+        borderRadius: state.device.type === "mobile" ? "0" : "12px",
+        background: "#000000",
+        overflow: "hidden",
+      },
+      onMessage: ({ value }) => handleMessage(value as LuupMessage),
     });
+    nube.render("modal_content", feedIframe);
   }
 
-  function settleNextCartRequest(ok: boolean, error?: string) {
-    const pending = pendingCartRequests.shift();
-    if (!pending) return;
-    clearTimeout(pending.timeout);
-    replyToFrame(pending.requestId, ok, error);
+  function handleMessage(message: LuupMessage) {
+    if (!message || typeof message !== "object") return;
+    const state = nube.getState();
+
+    if (message.type === "LUPP_NUBESDK_OPEN_FEED") {
+      void openFeed(message);
+      return;
+    }
+
+    if (message.type === "LUPP_OPEN_PRODUCT_PAGE_REQUEST" && message.productUrl) {
+      navigateToProduct(String(message.productUrl), state);
+      return;
+    }
+
+    if (message.type !== "LUPP_NUVEMSHOP_ADD_TO_CART_REQUEST") return;
+    const items = normalizeItems(message.items);
+    const requestId = String(message.requestId || "");
+    if (!items.length || !requestId) {
+      replyToFeed({
+        type: "LUPP_NUVEMSHOP_ADD_TO_CART_RESPONSE",
+        requestId,
+        ok: false,
+        error: "invalid_cart_items",
+      });
+      return;
+    }
+
+    pendingCartRequests.push(requestId);
+    nube.send("cart:add", () => ({ cart: { items } }));
   }
 
-  nube.on("cart:add:success", () => settleNextCartRequest(true));
-  nube.on("cart:add:fail", (state) => {
-    const payload = (state as { eventPayload?: { message?: string; error?: string } })
-      .eventPayload;
-    settleNextCartRequest(false, payload?.message || payload?.error || "nuvemshop_cart_add_failed");
+  function renderWidgets(state: Readonly<NubeSDKState>) {
+    try {
+      // Render the SDK-owned frames immediately. Besides improving perceived
+      // load time, this gives the classic-script yield guard a reliable
+      // signal that NubeSDK is active before it attempts to load the classic
+      // widget chain.
+      log("render", { store: state.store?.id, page: state.location?.page?.type });
+      const launcher = Iframe({
+        id: "luup-nuvemshop-launcher",
+        src: frameUrl("launcher", state),
+        width: state.device.type === "mobile" ? "116px" : "280px",
+        height: "116px",
+        autoresize: true,
+        style: { border: "0", background: "transparent", overflow: "visible" },
+        onMessage: ({ value }) => handleMessage(value as LuupMessage),
+      });
+      nube.render("corner_bottom_left", launcher);
+
+      if (state.location.page.type === "home") {
+        const carousel = Iframe({
+          id: "luup-nuvemshop-carousel",
+          src: frameUrl("carousel", state),
+          width: "100%",
+          height: state.device.type === "mobile" ? "560px" : "610px",
+          autoresize: true,
+          style: { border: "0", background: "transparent", overflow: "hidden" },
+          onMessage: ({ value }) => handleMessage(value as LuupMessage),
+        });
+        nube.render("before_section_products_sale", carousel);
+      } else {
+        nube.clearSlot("before_section_products_sale");
+      }
+    } catch (error) {
+      log("render failed", String(error));
+      nube.clearSlot("corner_bottom_left");
+      nube.clearSlot("before_section_products_sale");
+    }
+  }
+
+  nube.on("cart:add:success", () => {
+    const requestId = pendingCartRequests.shift();
+    if (!requestId) return;
+    replyToFeed({
+      type: "LUPP_NUVEMSHOP_ADD_TO_CART_RESPONSE",
+      requestId,
+      ok: true,
+    });
   });
 
-  function handleCartAdd(message: Extract<FrameMessage, { type: "LUPP_NUBESDK_CART_ADD" }>) {
-    const items = (Array.isArray(message.items) ? message.items : [])
-      .map((item) => ({
-        product_id: Math.trunc(Number(item?.product_id)),
-        variant_id: Math.trunc(Number(item?.variant_id)),
-        quantity: Math.trunc(Number(item?.quantity)),
-      }))
-      .filter((item) => item.product_id > 0 && item.variant_id > 0 && item.quantity > 0);
-
-    if (!items.length) {
-      replyToFrame(message.requestId, false, "empty_cart_items");
-      return;
-    }
-
-    const timeout = setTimeout(() => {
-      const index = pendingCartRequests.findIndex(
-        (pending) => pending.requestId === message.requestId,
-      );
-      if (index !== -1) {
-        pendingCartRequests.splice(index, 1);
-        replyToFrame(message.requestId, false, "nuvemshop_cart_timeout");
-      }
-    }, CART_TIMEOUT_MS);
-    pendingCartRequests.push({ requestId: message.requestId, timeout });
-
-    // One cart:add per item mirrors the platform contract; success/fail
-    // events settle requests in FIFO order.
-    for (const item of items) {
-      nube.send("cart:add", () => ({ cart: { items: [item] } }) as never);
-    }
-  }
-
-  function onFrameMessage(event: { type: "message"; state: NubeSDKState; value?: unknown }) {
-    const message = (event?.value ?? {}) as FrameMessage;
-    if (message?.type === "LUPP_NUBESDK_CART_ADD") handleCartAdd(message);
-    // "resize" is consumed by the SDK host itself (autoresize) — nothing to do.
-  }
-
-  async function renderLauncher(state: NubeSDKState) {
-    const externalStoreId = String(state.store?.id ?? "");
-    log("start", { store: externalStoreId || "(none)", url: state.location?.url });
-    if (!externalStoreId) {
-      log("abort: no store id in state");
-      return;
-    }
-
-    // The worker has fetch: ask the bootstrap whether the widget should show
-    // at all (billing gate + display rules for this page) and where the
-    // launcher sits. Any failure → render nothing (never break the store).
-    let position = "bottom-left";
-    let offsetX = 18;
-    let offsetY = 18;
-    try {
-      const query = new URLSearchParams({
-        widget: "floating_launcher",
-        external_store_id: externalStoreId,
-        url: String(state.location?.url ?? ""),
-      });
-      const response = await fetch(`${LUUP_API_URL}/api/widget/bootstrap?${query.toString()}`);
-      if (!response.ok) {
-        log("abort: bootstrap http", response.status);
-        return;
-      }
-      const payload = (await response.json()) as {
-        active?: boolean;
-        display?: { show?: boolean; reason?: string };
-        config?: { launcher?: { position?: string; offset_x?: number; offset_y?: number } };
-      };
-      log("bootstrap", {
-        active: payload.active,
-        show: payload.display?.show,
-        reason: payload.display?.reason,
-      });
-      if (payload.active === false || payload.display?.show === false) return;
-      position = payload.config?.launcher?.position || position;
-      if (Number.isFinite(payload.config?.launcher?.offset_x)) {
-        offsetX = Number(payload.config?.launcher?.offset_x);
-      }
-      if (Number.isFinite(payload.config?.launcher?.offset_y)) {
-        offsetY = Number(payload.config?.launcher?.offset_y);
-      }
-    } catch (error) {
-      log("abort: bootstrap fetch failed", String(error));
-      return;
-    }
-
-    launcherFrame = iframe({
-      id: "luup-widget-frame",
-      src: frameSrc(state),
-      width: "150px",
-      height: "190px",
-      autoresize: true,
-      style: launcherStyleFor(position, offsetX, offsetY),
-      onMessage: onFrameMessage,
+  nube.on("cart:add:fail", () => {
+    const requestId = pendingCartRequests.shift();
+    if (!requestId) return;
+    replyToFeed({
+      type: "LUPP_NUVEMSHOP_ADD_TO_CART_RESPONSE",
+      requestId,
+      ok: false,
+      error: "nuvemshop_cart_add_failed",
     });
+  });
 
-    // `render()` is the modern API; older storefront runtimes only understand
-    // the wire-level `ui:slot:set` event — try both and say which ran.
-    try {
-      nube.render(LAUNCHER_SLOT, launcherFrame);
-      log("rendered via nube.render into", LAUNCHER_SLOT);
-    } catch (error) {
-      log("nube.render failed, falling back to ui:slot:set", String(error));
-      try {
-        nube.send("ui:slot:set", () => ({
-          ui: { slots: { [LAUNCHER_SLOT]: launcherFrame } },
-        }) as never);
-        log("rendered via ui:slot:set into", LAUNCHER_SLOT);
-      } catch (sendError) {
-        log("ui:slot:set also failed", String(sendError));
-      }
-    }
-  }
+  nube.on("custom:modal:close", () => {
+    feedIframe = null;
+    pendingCartRequests.splice(0);
+  });
 
-  void renderLauncher(nube.getState());
+  nube.on("page:loaded", (state) => renderWidgets(state));
+  nube.on("location:updated", (state) => renderWidgets(state));
+  renderWidgets(nube.getState());
 }

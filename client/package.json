@@ -30,6 +30,7 @@
     "@tailwindcss/typography": "^0.5.15",
     "@tailwindcss/vite": "catalog:",
     "@tanstack/react-query": "catalog:",
+    "@tiendanube/nube-sdk-jsx": "^0.18.0",
     "@tiendanube/nube-sdk-types": "^0.86.0",
     "@tiendanube/nube-sdk-ui": "^0.19.0",
     "@types/node": "catalog:",

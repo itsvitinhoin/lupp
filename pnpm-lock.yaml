@@ -211,6 +211,9 @@ importers:
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.100.9(react@19.1.0)
+      '@tiendanube/nube-sdk-jsx':
+        specifier: ^0.18.0
+        version: 0.18.0(@tiendanube/nube-sdk-types@0.86.0)(@tiendanube/nube-sdk-ui@0.19.0(@tiendanube/nube-sdk-types@0.86.0))
       '@tiendanube/nube-sdk-types':
         specifier: ^0.86.0
         version: 0.86.0
@@ -1251,6 +1254,12 @@ packages:
     resolution: {integrity: sha512-Oa44XkaI3kCNN6ME0KByU3xT3SEUNOMfZpHxL6+wFoTm+OeUFYHKdeYVe0aOXlRDm/f15sgLwEt2HDorIdW8+A==}
     peerDependencies:
       react: ^18 || ^19
+
+  '@tiendanube/nube-sdk-jsx@0.18.0':
+    resolution: {integrity: sha512-Mhdxx54MPT61oeOFv69v0qzHhZ3nW8iUlNOIS26X96bUQhqhiZjFldl1kPetgmYbozDgWfjAcQhYccmiWneAiA==}
+    peerDependencies:
+      '@tiendanube/nube-sdk-types': '*'
+      '@tiendanube/nube-sdk-ui': '*'
 
   '@tiendanube/nube-sdk-types@0.86.0':
     resolution: {integrity: sha512-Lc7RwzqzhChkRCZLKtXmnCNbp2OJWH9xR/ERg7U/Oy/cplq86B7fmGgMP/sgYkBakEpyUrTA3HrdvyVQBwj49A==}
@@ -4375,6 +4384,11 @@ snapshots:
     dependencies:
       '@tanstack/query-core': 5.100.9
       react: 19.1.0
+
+  '@tiendanube/nube-sdk-jsx@0.18.0(@tiendanube/nube-sdk-types@0.86.0)(@tiendanube/nube-sdk-ui@0.19.0(@tiendanube/nube-sdk-types@0.86.0))':
+    dependencies:
+      '@tiendanube/nube-sdk-types': 0.86.0
+      '@tiendanube/nube-sdk-ui': 0.19.0(@tiendanube/nube-sdk-types@0.86.0)
 
   '@tiendanube/nube-sdk-types@0.86.0':
     dependencies:
