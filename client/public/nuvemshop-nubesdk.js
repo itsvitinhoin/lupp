@@ -157,7 +157,11 @@ function normalizeItems(items) {
     .filter(Boolean);
 }
 
-export function App(nube) {
+// Kept for the legacy NubeSDK entry contract, but NOT exported: this file is
+// uploaded as a CLASSIC portal script (module `export` syntax is a parse
+// error in a classic <script>, killing the whole file — the NubeSDK-mode
+// entry lives in nuvemshop-nubesdk-app.js, built from nubesdk-src/).
+function App(nube) {
   if (typeof window === "undefined") return;
 
   const pending = [];
