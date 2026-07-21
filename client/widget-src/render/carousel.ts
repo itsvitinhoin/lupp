@@ -14,6 +14,22 @@ var homeCarouselAnchorRetryTimer: number | null = null;
 
 var homeCarouselAnchorRetryCount = 0;
 
+var homeCarouselAnchorObserverDebounce: number | null = null;
+
+/**
+ * Which entrance class a carousel card should render with. Pure so it's
+ * unit-testable: whether cards start invisible-until-scrolled
+ * (IntersectionObserver-gated) or animate immediately depends only on
+ * browser support, not on any DOM state.
+ */
+export function resolveCarouselCardEntranceClass(
+  supportsIntersectionObserver: boolean,
+): string {
+  return supportsIntersectionObserver
+    ? "lupp-home-carousel-card--pending"
+    : "lupp-home-carousel-card--entrance";
+}
+
 /**
  * How many carousel cards to show for the current viewport. Pure so it's
  * unit-testable without a DOM/matchMedia stub; renderCarousel supplies the
@@ -239,6 +255,43 @@ function findHomeCarouselBeforeNode(): Element | null {
   return null;
 }
 
+/**
+ * Scores how likely a normalized text blob is to be a Brazilian storefront's
+ * "shipping/payment benefits" strip (free shipping, installments, Pix,
+ * etc.) — pure so the keyword heuristic is unit-testable without seeding a
+ * live DOM tree of candidate sections.
+ */
+export function scoreBenefitsSectionText(text: string): number {
+  var score = 0;
+  if (
+    text.indexOf("entrega") !== -1 ||
+    text.indexOf("frete") !== -1 ||
+    text.indexOf("envio") !== -1
+  ) {
+    score += 1;
+  }
+  if (
+    text.indexOf("exclusivo") !== -1 ||
+    text.indexOf("pedido") !== -1 ||
+    text.indexOf("mínimo") !== -1 ||
+    text.indexOf("minimo") !== -1
+  ) {
+    score += 1;
+  }
+  if (
+    text.indexOf("pagamento") !== -1 ||
+    text.indexOf("parcela") !== -1 ||
+    text.indexOf("cartão") !== -1 ||
+    text.indexOf("cartao") !== -1
+  ) {
+    score += 1;
+  }
+  if (text.indexOf("pix") !== -1) score += 1;
+  return score;
+}
+
+export var HOME_BENEFITS_SECTION_MIN_SCORE = 3;
+
 function findHomeBenefitsSection(): Element | null {
   var candidates: Element[] = [];
   var seen: Element[] = [];
@@ -273,33 +326,7 @@ function findHomeBenefitsSection(): Element | null {
     var text = normalizeText(candidate.textContent);
     if (text.length < 12 || text.length > 1500) continue;
 
-    var score = 0;
-    if (
-      text.indexOf("entrega") !== -1 ||
-      text.indexOf("frete") !== -1 ||
-      text.indexOf("envio") !== -1
-    ) {
-      score += 1;
-    }
-    if (
-      text.indexOf("exclusivo") !== -1 ||
-      text.indexOf("pedido") !== -1 ||
-      text.indexOf("mínimo") !== -1 ||
-      text.indexOf("minimo") !== -1
-    ) {
-      score += 1;
-    }
-    if (
-      text.indexOf("pagamento") !== -1 ||
-      text.indexOf("parcela") !== -1 ||
-      text.indexOf("cartão") !== -1 ||
-      text.indexOf("cartao") !== -1
-    ) {
-      score += 1;
-    }
-    if (text.indexOf("pix") !== -1) score += 1;
-
-    if (score >= 3) {
+    if (scoreBenefitsSectionText(text) >= HOME_BENEFITS_SECTION_MIN_SCORE) {
       return closestHomeBlock(candidate);
     }
   }
@@ -308,6 +335,13 @@ function findHomeBenefitsSection(): Element | null {
 
 function ensureHomeCarouselRoot(): HTMLElement | null {
   if (!homeCarouselRoot) {
+    // A duplicate embed <script> tag runs its own independent module
+    // instance with its own module-level homeCarouselRoot, so this guard
+    // (module-scoped) can't see a root a different instance created — check
+    // the live DOM instead, and never inject a second carousel next to it.
+    if (document.querySelector('[data-lupp-widget-root="home_carousel"]')) {
+      return null;
+    }
     homeCarouselRoot = document.createElement("div");
     homeCarouselRoot.setAttribute("data-lupp-widget-root", "home_carousel");
     homeCarouselRoot.setAttribute("data-lupp-injected", "true");
@@ -403,6 +437,10 @@ function clearHomeCarouselAnchorWatch(): void {
     window.clearTimeout(homeCarouselAnchorRetryTimer);
     homeCarouselAnchorRetryTimer = null;
   }
+  if (homeCarouselAnchorObserverDebounce) {
+    window.clearTimeout(homeCarouselAnchorObserverDebounce);
+    homeCarouselAnchorObserverDebounce = null;
+  }
 }
 
 function scheduleHomeCarouselAnchorRetry(root: HTMLElement): void {
@@ -411,13 +449,21 @@ function scheduleHomeCarouselAnchorRetry(root: HTMLElement): void {
 
   if ("MutationObserver" in window && document.body) {
     homeCarouselAnchorObserver = new MutationObserver(function () {
-      // The observer can fire during page teardown, when the document is
-      // already being destroyed.
-      if (!document || !document.body) return;
-      if (!hasHomeCarouselAnchor()) return;
-      clearHomeCarouselAnchorWatch();
-      homeCarouselAnchorRetryCount = 0;
-      ctx.renderForCurrentUrl(root);
+      // Storefront hydration/animation churn can fire dozens of mutation
+      // batches per second; hasHomeCarouselAnchor() runs several
+      // full-document querySelectorAll scans, so coalesce bursts into a
+      // single check instead of running it on every batch.
+      if (homeCarouselAnchorObserverDebounce) return;
+      homeCarouselAnchorObserverDebounce = window.setTimeout(function () {
+        homeCarouselAnchorObserverDebounce = null;
+        // The observer (and this deferred check) can fire during page
+        // teardown, when the document is already being destroyed.
+        if (!document || !document.body) return;
+        if (!hasHomeCarouselAnchor()) return;
+        clearHomeCarouselAnchorWatch();
+        homeCarouselAnchorRetryCount = 0;
+        ctx.renderForCurrentUrl(root);
+      }, 150);
     });
     homeCarouselAnchorObserver.observe(document.body, {
       childList: true,
@@ -468,6 +514,44 @@ export function renderEmbeddedHomeCarousel(videos: SlimVideo[], root: HTMLElemen
   renderCarousel(carouselRoot, ctx.sharedState.activeStore as StorePayload, videos);
 }
 
+// Cards render invisible (--pending) so the stagger fade-in only plays once
+// the carousel actually scrolls into view — previously it played unseen for
+// any anchor placed further down the page, since the CSS animation started
+// immediately at insertion time regardless of visibility.
+var CAROUSEL_ENTRANCE_TRIGGERED_ATTR = "data-lupp-carousel-entrance-triggered";
+
+function triggerCarouselEntranceWhenVisible(root: HTMLElement): void {
+  // renderCarousel re-renders the same root (breakpoint resize, Upzero
+  // status refresh) — once the reveal has played this session, later
+  // re-renders render their cards already-visible (see
+  // resolveCarouselCardEntranceClass's caller) instead of re-arming an
+  // observer that would just replay the fade every time.
+  if (root.getAttribute(CAROUSEL_ENTRANCE_TRIGGERED_ATTR) === "true") return;
+  if (!("IntersectionObserver" in window)) return;
+  var section = root.querySelector(".lupp-home-carousel");
+  if (!section) return;
+
+  var observer = new IntersectionObserver(
+    function (entries) {
+      var isVisible = entries.some(function (entry) {
+        return entry.isIntersecting;
+      });
+      if (!isVisible) return;
+      observer.disconnect();
+      root.setAttribute(CAROUSEL_ENTRANCE_TRIGGERED_ATTR, "true");
+      var pendingCards = section!.querySelectorAll(
+        ".lupp-home-carousel-card--pending",
+      );
+      for (var index = 0; index < pendingCards.length; index += 1) {
+        pendingCards[index].classList.remove("lupp-home-carousel-card--pending");
+        pendingCards[index].classList.add("lupp-home-carousel-card--entrance");
+      }
+    },
+    { threshold: 0.15 },
+  );
+  observer.observe(section);
+}
+
 export function renderCarousel(
   root: HTMLElement,
   store: StorePayload,
@@ -481,6 +565,9 @@ export function renderCarousel(
     0,
     resolveCarouselItemLimit(isMobileViewport, ctx.carouselConfig),
   );
+  var supportsCarouselEntranceObserver =
+    root.getAttribute(CAROUSEL_ENTRANCE_TRIGGERED_ATTR) !== "true" &&
+    "IntersectionObserver" in window;
   var upzeroCustomerStatus = isUpzeroStore(store)
     ? ctx.sharedState.upzeroCustomerStatusCache
     : { approved: true, loggedIn: true };
@@ -541,15 +628,29 @@ export function renderCarousel(
     "<style>" +
     ".lupp-home-carousel{font-family:" +
     ctx.launcherConfig.fontFamily +
-    ";box-sizing:border-box;width:100%;max-width:100vw;padding:24px 0 30px;background:#fff;color:#16171a;overflow:hidden}" +
+    ";box-sizing:border-box;position:relative;width:100%;max-width:100vw;padding:24px 0 30px;background:#fff;color:#16171a;overflow:hidden}" +
     ".lupp-home-carousel *{box-sizing:border-box}" +
     ".lupp-home-carousel-title{margin:0 16px 22px;text-align:center;font-size:clamp(18px,2vw,29px);font-weight:500;letter-spacing:0;line-height:1.2;color:#202124}" +
     ".lupp-home-carousel-description{max-width:680px;margin:-12px auto 22px;padding:0 16px;text-align:center;color:#64748b;font-size:14px;font-weight:600;line-height:1.5;letter-spacing:0}" +
     ".lupp-home-carousel-track{display:flex;gap:clamp(18px,2.5vw,48px);overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;padding:4px max(16px,calc((100vw - 1240px)/2)) 10px;-webkit-overflow-scrolling:touch;scrollbar-width:none}" +
     ".lupp-home-carousel-track::-webkit-scrollbar{display:none}" +
-    ".lupp-home-carousel-card{position:relative;display:block;flex:0 0 clamp(178px,14.2vw,250px);aspect-ratio:9/16;border:0;border-radius:12px;background:#f3f4f6;box-shadow:0 14px 28px rgba(15,23,42,.12);overflow:hidden;cursor:pointer;scroll-snap-align:center;padding:0;color:inherit;opacity:0;animation:lupp-home-carousel-card-in .38s ease-out forwards;animation-delay:calc(var(--lupp-card-index, 0) * 45ms)}" +
+    ".lupp-home-carousel-track:focus-visible{outline:2px solid " +
+    accent +
+    ";outline-offset:-2px}" +
+    // Subtle edge fade hints there's more to scroll horizontally — the
+    // classic "content continues" affordance for an overflow-x list with no
+    // visible scrollbar.
+    ".lupp-home-carousel-edge-fade{position:absolute;top:24px;bottom:30px;width:32px;pointer-events:none;z-index:1}" +
+    ".lupp-home-carousel-edge-fade--left{left:0;background:linear-gradient(to right,#fff,rgba(255,255,255,0))}" +
+    ".lupp-home-carousel-edge-fade--right{right:0;background:linear-gradient(to left,#fff,rgba(255,255,255,0))}" +
+    ".lupp-home-carousel-card{position:relative;display:block;flex:0 0 clamp(178px,14.2vw,250px);aspect-ratio:9/16;border:0;border-radius:12px;background:#f3f4f6;box-shadow:0 14px 28px rgba(15,23,42,.12);overflow:hidden;cursor:pointer;scroll-snap-align:center;padding:0;color:inherit}" +
+    ".lupp-home-carousel-card:focus-visible{outline:3px solid " +
+    accent +
+    ";outline-offset:2px}" +
+    ".lupp-home-carousel-card--pending{opacity:0}" +
+    ".lupp-home-carousel-card--entrance{opacity:0;animation:lupp-home-carousel-card-in .38s ease-out forwards;animation-delay:calc(var(--lupp-card-index, 0) * 45ms)}" +
     "@keyframes lupp-home-carousel-card-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}" +
-    "@media (prefers-reduced-motion: reduce){.lupp-home-carousel-card{animation-duration:.001s;animation-delay:0s}}" +
+    "@media (prefers-reduced-motion: reduce){.lupp-home-carousel-card--entrance{animation-duration:.001s;animation-delay:0s}}" +
     ".lupp-home-carousel-card:nth-child(4n){flex-basis:clamp(190px,15.5vw,270px)}" +
     ".lupp-home-carousel-thumb{width:100%;height:100%;display:block;object-fit:cover;background:#e5e7eb;transition:transform .28s ease}" +
     ".lupp-home-carousel-card:hover .lupp-home-carousel-thumb{transform:scale(1.025)}" +
@@ -572,13 +673,19 @@ export function renderCarousel(
     escapeHtml(ctx.carouselConfig.title) +
     "</h2>" +
     descriptionHtml +
-    '<div class="lupp-home-carousel-track">' +
+    '<div class="lupp-home-carousel-edge-fade lupp-home-carousel-edge-fade--left" aria-hidden="true"></div>' +
+    '<div class="lupp-home-carousel-edge-fade lupp-home-carousel-edge-fade--right" aria-hidden="true"></div>' +
+    '<div class="lupp-home-carousel-track" role="region" aria-label="' +
+    escapeHtml(ctx.carouselConfig.title) +
+    '" tabindex="0">' +
     items
       .map(function (video, index) {
         var thumbnailUrl = video.thumbnail_url || "";
         var mediaUrl = videoMediaUrl(video);
         return (
-          '<button type="button" class="lupp-home-carousel-card" style="--lupp-card-index:' +
+          '<button type="button" class="lupp-home-carousel-card ' +
+          resolveCarouselCardEntranceClass(supportsCarouselEntranceObserver) +
+          '" style="--lupp-card-index:' +
           index +
           '" data-video="' +
           video.id +
@@ -604,6 +711,7 @@ export function renderCarousel(
     "</div></section>";
 
   primeInlineVideos(root);
+  triggerCarouselEntranceWhenVisible(root);
 
   root.onclick = function (event) {
     var target = event.target as HTMLElement | null;

@@ -19,3 +19,12 @@ export function formatBRL(value?: number | null) {
     style: "currency",
   }).format(Number(value || 0));
 }
+
+/** Respects the OS-level "reduce motion" accessibility setting. */
+export function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}

@@ -52,3 +52,65 @@ function parseAspectRatio(aspectRatio?: string | null): number | null {
   if (!(width > 0) || !(height > 0)) return null;
   return width / height;
 }
+
+export type FeedVisibilityEntry = {
+  isIntersecting: boolean;
+  intersectionRatio: number;
+  videoId: string | null;
+};
+
+/**
+ * Picks which video the IntersectionObserver considers "active" — the most
+ * visible intersecting section. Takes plain objects (not IntersectionObserverEntry)
+ * so it's testable without a real observer/DOM.
+ */
+export function pickMostVisibleVideoId(
+  entries: FeedVisibilityEntry[],
+): string | null {
+  const mostVisible = entries
+    .filter((entry) => entry.isIntersecting)
+    .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0];
+  return mostVisible?.videoId ?? null;
+}
+
+/**
+ * The buffering spinner should only cover the video the viewer is actually
+ * watching, only while it's genuinely stalled (not paused by the viewer),
+ * and only over a real playable video (the thumbnail-only placeholder has
+ * nothing to buffer).
+ */
+export function shouldShowBufferingSpinner(state: {
+  hasRealVideo: boolean;
+  isActiveVideo: boolean;
+  isBuffering: boolean;
+  isPaused: boolean;
+}): boolean {
+  return (
+    state.isActiveVideo &&
+    state.isBuffering &&
+    !state.isPaused &&
+    state.hasRealVideo
+  );
+}
+
+export type FeedNavigationKey = "ArrowUp" | "ArrowDown" | (string & {});
+
+/**
+ * Arrow-key feed navigation (desktop parity with swipe): Up moves to the
+ * previous video, Down to the next one. Clamped to the list bounds rather
+ * than wrapping, matching the scroll-snap container's own end-stop behavior.
+ * Returns null for any other key or when the move would be a no-op.
+ */
+export function resolveKeyboardNavigationIndex(
+  key: FeedNavigationKey,
+  currentIndex: number,
+  videoCount: number,
+): number | null {
+  if (videoCount <= 0) return null;
+  let nextIndex: number;
+  if (key === "ArrowDown") nextIndex = currentIndex + 1;
+  else if (key === "ArrowUp") nextIndex = currentIndex - 1;
+  else return null;
+  if (nextIndex < 0 || nextIndex > videoCount - 1) return null;
+  return nextIndex;
+}

@@ -11,7 +11,14 @@ import {
 } from "@/components/ui/drawer";
 import { CommerceProductCard } from "@/components/shared/CommerceProductCard";
 import { LazyVideoPlayer } from "@/components/shared/LazyVideoPlayer";
-import { resolvePreloadStrategy, resolveVideoFitMode } from "@/lib/feed-playback";
+import {
+  pickMostVisibleVideoId,
+  resolveKeyboardNavigationIndex,
+  resolvePreloadStrategy,
+  resolveVideoFitMode,
+  shouldShowBufferingSpinner,
+} from "@/lib/feed-playback";
+import { cn, prefersReducedMotion } from "@/lib/utils";
 import {
   Heart,
   MessageCircle,
@@ -29,6 +36,8 @@ import {
   Loader2,
   Minus,
   Plus,
+  VideoOff,
+  RotateCw,
 } from "lucide-react";
 import { mockVideos } from "@/data/mock";
 import { Link, useRoute } from "wouter";
@@ -38,6 +47,10 @@ import { commentsService } from "@/services/comments.service";
 import { env, isApiConfigured } from "@/lib/env";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+
+// Remembers the viewer's last explicit mute/unmute choice across sessions in
+// this browser, so returning visitors aren't forced back to muted-autoplay.
+const FEED_SOUND_PREFERENCE_KEY = "lupp_feed_sound_preference";
 
 function asRecord(value: unknown): Record<string, any> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -810,6 +823,7 @@ export default function PreviewFeed() {
     () => new URLSearchParams(window.location.search).get("preview_poster_url"),
     [],
   );
+  const reduceMotion = React.useMemo(() => prefersReducedMotion(), []);
 
   const feedQuery = useQuery({
     queryKey: ["public-feed", storeSlug, requestedVideoId, sourceProductUrl],
@@ -841,9 +855,14 @@ export default function PreviewFeed() {
   const pauseWhenHidden = feedOption(feedOptions, "pause_when_hidden", true);
   const addToCartInline = feedOption(feedOptions, "add_to_cart_inline", true);
   const realVideos = feedQuery.data?.videos ?? [];
-  const videos = storeSlug
-    ? realVideos
-    : mockVideos.filter((video) => video.productName);
+  // Memoized so unrelated state changes (a like tap, a mute toggle) don't
+  // hand orderedVideos/productViewsByVideoId a fresh array reference below —
+  // mockVideos.filter would otherwise re-run and invalidate both memos, and
+  // with them the active-video IntersectionObserver, on every render.
+  const videos = React.useMemo(
+    () => (storeSlug ? realVideos : mockVideos.filter((video) => video.productName)),
+    [storeSlug, realVideos],
+  );
   const orderedVideos = React.useMemo(() => {
     if (!requestedVideoId) return videos;
     const requestedIndex = videos.findIndex(
@@ -915,7 +934,12 @@ export default function PreviewFeed() {
     orderedVideos.findIndex((video: any) => video.id === activeVideoId),
   );
   const [pausedMap, setPausedMap] = React.useState<Record<string, boolean>>({});
-  const [isMuted, setIsMuted] = React.useState(() => effectiveAutoplayMuted);
+  const [isMuted, setIsMuted] = React.useState(() => {
+    const storedPreference = localStorage.getItem(FEED_SOUND_PREFERENCE_KEY);
+    if (storedPreference === "muted") return true;
+    if (storedPreference === "unmuted") return false;
+    return effectiveAutoplayMuted;
+  });
   const [soundUnlocked, setSoundUnlocked] = React.useState(
     () => !effectiveAutoplayMuted,
   );
@@ -1644,7 +1668,14 @@ export default function PreviewFeed() {
   const toggleMute = (video: any, event?: React.MouseEvent) => {
     event?.stopPropagation();
     setSoundUnlocked(true);
-    setIsMuted((current) => !current);
+    setIsMuted((current) => {
+      const next = !current;
+      localStorage.setItem(
+        FEED_SOUND_PREFERENCE_KEY,
+        next ? "muted" : "unmuted",
+      );
+      return next;
+    });
     showControlsFor(video.id);
   };
 
@@ -1667,6 +1698,15 @@ export default function PreviewFeed() {
   };
 
   const resetSpeed = (video: any) => {
+    // A pointercancel (the gesture recognizer taking over mid-press, common
+    // on scroll/snap) can fire before the long-press timer elapses — without
+    // clearing it here, it later fires anyway and force-speeds-up whatever
+    // video the closure captured, even though the press it belonged to was
+    // already cancelled.
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
     const element = videoRefs.current.get(video.id);
     if (element) element.playbackRate = 1;
     setSpeedVideoId(null);
@@ -1768,12 +1808,13 @@ export default function PreviewFeed() {
     if (!orderedVideos.length) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort(
-            (left, right) => right.intersectionRatio - left.intersectionRatio,
-          )[0];
-        const id = visible?.target.getAttribute("data-video-id");
+        const id = pickMostVisibleVideoId(
+          entries.map((entry) => ({
+            isIntersecting: entry.isIntersecting,
+            intersectionRatio: entry.intersectionRatio,
+            videoId: entry.target.getAttribute("data-video-id"),
+          })),
+        );
         if (id) setActiveVideoId(id);
       },
       { threshold: [0.65, 0.8, 0.95] },
@@ -1861,6 +1902,38 @@ export default function PreviewFeed() {
   React.useEffect(() => {
     return () => clearGestureTimers();
   }, []);
+
+  // Desktop-web parity with the touch swipe gesture: Up/Down moves between
+  // videos. A window-level listener (rather than requiring the feed to hold
+  // focus) matches how the touch/scroll gesture works regardless of focus.
+  React.useEffect(() => {
+    function handleFeedKeyDown(event: KeyboardEvent) {
+      const activeElement = document.activeElement as HTMLElement | null;
+      if (
+        activeElement &&
+        (activeElement.tagName === "INPUT" ||
+          activeElement.tagName === "TEXTAREA" ||
+          activeElement.isContentEditable)
+      ) {
+        return;
+      }
+      const nextIndex = resolveKeyboardNavigationIndex(
+        event.key,
+        activeIndex,
+        orderedVideos.length,
+      );
+      if (nextIndex === null) return;
+      event.preventDefault();
+      const nextVideo = orderedVideos[nextIndex];
+      sectionRefs.current.get(nextVideo.id)?.scrollIntoView({
+        block: "start",
+        behavior: reduceMotion ? "auto" : "smooth",
+      });
+    }
+
+    window.addEventListener("keydown", handleFeedKeyDown);
+    return () => window.removeEventListener("keydown", handleFeedKeyDown);
+  }, [activeIndex, orderedVideos, reduceMotion]);
 
   const selectedProductRestricted = Boolean(
     selectedProduct &&
@@ -1985,7 +2058,24 @@ export default function PreviewFeed() {
           </div>
         )}
 
-        {!feedQuery.isLoading && !orderedVideos.length && (
+        {feedQuery.isError && (
+          <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center text-white/70">
+            <VideoOff className="h-8 w-8" />
+            <p>Não foi possível carregar o feed agora.</p>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="gap-2"
+              onClick={() => void feedQuery.refetch()}
+            >
+              <RotateCw className="h-4 w-4" />
+              Tentar novamente
+            </Button>
+          </div>
+        )}
+
+        {!feedQuery.isLoading && !feedQuery.isError && !orderedVideos.length && (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center text-white/70">
             <ShoppingBag className="h-8 w-8" />
             <p>Nenhum vídeo ativo no feed ainda.</p>
@@ -2054,7 +2144,9 @@ export default function PreviewFeed() {
             aria-hidden="true"
           >
             <div className="flex flex-col items-center gap-3 rounded-2xl bg-black/55 px-6 py-5 text-white shadow-2xl backdrop-blur-md">
-              <ChevronsUp className="h-10 w-10 animate-bounce" />
+              <ChevronsUp
+                className={cn("h-10 w-10", !reduceMotion && "animate-bounce")}
+              />
               <div>
                 <p className="text-base font-black">
                   {isProductSwipeHint
@@ -2912,8 +3004,42 @@ const FeedItem = React.memo(function FeedItem({
   const showVideoControls = isActiveVideo && (controlsVisible || isPaused);
   const fitMode = resolveVideoFitMode(video.aspect_ratio);
   const [isBuffering, setIsBuffering] = React.useState(false);
-  const showBufferingSpinner =
-    isActiveVideo && isBuffering && !isPaused && hasRealVideo;
+  const showBufferingSpinner = shouldShowBufferingSpinner({
+    hasRealVideo,
+    isActiveVideo,
+    isBuffering,
+    isPaused,
+  });
+  const [playbackError, setPlaybackError] = React.useState(false);
+  const [retryToken, setRetryToken] = React.useState(0);
+  const [progressPercent, setProgressPercent] = React.useState(0);
+  const retryPlayback = React.useCallback(() => {
+    setPlaybackError(false);
+    setProgressPercent(0);
+    setRetryToken((token) => token + 1);
+  }, []);
+
+  // Composes videoRefCb (registers the element for play/pause/mute control)
+  // with a local timeupdate listener for the progress bar. Cleaned up via
+  // progressCleanupRef rather than the ref-callback's own return value,
+  // since React 18 callback refs don't support that cleanup form yet.
+  const progressCleanupRef = React.useRef<() => void>(() => {});
+  const handleVideoRef = React.useCallback(
+    (element: HTMLVideoElement | null) => {
+      videoRefCb(element);
+      progressCleanupRef.current();
+      progressCleanupRef.current = () => {};
+      if (!element) return;
+      const updateProgress = () => {
+        if (!element.duration || Number.isNaN(element.duration)) return;
+        setProgressPercent((element.currentTime / element.duration) * 100);
+      };
+      element.addEventListener("timeupdate", updateProgress);
+      progressCleanupRef.current = () =>
+        element.removeEventListener("timeupdate", updateProgress);
+    },
+    [videoRefCb],
+  );
 
   return (
     <section
@@ -2936,14 +3062,16 @@ const FeedItem = React.memo(function FeedItem({
             />
           )}
           <LazyVideoPlayer
-            ref={videoRefCb}
+            key={retryToken}
+            ref={handleVideoRef}
             src={video.video_url}
             poster={video.thumbnail_url ?? undefined}
-            className={
+            className={cn(
               fitMode === "contain"
                 ? "absolute inset-0 h-full w-full object-contain"
-                : "absolute inset-0 h-full w-full object-cover"
-            }
+                : "absolute inset-0 h-full w-full object-cover",
+              playbackError && "invisible",
+            )}
             active={playerActive}
             style={{
               backgroundColor: fitMode === "contain" ? "transparent" : "#000",
@@ -2960,6 +3088,7 @@ const FeedItem = React.memo(function FeedItem({
             autoPlay
             preload={resolvePreloadStrategy(offsetFromActive, preloadNextEnabled)}
             onBufferingChange={setIsBuffering}
+            onPlaybackError={() => setPlaybackError(true)}
           />
         </>
       ) : (
@@ -2976,6 +3105,35 @@ const FeedItem = React.memo(function FeedItem({
       {showBufferingSpinner && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
           <Loader2 className="h-9 w-9 animate-spin text-white/85" />
+        </div>
+      )}
+
+      {hasRealVideo && playbackError && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/80 px-8 text-center text-white/85">
+          <VideoOff className="h-8 w-8" />
+          <p className="text-sm font-semibold">Não foi possível carregar este vídeo.</p>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="gap-2"
+            onClick={(event) => {
+              event.stopPropagation();
+              retryPlayback();
+            }}
+          >
+            <RotateCw className="h-4 w-4" />
+            Tentar novamente
+          </Button>
+        </div>
+      )}
+
+      {hasRealVideo && isActiveVideo && !playbackError && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-[2px] bg-white/20">
+          <div
+            className="h-full bg-white/85"
+            style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }}
+          />
         </div>
       )}
 

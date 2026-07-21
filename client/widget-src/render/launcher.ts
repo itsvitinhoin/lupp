@@ -118,6 +118,8 @@ function installLauncherDrag(
 
   interface DragState {
     moved: boolean;
+    pendingDeltaX: number;
+    pendingDeltaY: number;
     startLeft: number;
     startTop: number;
     startX: number;
@@ -126,6 +128,7 @@ function installLauncherDrag(
   }
   var state: DragState | null = null;
   var previousUserSelect = "";
+  var pendingMoveFrame: number | null = null;
 
   function pointFromEvent(event: Event): { x: number; y: number } {
     var touchEvent = event as TouchEvent;
@@ -148,6 +151,22 @@ function installLauncherDrag(
     }, 260);
   }
 
+  // getBoundingClientRect (inside clampLauncherPosition) + the style writes
+  // it feeds only need to happen once per paint, not once per mousemove
+  // event — batching them into a rAF avoids layout thrashing on lower-end
+  // devices while dragging.
+  function flushPendingMove() {
+    pendingMoveFrame = null;
+    if (!state) return;
+    var position = clampLauncherPosition(
+      root,
+      state.startLeft + state.pendingDeltaX,
+      state.startTop + state.pendingDeltaY,
+    );
+    applyLauncherDragPosition(root, position);
+    state.lastPosition = position;
+  }
+
   function onMove(event: Event) {
     if (!state) return;
     var point = pointFromEvent(event);
@@ -161,17 +180,19 @@ function installLauncherDrag(
     if (event.cancelable) event.preventDefault();
     root.setAttribute("data-lupp-dragging", "true");
     document.body.style.userSelect = "none";
-    var position = clampLauncherPosition(
-      root,
-      state.startLeft + deltaX,
-      state.startTop + deltaY,
-    );
-    applyLauncherDragPosition(root, position);
-    state.lastPosition = position;
+    state.pendingDeltaX = deltaX;
+    state.pendingDeltaY = deltaY;
+    if (pendingMoveFrame === null) {
+      pendingMoveFrame = requestAnimationFrame(flushPendingMove);
+    }
   }
 
   function onEnd() {
     if (!state) return;
+    if (pendingMoveFrame !== null) {
+      cancelAnimationFrame(pendingMoveFrame);
+      flushPendingMove();
+    }
     if (state.moved && state.lastPosition) {
       saveLauncherDragPosition(store, state.lastPosition);
       setSuppressClick();
@@ -207,6 +228,8 @@ function installLauncherDrag(
     previousUserSelect = document.body.style.userSelect;
     state = {
       moved: false,
+      pendingDeltaX: 0,
+      pendingDeltaY: 0,
       startLeft: rect.left,
       startTop: rect.top,
       startX: point.x,
@@ -317,7 +340,9 @@ export function renderLauncher(
     ";will-change:transform,left,top;touch-action:none;-webkit-user-select:none;user-select:none;";
   root.innerHTML =
     "<style>@keyframes lupp-launcher-in{to{opacity:1;transform:scale(1)}}</style>" +
-    '<button type="button" data-lupp-launcher style="' +
+    '<button type="button" data-lupp-launcher aria-label="' +
+    escapeHtml(ctx.launcherConfig.label || "Assista e compre pelo vídeo") +
+    '" style="' +
     "display:flex;align-items:center;gap:10px;border:0;background:transparent;padding:0;cursor:grab;touch-action:none;font-family:" +
     ctx.launcherConfig.fontFamily +
     ";filter:drop-shadow(0 14px 28px rgba(0,0,0,.28));" +

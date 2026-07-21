@@ -1482,8 +1482,19 @@ type AnyAdapter = UpzeroAdapter | NuvemshopAdapter | ShopifyAdapter;
       // Single round trip: context mode returns the store, the fully
       // evaluated display/config block and the page's filtered, ordered
       // video list in one payload.
+      //
+      // watchUrlChanges is already listening at this point (registered
+      // before runAfterPageReady even schedules startWidget), so an SPA
+      // navigation can fire refreshContextForUrl while this very first
+      // fetch is still in flight. Sharing its lastRequestedContextUrl guard
+      // means whichever response is stale from a navigation that happened
+      // meanwhile is dropped instead of unconditionally overwriting
+      // whatever the newer request already rendered.
+      var requestedUrl = window.location.href;
+      lastRequestedContextUrl = requestedUrl;
       fetchBootstrap()
         .then(function (payload) {
+          if (lastRequestedContextUrl !== requestedUrl) return;
           var store = payload.store || {
             id: null,
             slug: storeSlug || externalStoreId,
@@ -1536,6 +1547,7 @@ type AnyAdapter = UpzeroAdapter | NuvemshopAdapter | ShopifyAdapter;
           renderForCurrentUrl(root);
         })
         .catch(function (error) {
+          if (lastRequestedContextUrl !== requestedUrl) return;
           debugLog("abort: bootstrap error", error.message);
           emitWidgetAborted("bootstrap_error", { message: error.message });
           console.warn("[Luup]", error.message);

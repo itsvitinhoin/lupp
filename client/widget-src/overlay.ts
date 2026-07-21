@@ -172,8 +172,13 @@ export function openFeedOverlay(
       OVERLAY_TRANSITION_MS +
       "ms cubic-bezier(.2,.9,.3,1);";
 
+  var previouslyFocusedElement = document.activeElement as HTMLElement | null;
+
   var overlay = document.createElement("div");
   overlay.setAttribute("data-lupp-feed-overlay", "true");
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-label", "Feed Luup");
   overlay.style.cssText =
     "position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.76);display:flex;align-items:center;justify-content:center;font-family:" +
     ctx.launcherConfig.fontFamily +
@@ -194,7 +199,10 @@ export function openFeedOverlay(
   frame.title = "Feed vertical Luup";
   frame.allow = "autoplay; clipboard-write; encrypted-media; fullscreen";
   frame.style.cssText =
-    "width:min(100vw,430px);height:100dvh;max-height:100dvh;border:0;background:#000;box-shadow:0 24px 80px rgba(0,0,0,.42);" +
+    // The plain 100vh comes first as a fallback for browsers without
+    // dynamic-viewport-unit support (Safari <15.4, older Chromium) — the
+    // 100dvh declaration right after it wins wherever it's understood.
+    "width:min(100vw,430px);height:100vh;height:100dvh;max-height:100vh;max-height:100dvh;border:0;background:#000;box-shadow:0 24px 80px rgba(0,0,0,.42);" +
     (reduceMotion
       ? ""
       : "opacity:0;transform:translateY(18px) scale(.97);" + frameTransitionStyle);
@@ -238,11 +246,15 @@ export function openFeedOverlay(
         };
 
   setFrameSrc(initialCustomerStatus);
-  ctx.detectCustomerStatus(store, {
-    forceRefresh: shouldForceCustomerRefresh,
-  }).then(function (customerStatus) {
-    setFrameSrc(customerStatus);
-  });
+  // Non-Upzero stores already got the final status synchronously above —
+  // detectCustomerStatus resolves to the same "not_applicable" shape for
+  // them, just asynchronously, and re-setting frame.src from that would
+  // reload the just-opened feed iframe a second time for no reason.
+  if (shouldForceCustomerRefresh) {
+    ctx.detectCustomerStatus(store, { forceRefresh: true }).then(function (customerStatus) {
+      setFrameSrc(customerStatus);
+    });
+  }
 
   var feedbackShown = false;
 
@@ -261,13 +273,25 @@ export function openFeedOverlay(
     });
   }
 
+  function restoreFocusToLauncher() {
+    if (
+      previouslyFocusedElement &&
+      typeof previouslyFocusedElement.focus === "function" &&
+      document.contains(previouslyFocusedElement)
+    ) {
+      previouslyFocusedElement.focus();
+    }
+  }
+
   function destroyOverlay(reason?: string) {
     trackFeedClose(reason);
     document.body.style.overflow = previousOverflow;
+    document.removeEventListener("keydown", onOverlayKeydown);
     ctx.flushPendingStorefrontCartRefresh();
 
     if (reduceMotion) {
       overlay.remove();
+      restoreFocusToLauncher();
       return;
     }
 
@@ -279,12 +303,44 @@ export function openFeedOverlay(
       if (removed) return;
       removed = true;
       overlay.remove();
+      restoreFocusToLauncher();
     }
     overlay.addEventListener("transitionend", removeNow, { once: true });
     window.setTimeout(removeNow, OVERLAY_TRANSITION_MS + 120);
     overlay.style.opacity = "0";
     frame.style.opacity = "0";
     frame.style.transform = "translateY(18px) scale(.97)";
+  }
+
+  // Keeps Tab/Shift+Tab cycling inside the overlay instead of reaching the
+  // storefront page behind it — the previous version had no focus trap at
+  // all, and its Escape listener only ever removed itself, leaking a
+  // document-level keydown listener on every close via the × button or
+  // backdrop click.
+  function focusableOverlayElements(): HTMLElement[] {
+    var nodeList = overlay.querySelectorAll(
+      'button, [href], input, select, textarea, iframe, [tabindex]:not([tabindex="-1"])',
+    );
+    return Array.prototype.slice.call(nodeList);
+  }
+
+  function onOverlayKeydown(event: KeyboardEvent) {
+    if (event.key === "Escape") {
+      showFeedbackForm();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    var focusable = focusableOverlayElements();
+    if (!focusable.length) return;
+    var first = focusable[0];
+    var last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   function showFeedbackForm() {
@@ -322,7 +378,9 @@ export function openFeedOverlay(
             rating +
             '" type="button" aria-label="' +
             rating +
-            ' estrelas" style="border:0;background:transparent;color:' +
+            ' estrelas" aria-pressed="' +
+            (selectedRating >= rating ? "true" : "false") +
+            '" style="border:0;background:transparent;color:' +
             (selectedRating >= rating ? "#facc15" : "rgba(255,255,255,.38)") +
             ';font-size:32px;line-height:1;cursor:pointer;padding:0 2px;">★</button>'
           );
@@ -367,15 +425,12 @@ export function openFeedOverlay(
   overlay.addEventListener("click", function (event) {
     if (event.target === overlay) showFeedbackForm();
   });
-  document.addEventListener("keydown", function onKeydown(event) {
-    if (event.key !== "Escape") return;
-    document.removeEventListener("keydown", onKeydown);
-    showFeedbackForm();
-  });
+  document.addEventListener("keydown", onOverlayKeydown);
 
   overlay.appendChild(frame);
   overlay.appendChild(close);
   document.body.appendChild(overlay);
+  close.focus();
 
   if (!reduceMotion) {
     // Flip to the "shown" state on the next frame so the browser has

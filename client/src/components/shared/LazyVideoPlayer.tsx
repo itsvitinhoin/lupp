@@ -12,6 +12,8 @@ type LazyVideoPlayerProps = Omit<
   hlsStartQuality?: "auto" | "high";
   /** Fires on native waiting/stalled → playing/canplay/loadeddata transitions. */
   onBufferingChange?: (isBuffering: boolean) => void;
+  /** Fires once playback has genuinely failed (bad manifest/segment, decode error) — never for transient buffering. */
+  onPlaybackError?: (error: { message: string }) => void;
   src?: string | null;
 };
 
@@ -45,6 +47,7 @@ export const LazyVideoPlayer = React.forwardRef<
     hlsStartQuality = "auto",
     muted = true,
     onBufferingChange,
+    onPlaybackError,
     preload = "metadata",
     src,
     ...props
@@ -96,6 +99,26 @@ export const LazyVideoPlayer = React.forwardRef<
     let cancelled = false;
     const shouldPreferHighStart = hlsStartQuality === "high";
     const teardownCallbacks: Array<() => void> = [];
+
+    function reportPlaybackError(message: string) {
+      if (cancelled || !onPlaybackError) return;
+      onPlaybackError({ message });
+    }
+
+    // Native errors cover both playNatively's <video src> assignment and
+    // MSE-based HLS.js playback (fatal MSE failures still surface here);
+    // Hls.Events.ERROR below additionally catches manifest/network failures
+    // that never reach the media element as a native error.
+    function handleNativeError() {
+      const mediaError = video!.error;
+      reportPlaybackError(
+        mediaError ? `media_error_${mediaError.code}` : "media_error_unknown",
+      );
+    }
+    video.addEventListener("error", handleNativeError);
+    teardownCallbacks.push(() =>
+      video!.removeEventListener("error", handleNativeError),
+    );
 
     async function playVideo() {
       if (!autoPlay || cancelled) return;
@@ -164,6 +187,13 @@ export const LazyVideoPlayer = React.forwardRef<
         enableWorker: true,
         startLevel: -1,
         lowLatencyMode: false,
+      });
+      // Fatal HLS.js errors (manifest 404s, unrecoverable network/media
+      // failures) don't always surface as a native <video> "error" event —
+      // this is the only signal for those.
+      hls.on(Hls.Events.ERROR, (_event: unknown, data: { fatal?: boolean; type?: string }) => {
+        if (!data.fatal) return;
+        reportPlaybackError(`hls_fatal_${data.type || "unknown"}`);
       });
       if (shouldPreferHighStart) {
         attachQualityPinRelease(hls);
