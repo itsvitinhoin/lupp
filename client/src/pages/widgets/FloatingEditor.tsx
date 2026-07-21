@@ -101,10 +101,7 @@ export function FloatingEditor(props: {
             </p>
           </div>
         </div>
-      </div>
-
-      <div className="mb-6 flex justify-end">
-        <div className="flex flex-wrap justify-end gap-3">
+        <div className="flex flex-wrap gap-3 xl:justify-end">
           {props.storeSlug && (
             <Button
               variant="outline"

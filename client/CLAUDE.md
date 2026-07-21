@@ -31,9 +31,9 @@ npx tsc -p tsconfig.json --noEmit   # typecheck (widget has its own tsconfig)
   phone bezels, external-logo chips on fixed `bg-white`).
 - **Card/Button base classes stay unprefixed** (`p-6 pt-0`): breakpoint-scoped
   defaults survive plain `p-*` overrides in tailwind-merge and break spacing.
-- **Layout**: `AppLayout` and `AdminShell` are full-width; pages own their
-  internal widths (forms cap at `max-w-5xl`/`max-w-6xl`, grids add `2xl:`
-  column steps). Never rely on the shell to constrain content.
+- **Layout**: `AppLayout` and `AdminShell` are full-width and pages use the
+  full available width (grids add `2xl:` column steps to fill it). Never rely
+  on the shell to constrain content.
 - The auth refresh call in `src/services/auth.service.ts` deliberately uses
   raw `fetch` — do not route it through the shared API client (recursion).
 - `src/lib/widget-embed.ts` generates the manual install snippet and must stay

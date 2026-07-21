@@ -187,7 +187,7 @@ export default function Settings() {
         </p>
       </div>
 
-      <Tabs defaultValue="loja" className="w-full max-w-5xl">
+      <Tabs defaultValue="loja" className="w-full">
         <TabsList className="mb-6 h-auto w-full justify-start overflow-x-auto rounded-none border-b border-border bg-transparent p-0">
           <TabsTrigger
             value="loja"
