@@ -186,6 +186,52 @@ describe("GET /api/widget/bootstrap context mode (e2e)", () => {
     );
   });
 
+  it("orders by sort_order (manual) by default, and by created_at when home_ordering is automatic", async () => {
+    const store = await seedContextStore({ display: { home_ordering: "manual" } });
+    const older = await prisma.video.create({
+      data: {
+        store_id: store.id,
+        title: "Older, pinned first manually",
+        status: "active",
+        processing_status: "ready",
+        sort_order: 0,
+        created_at: new Date("2026-01-01T00:00:00Z"),
+      },
+    });
+    const newer = await prisma.video.create({
+      data: {
+        store_id: store.id,
+        title: "Newer, pinned second manually",
+        status: "active",
+        processing_status: "ready",
+        sort_order: 1,
+        created_at: new Date("2026-06-01T00:00:00Z"),
+      },
+    });
+
+    const manualResponse = await request(app.server).get(
+      contextUrl(store.id, "https://loja.example.com/"),
+    );
+    expect(manualResponse.body.videos.map((video: { id: string }) => video.id)).toEqual([
+      older.id,
+      newer.id,
+    ]);
+
+    await prisma.widget.updateMany({
+      where: { store_id: store.id },
+      data: { settings: { display: { home_ordering: "automatic" } } },
+    });
+
+    const automaticResponse = await request(app.server).get(
+      contextUrl(store.id, "https://loja.example.com/"),
+    );
+    // Automatic mode ignores sort_order and ranks the newest video first.
+    expect(automaticResponse.body.videos.map((video: { id: string }) => video.id)).toEqual([
+      newer.id,
+      older.id,
+    ]);
+  });
+
   it("hides on excluded paths and returns no video payload", async () => {
     const store = await seedContextStore({ display: { exclude_paths: ["/checkout"] } });
     await seedVideo(store.id);

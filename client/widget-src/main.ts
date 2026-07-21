@@ -27,6 +27,7 @@ import {
   openFeedOverlay,
   postFrameResponse,
   postUpzeroCustomerStatus,
+  preconnectFeedOrigin,
 } from "./overlay";
 import { renderLauncher } from "./render/launcher";
 import {
@@ -566,6 +567,10 @@ type AnyAdapter = UpzeroAdapter | NuvemshopAdapter | ShopifyAdapter;
   ctx.repairUpzeroProductUrl = repairUpzeroProductUrl;
   ctx.flushPendingStorefrontCartRefresh = flushPendingStorefrontCartRefresh;
   ctx.renderForCurrentUrl = renderForCurrentUrl;
+
+  // Warm the feed origin's DNS/TLS as early as possible — well before the
+  // launcher is even clicked — so opening the overlay later skips that cost.
+  preconnectFeedOrigin(luppBaseUrl);
 
   // Adapters are served from the same directory as widget.js itself.
   var adapterScriptBase = resolveUrl(
@@ -1318,6 +1323,30 @@ type AnyAdapter = UpzeroAdapter | NuvemshopAdapter | ShopifyAdapter;
     window.addEventListener("hashchange", scheduleRender);
   }
 
+  // Must match the media query renderCarousel/its injected CSS use for
+  // isMobileViewport — keeps the JS re-slice and the CSS breakpoint in sync.
+  var CAROUSEL_MOBILE_BREAKPOINT = "(max-width: 640px)";
+
+  // renderCarousel reads matchMedia once per render to pick max_items vs
+  // mobile_max_items; without this, rotating a tablet or resizing past 640px
+  // never re-slices the already-rendered carousel until an unrelated
+  // re-render happens to fire. Re-render only on an actual breakpoint
+  // crossing (not every resize tick), reusing the already-fetched video list
+  // — renderForCurrentUrl issues no network request.
+  function watchCarouselViewportBreakpoint(root: HTMLElement): void {
+    if (typeof window.matchMedia !== "function") return;
+    var query = window.matchMedia(CAROUSEL_MOBILE_BREAKPOINT);
+    var onBreakpointChange = function () {
+      renderForCurrentUrl(root);
+    };
+    if (typeof query.addEventListener === "function") {
+      query.addEventListener("change", onBreakpointChange);
+    } else if (typeof (query as any).addListener === "function") {
+      // Safari < 14.
+      (query as any).addListener(onBreakpointChange);
+    }
+  }
+
   var upzeroCustomerRefreshTimer: number | null = null;
 
   function refreshUpzeroCustomerState(root: HTMLElement): void {
@@ -1446,6 +1475,7 @@ type AnyAdapter = UpzeroAdapter | NuvemshopAdapter | ShopifyAdapter;
   var root = createRoot();
   watchUrlChanges(root);
   watchUpzeroCustomerState(root);
+  watchCarouselViewportBreakpoint(root);
 
   function startWidget(): void {
     if (shouldUseBootstrap()) {

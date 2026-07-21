@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/drawer";
 import { CommerceProductCard } from "@/components/shared/CommerceProductCard";
 import { LazyVideoPlayer } from "@/components/shared/LazyVideoPlayer";
+import { resolvePreloadStrategy, resolveVideoFitMode } from "@/lib/feed-playback";
 import {
   Heart,
   MessageCircle,
@@ -25,6 +26,7 @@ import {
   Volume2,
   VolumeX,
   ChevronsUp,
+  Loader2,
   Minus,
   Plus,
 } from "lucide-react";
@@ -919,7 +921,6 @@ export default function PreviewFeed() {
   );
   const [speedVideoId, setSpeedVideoId] = React.useState<string | null>(null);
   const [showSwipeHint, setShowSwipeHint] = React.useState(false);
-  const [showLuupSplash, setShowLuupSplash] = React.useState(true);
   const videoRefs = React.useRef(new Map<string, HTMLVideoElement>());
   const sectionRefs = React.useRef(new Map<string, HTMLElement>());
   const viewedVideoIdsRef = React.useRef(new Set<string>());
@@ -1861,11 +1862,6 @@ export default function PreviewFeed() {
     return () => clearGestureTimers();
   }, []);
 
-  React.useEffect(() => {
-    const timer = window.setTimeout(() => setShowLuupSplash(false), 2000);
-    return () => window.clearTimeout(timer);
-  }, []);
-
   const selectedProductRestricted = Boolean(
     selectedProduct &&
     isUpzeroCommerce(store, selectedProduct.product) &&
@@ -1989,21 +1985,6 @@ export default function PreviewFeed() {
           </div>
         )}
 
-        {showLuupSplash && (
-          <div className="pointer-events-none absolute inset-0 z-[90] flex items-center justify-center bg-black text-white transition-opacity">
-            <div className="flex flex-col items-center gap-4 px-8 text-center">
-              <img
-                src="/luup-logo-main.png"
-                alt="Luup"
-                className="h-28 max-w-[260px] object-contain"
-              />
-              <p className="text-sm font-semibold text-white/78">
-                Experiência desenvolvida por LUUP
-              </p>
-            </div>
-          </div>
-        )}
-
         {!feedQuery.isLoading && !orderedVideos.length && (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center text-white/70">
             <ShoppingBag className="h-8 w-8" />
@@ -2046,7 +2027,8 @@ export default function PreviewFeed() {
                 playerActive={
                   isActiveVideo || Math.abs(index - activeIndex) <= 1
                 }
-                preloadNext={preloadNext}
+                offsetFromActive={index - activeIndex}
+                preloadNextEnabled={preloadNext}
                 productViews={productViewsByVideoId.get(video.id) ?? []}
                 setSectionRef={setSectionRef}
                 setVideoRef={setVideoRef}
@@ -2801,8 +2783,9 @@ type FeedItemProps = {
   isPaused: boolean;
   liked: boolean;
   loopVideo: boolean;
+  offsetFromActive: number;
   playerActive: boolean;
-  preloadNext: boolean;
+  preloadNextEnabled: boolean;
   productViews: ProductView[];
   setSectionRef: SectionRefFactory;
   setVideoRef: (id: string) => (element: HTMLVideoElement | null) => void;
@@ -2831,8 +2814,9 @@ const FeedItem = React.memo(function FeedItem({
   isPaused,
   liked,
   loopVideo,
+  offsetFromActive,
   playerActive,
-  preloadNext,
+  preloadNextEnabled,
   productViews,
   setSectionRef,
   setVideoRef,
@@ -2926,6 +2910,10 @@ const FeedItem = React.memo(function FeedItem({
   const canShare = videoFeatureEnabled(video, "allow_sharing");
   const hasRealVideo = Boolean(video.video_url);
   const showVideoControls = isActiveVideo && (controlsVisible || isPaused);
+  const fitMode = resolveVideoFitMode(video.aspect_ratio);
+  const [isBuffering, setIsBuffering] = React.useState(false);
+  const showBufferingSpinner =
+    isActiveVideo && isBuffering && !isPaused && hasRealVideo;
 
   return (
     <section
@@ -2935,26 +2923,45 @@ const FeedItem = React.memo(function FeedItem({
       className="relative h-full w-full snap-start bg-black"
     >
       {hasRealVideo ? (
-        <LazyVideoPlayer
-          ref={videoRefCb}
-          src={video.video_url}
-          poster={video.thumbnail_url ?? undefined}
-          className="absolute inset-0 h-full w-full object-cover"
-          active={playerActive}
-          style={{
-            backgroundColor: "#000",
-            backgroundImage: video.thumbnail_url
-              ? `url(${video.thumbnail_url})`
-              : undefined,
-            backgroundPosition: "center",
-            backgroundSize: "cover",
-          }}
-          muted={isMuted || !soundUnlocked}
-          hlsStartQuality="high"
-          loop={loopVideo}
-          autoPlay
-          preload={preloadNext ? "auto" : "metadata"}
-        />
+        <>
+          {fitMode === "contain" && video.thumbnail_url && (
+            // Square/landscape source video would either crop (cover) or
+            // letterbox on black (plain contain) — a blurred, scaled copy of
+            // the same frame behind it fills the edges instead, the same
+            // treatment Reels/TikTok use for non-vertical uploads.
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 scale-110 bg-cover bg-center blur-2xl brightness-50"
+              style={{ backgroundImage: `url(${video.thumbnail_url})` }}
+            />
+          )}
+          <LazyVideoPlayer
+            ref={videoRefCb}
+            src={video.video_url}
+            poster={video.thumbnail_url ?? undefined}
+            className={
+              fitMode === "contain"
+                ? "absolute inset-0 h-full w-full object-contain"
+                : "absolute inset-0 h-full w-full object-cover"
+            }
+            active={playerActive}
+            style={{
+              backgroundColor: fitMode === "contain" ? "transparent" : "#000",
+              backgroundImage:
+                fitMode === "cover" && video.thumbnail_url
+                  ? `url(${video.thumbnail_url})`
+                  : undefined,
+              backgroundPosition: "center",
+              backgroundSize: "cover",
+            }}
+            muted={isMuted || !soundUnlocked}
+            hlsStartQuality="high"
+            loop={loopVideo}
+            autoPlay
+            preload={resolvePreloadStrategy(offsetFromActive, preloadNextEnabled)}
+            onBufferingChange={setIsBuffering}
+          />
+        </>
       ) : (
         <div
           className="absolute inset-0 bg-black bg-cover bg-center"
@@ -2964,6 +2971,12 @@ const FeedItem = React.memo(function FeedItem({
               : undefined,
           }}
         />
+      )}
+
+      {showBufferingSpinner && (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+          <Loader2 className="h-9 w-9 animate-spin text-white/85" />
+        </div>
       )}
 
       <div

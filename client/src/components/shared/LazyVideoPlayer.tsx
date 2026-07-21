@@ -1,4 +1,8 @@
 import React from "react";
+import {
+  attachBufferingListener,
+  shouldReleaseQualityPin,
+} from "@/lib/video-buffering";
 
 type LazyVideoPlayerProps = Omit<
   React.VideoHTMLAttributes<HTMLVideoElement>,
@@ -6,6 +10,8 @@ type LazyVideoPlayerProps = Omit<
 > & {
   active?: boolean;
   hlsStartQuality?: "auto" | "high";
+  /** Fires on native waiting/stalled → playing/canplay/loadeddata transitions. */
+  onBufferingChange?: (isBuffering: boolean) => void;
   src?: string | null;
 };
 
@@ -38,6 +44,7 @@ export const LazyVideoPlayer = React.forwardRef<
     autoPlay = true,
     hlsStartQuality = "auto",
     muted = true,
+    onBufferingChange,
     preload = "metadata",
     src,
     ...props
@@ -46,6 +53,12 @@ export const LazyVideoPlayer = React.forwardRef<
 ) {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const [isNearViewport, setIsNearViewport] = React.useState(false);
+
+  React.useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !onBufferingChange) return;
+    return attachBufferingListener(video, onBufferingChange);
+  }, [onBufferingChange]);
   const setRefs = React.useCallback(
     (element: HTMLVideoElement | null) => {
       videoRef.current = element;
@@ -82,6 +95,7 @@ export const LazyVideoPlayer = React.forwardRef<
     let hls: any = null;
     let cancelled = false;
     const shouldPreferHighStart = hlsStartQuality === "high";
+    const teardownCallbacks: Array<() => void> = [];
 
     async function playVideo() {
       if (!autoPlay || cancelled) return;
@@ -90,54 +104,93 @@ export const LazyVideoPlayer = React.forwardRef<
       await currentVideo.play().catch(() => null);
     }
 
+    function playNatively() {
+      if (!video) return Promise.resolve();
+      if (video.src !== mediaSrc) video.src = mediaSrc;
+      return playVideo();
+    }
+
+    // Keeps the forced-high start level pinned through the video's initial
+    // cold-start buffering, then releases it back to auto ABR the first time
+    // *real* mid-playback buffering happens.
+    function attachQualityPinRelease(activeHls: any) {
+      let hasPlayedOnce = false;
+      const markPlayedOnce = () => {
+        hasPlayedOnce = true;
+      };
+      video!.addEventListener("playing", markPlayedOnce, { once: true });
+      teardownCallbacks.push(() =>
+        video!.removeEventListener("playing", markPlayedOnce),
+      );
+
+      let releasedPin = false;
+      teardownCallbacks.push(
+        attachBufferingListener(video!, (isBuffering) => {
+          if (
+            !shouldReleaseQualityPin({
+              alreadyReleased: releasedPin,
+              hasPlayedOnce,
+              isBuffering,
+            })
+          ) {
+            return;
+          }
+          releasedPin = true;
+          activeHls.nextLevel = -1;
+          activeHls.loadLevel = -1;
+        }),
+      );
+    }
+
     async function attachSource() {
       if (!video) return;
-      if (!isHlsUrl(mediaSrc) || canPlayNativeHls(video)) {
-        if (video.src !== mediaSrc) video.src = mediaSrc;
-        await playVideo();
-      } else {
-        const { default: Hls } = await import("hls.js");
-        if (cancelled || !Hls.isSupported()) return;
-        hls = new Hls({
-          autoStartLoad: !shouldPreferHighStart,
-          abrEwmaDefaultEstimate:
-            shouldPreferHighStart ? 8_000_000 : undefined,
-          capLevelToPlayerSize: !shouldPreferHighStart,
-          enableWorker: true,
-          startLevel: -1,
-          lowLatencyMode: false,
-        });
-        if (shouldPreferHighStart) {
-          hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            const level = preferredHighStartLevel(hls.levels || []);
-            if (level >= 0) {
-              hls.startLevel = level;
-              hls.nextLevel = level;
-              hls.loadLevel = level;
-            }
-            hls.startLoad(0);
-            void playVideo();
-          });
-          const restoreAutoQuality = () => {
-            hls.nextLevel = -1;
-            hls.loadLevel = -1;
-            hls.off(Hls.Events.FRAG_LOADED, restoreAutoQuality);
-          };
-          hls.on(Hls.Events.FRAG_LOADED, restoreAutoQuality);
-        } else {
-          hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            void playVideo();
-          });
-        }
-        hls.loadSource(mediaSrc);
-        hls.attachMedia(video);
+      const preferNativeHls = !shouldPreferHighStart && canPlayNativeHls(video);
+      if (!isHlsUrl(mediaSrc) || preferNativeHls) {
+        await playNatively();
+        return;
       }
+
+      const { default: Hls } = await import("hls.js");
+      if (cancelled) return;
+      if (!Hls.isSupported()) {
+        await playNatively();
+        return;
+      }
+
+      hls = new Hls({
+        autoStartLoad: !shouldPreferHighStart,
+        abrEwmaDefaultEstimate: shouldPreferHighStart ? 8_000_000 : undefined,
+        capLevelToPlayerSize: !shouldPreferHighStart,
+        enableWorker: true,
+        startLevel: -1,
+        lowLatencyMode: false,
+      });
+      if (shouldPreferHighStart) {
+        attachQualityPinRelease(hls);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          const level = preferredHighStartLevel(hls.levels || []);
+          if (level >= 0) {
+            hls.startLevel = level;
+            hls.nextLevel = level;
+            hls.loadLevel = level;
+          }
+          hls.startLoad(0);
+          void playVideo();
+        });
+      } else {
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          void playVideo();
+        });
+      }
+      hls.loadSource(mediaSrc);
+      hls.attachMedia(video);
     }
 
     void attachSource();
 
     return () => {
       cancelled = true;
+      teardownCallbacks.forEach((teardown) => teardown());
       hls?.destroy();
       video.pause();
     };

@@ -14,6 +14,20 @@ var homeCarouselAnchorRetryTimer: number | null = null;
 
 var homeCarouselAnchorRetryCount = 0;
 
+/**
+ * How many carousel cards to show for the current viewport. Pure so it's
+ * unit-testable without a DOM/matchMedia stub; renderCarousel supplies the
+ * live matchMedia result and reruns this on breakpoint-crossing resizes
+ * (see watchCarouselViewportBreakpoint in main.ts).
+ */
+export function resolveCarouselItemLimit(
+  isMobileViewport: boolean,
+  config: { maxItems: number; mobileMaxItems: number },
+): number {
+  const configured = isMobileViewport ? config.mobileMaxItems : config.maxItems;
+  return Math.max(1, Number(configured) || 1);
+}
+
 function isFloatingWidget(): boolean {
   return ctx.widgetType === "floating_launcher" || ctx.widgetType === "floating_video";
 }
@@ -463,10 +477,10 @@ export function renderCarousel(
   var isMobileViewport =
     typeof window.matchMedia === "function" &&
     window.matchMedia("(max-width: 640px)").matches;
-  var configuredMaxItems = isMobileViewport
-    ? ctx.carouselConfig.mobileMaxItems
-    : ctx.carouselConfig.maxItems;
-  var items = videos.slice(0, Math.max(1, Number(configuredMaxItems) || 1));
+  var items = videos.slice(
+    0,
+    resolveCarouselItemLimit(isMobileViewport, ctx.carouselConfig),
+  );
   var upzeroCustomerStatus = isUpzeroStore(store)
     ? ctx.sharedState.upzeroCustomerStatusCache
     : { approved: true, loggedIn: true };
@@ -533,7 +547,9 @@ export function renderCarousel(
     ".lupp-home-carousel-description{max-width:680px;margin:-12px auto 22px;padding:0 16px;text-align:center;color:#64748b;font-size:14px;font-weight:600;line-height:1.5;letter-spacing:0}" +
     ".lupp-home-carousel-track{display:flex;gap:clamp(18px,2.5vw,48px);overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;padding:4px max(16px,calc((100vw - 1240px)/2)) 10px;-webkit-overflow-scrolling:touch;scrollbar-width:none}" +
     ".lupp-home-carousel-track::-webkit-scrollbar{display:none}" +
-    ".lupp-home-carousel-card{position:relative;display:block;flex:0 0 clamp(178px,14.2vw,250px);aspect-ratio:9/16;border:0;border-radius:12px;background:#f3f4f6;box-shadow:0 14px 28px rgba(15,23,42,.12);overflow:hidden;cursor:pointer;scroll-snap-align:center;padding:0;color:inherit}" +
+    ".lupp-home-carousel-card{position:relative;display:block;flex:0 0 clamp(178px,14.2vw,250px);aspect-ratio:9/16;border:0;border-radius:12px;background:#f3f4f6;box-shadow:0 14px 28px rgba(15,23,42,.12);overflow:hidden;cursor:pointer;scroll-snap-align:center;padding:0;color:inherit;opacity:0;animation:lupp-home-carousel-card-in .38s ease-out forwards;animation-delay:calc(var(--lupp-card-index, 0) * 45ms)}" +
+    "@keyframes lupp-home-carousel-card-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}" +
+    "@media (prefers-reduced-motion: reduce){.lupp-home-carousel-card{animation-duration:.001s;animation-delay:0s}}" +
     ".lupp-home-carousel-card:nth-child(4n){flex-basis:clamp(190px,15.5vw,270px)}" +
     ".lupp-home-carousel-thumb{width:100%;height:100%;display:block;object-fit:cover;background:#e5e7eb;transition:transform .28s ease}" +
     ".lupp-home-carousel-card:hover .lupp-home-carousel-thumb{transform:scale(1.025)}" +
@@ -558,11 +574,13 @@ export function renderCarousel(
     descriptionHtml +
     '<div class="lupp-home-carousel-track">' +
     items
-      .map(function (video) {
+      .map(function (video, index) {
         var thumbnailUrl = video.thumbnail_url || "";
         var mediaUrl = videoMediaUrl(video);
         return (
-          '<button type="button" class="lupp-home-carousel-card" data-video="' +
+          '<button type="button" class="lupp-home-carousel-card" style="--lupp-card-index:' +
+          index +
+          '" data-video="' +
           video.id +
           '" aria-label="Abrir vídeo ' +
           escapeHtml(video.title || "Luup") +

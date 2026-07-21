@@ -255,6 +255,25 @@ function trackLauncherImpression(
   }, 250);
 }
 
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
+// Animate the bubble in only the first time it mounts in this page session —
+// re-renders (URL changes, viewport-breakpoint re-slices, status refreshes)
+// must not replay the pop-in, or it would flash every time the widget
+// re-evaluates its state.
+function launcherEntranceStyle(root: HTMLElement): string {
+  if (root.getAttribute("data-lupp-launcher-mounted") === "true" || prefersReducedMotion()) {
+    return "";
+  }
+  root.setAttribute("data-lupp-launcher-mounted", "true");
+  return "opacity:0;transform:scale(.6);animation:lupp-launcher-in .32s cubic-bezier(.34,1.56,.64,1) forwards;";
+}
+
 export function renderLauncher(
   root: HTMLElement,
   store: StorePayload,
@@ -297,10 +316,13 @@ export function renderLauncher(
     positionStyles() +
     ";will-change:transform,left,top;touch-action:none;-webkit-user-select:none;user-select:none;";
   root.innerHTML =
+    "<style>@keyframes lupp-launcher-in{to{opacity:1;transform:scale(1)}}</style>" +
     '<button type="button" data-lupp-launcher style="' +
     "display:flex;align-items:center;gap:10px;border:0;background:transparent;padding:0;cursor:grab;touch-action:none;font-family:" +
     ctx.launcherConfig.fontFamily +
-    ';filter:drop-shadow(0 14px 28px rgba(0,0,0,.28));">' +
+    ";filter:drop-shadow(0 14px 28px rgba(0,0,0,.28));" +
+    launcherEntranceStyle(root) +
+    '">' +
     '<span style="position:relative;display:block;width:' +
     width +
     "px;height:" +

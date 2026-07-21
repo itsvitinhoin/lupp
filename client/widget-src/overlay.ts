@@ -1,7 +1,6 @@
 // Lupp widget – feed overlay (fullscreen iframe + feedback form) and the
 // postMessage plumbing shared with the feed iframe and platform adapters.
 import {
-  escapeHtml,
   getUrlHostname,
   getUrlOrigin,
   resolveUrl,
@@ -9,6 +8,37 @@ import {
 } from "./utils";
 import { ctx, isUpzeroStore, videoMediaUrl } from "./context";
 import type { CustomerStatus, SlimVideo, StorePayload } from "./types";
+
+var OVERLAY_TRANSITION_MS = 220;
+
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
+var preconnectedOrigin: string | null = null;
+
+// Warms DNS/TLS for the feed's origin as soon as the widget knows it (right
+// after bootstrap resolves), so the overlay iframe's first navigation on
+// click doesn't pay that cost cold. Safe to call repeatedly — it's a no-op
+// once the same origin has already been hinted.
+export function preconnectFeedOrigin(luppBaseUrl: string): void {
+  try {
+    var origin = getUrlOrigin(luppBaseUrl);
+    if (!origin || origin === preconnectedOrigin) return;
+    preconnectedOrigin = origin;
+
+    (["preconnect", "dns-prefetch"] as const).forEach(function (rel) {
+      var link = document.createElement("link");
+      link.rel = rel;
+      link.href = origin;
+      if (rel === "preconnect") link.crossOrigin = "anonymous";
+      document.head.appendChild(link);
+    });
+  } catch (_) {}
+}
 
 export function isTrustedLuppFrameOrigin(origin: string): boolean {
   try {
@@ -130,12 +160,27 @@ export function openFeedOverlay(
   var closeTracked = false;
   document.body.style.overflow = "hidden";
 
+  var reduceMotion = prefersReducedMotion();
+  var transitionStyle = reduceMotion
+    ? ""
+    : "transition:opacity " + OVERLAY_TRANSITION_MS + "ms ease-out;";
+  var frameTransitionStyle = reduceMotion
+    ? ""
+    : "transition:opacity " +
+      OVERLAY_TRANSITION_MS +
+      "ms ease-out,transform " +
+      OVERLAY_TRANSITION_MS +
+      "ms cubic-bezier(.2,.9,.3,1);";
+
   var overlay = document.createElement("div");
   overlay.setAttribute("data-lupp-feed-overlay", "true");
   overlay.style.cssText =
     "position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.76);display:flex;align-items:center;justify-content:center;font-family:" +
     ctx.launcherConfig.fontFamily +
-    ";";
+    ";opacity:" +
+    (reduceMotion ? "1" : "0") +
+    ";" +
+    transitionStyle;
 
   var close = document.createElement("button");
   close.type = "button";
@@ -149,7 +194,10 @@ export function openFeedOverlay(
   frame.title = "Feed vertical Luup";
   frame.allow = "autoplay; clipboard-write; encrypted-media; fullscreen";
   frame.style.cssText =
-    "width:min(100vw,430px);height:100dvh;max-height:100dvh;border:0;background:#000;box-shadow:0 24px 80px rgba(0,0,0,.42);";
+    "width:min(100vw,430px);height:100dvh;max-height:100dvh;border:0;background:#000;box-shadow:0 24px 80px rgba(0,0,0,.42);" +
+    (reduceMotion
+      ? ""
+      : "opacity:0;transform:translateY(18px) scale(.97);" + frameTransitionStyle);
 
   function setFrameSrc(customerStatus: CustomerStatus) {
     var params =
@@ -215,9 +263,28 @@ export function openFeedOverlay(
 
   function destroyOverlay(reason?: string) {
     trackFeedClose(reason);
-    overlay.remove();
     document.body.style.overflow = previousOverflow;
     ctx.flushPendingStorefrontCartRefresh();
+
+    if (reduceMotion) {
+      overlay.remove();
+      return;
+    }
+
+    // Play the close transition, then remove — with a fallback timeout in
+    // case transitionend never fires (e.g. the element was already detached
+    // by other cleanup, or the browser drops the event under heavy load).
+    var removed = false;
+    function removeNow() {
+      if (removed) return;
+      removed = true;
+      overlay.remove();
+    }
+    overlay.addEventListener("transitionend", removeNow, { once: true });
+    window.setTimeout(removeNow, OVERLAY_TRANSITION_MS + 120);
+    overlay.style.opacity = "0";
+    frame.style.opacity = "0";
+    frame.style.transform = "translateY(18px) scale(.97)";
   }
 
   function showFeedbackForm() {
@@ -231,42 +298,21 @@ export function openFeedOverlay(
     overlay.style.background = "rgba(0,0,0,.62)";
     close.style.display = "none";
 
-    var selected = "";
     var selectedRating = 0;
-    var feedbackLogoUrl = resolveUrl(
-      "/luup-logo-completa-white.png",
-      ctx.luppBaseUrl,
-    );
     var feedback = document.createElement("div");
     feedback.setAttribute("data-lupp-feedback", "true");
     feedback.style.cssText =
       "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:12px;color:#fff;";
 
     feedback.innerHTML =
-      '<div style="width:min(100%,430px);height:min(100dvh,805px);border-radius:18px;background:radial-gradient(circle at 50% 0%,rgba(255,255,255,.28),rgba(255,255,255,.08) 42%,rgba(0,0,0,.34));box-shadow:0 28px 90px rgba(0,0,0,.55);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);padding:26px 28px;display:flex;flex-direction:column;justify-content:center;gap:14px;">' +
-      '<a href="' +
-      escapeHtml(ctx.luppBaseUrl || "https://luup.dzns.com.br") +
-      '" target="_blank" rel="noopener noreferrer" aria-label="Luup" style="display:flex;justify-content:center;margin-bottom:4px;text-decoration:none;"><img src="' +
-      escapeHtml(feedbackLogoUrl) +
-      '" alt="Luup" style="height:42px;max-width:150px;object-fit:contain;display:block;"/></a>' +
-      '<div style="text-align:center;margin-bottom:8px;"><h2 style="margin:0 0 8px;font-size:20px;line-height:1.1;font-weight:800;">Queremos saber sua opinião!</h2><p style="margin:0 auto;max-width:360px;font-size:12px;line-height:1.15;font-weight:700;color:rgba(255,255,255,.92);">Sua experiência é muito importante para nós. Responda rapidamente e ajude-nos a melhorar cada vez mais.</p></div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;"><div style="border:1px solid rgba(255,255,255,.24);border-radius:10px;background:rgba(255,255,255,.12);padding:10px;text-align:center;"><strong style="display:block;font-size:18px;line-height:1;">0</strong><span style="display:block;margin-top:3px;font-size:11px;font-weight:800;color:rgba(255,255,255,.76);">Comentários</span></div><div style="border:1px solid rgba(255,255,255,.24);border-radius:10px;background:rgba(255,255,255,.12);padding:10px;text-align:center;"><strong data-lupp-rating-count style="display:block;font-size:18px;line-height:1;">0/5</strong><span style="display:block;margin-top:3px;font-size:11px;font-weight:800;color:rgba(255,255,255,.76);">Estrelas</span></div></div>' +
-      '<div data-lupp-feedback-stars style="display:flex;justify-content:center;gap:8px;margin-bottom:10px;"></div>' +
-      '<div data-lupp-feedback-options style="display:grid;gap:10px;"></div>' +
-      '<textarea data-lupp-feedback-text placeholder="Deixe aqui sua sugestão do que achou ou de como podemos melhorar." style="margin-top:24px;width:100%;min-height:66px;resize:none;border:1px solid rgba(255,255,255,.32);border-radius:9px;background:rgba(255,255,255,.13);color:#fff;outline:none;padding:14px;font-family:inherit;font-size:13px;font-weight:600;line-height:1.4;box-sizing:border-box;"></textarea>' +
-      '<button data-lupp-feedback-submit type="button" style="height:40px;border:0;border-radius:5px;background:#fff;color:#050505;font-family:inherit;font-size:15px;font-weight:800;line-height:1;cursor:pointer;">Enviar Feedback</button>' +
-      '<button data-lupp-feedback-skip type="button" style="height:40px;border:0;background:transparent;color:#fff;font-family:inherit;font-size:16px;font-weight:800;line-height:1;cursor:pointer;">Agora não</button>' +
+      '<div style="width:min(100%,320px);border-radius:18px;background:radial-gradient(circle at 50% 0%,rgba(255,255,255,.28),rgba(255,255,255,.08) 42%,rgba(0,0,0,.34));box-shadow:0 28px 90px rgba(0,0,0,.55);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);padding:28px;display:flex;flex-direction:column;align-items:stretch;gap:18px;">' +
+      '<p style="margin:0;text-align:center;font-size:16px;line-height:1.3;font-weight:800;">Como foi sua experiência?</p>' +
+      '<div data-lupp-feedback-stars style="display:flex;justify-content:center;gap:10px;"></div>' +
+      '<button data-lupp-feedback-submit type="button" style="height:44px;border:0;border-radius:8px;background:#fff;color:#050505;font-family:inherit;font-size:15px;font-weight:800;line-height:1;cursor:pointer;">Enviar</button>' +
+      '<button data-lupp-feedback-skip type="button" style="height:36px;border:0;background:transparent;color:rgba(255,255,255,.78);font-family:inherit;font-size:13px;font-weight:700;line-height:1;cursor:pointer;">Agora não</button>' +
       "</div>";
 
-    var options = [
-      "A experiência foi incrível",
-      "Atendeu às expectativas",
-      "Poderia ser melhor",
-      "Prefiro ver somente fotos",
-    ];
-    var optionList = feedback.querySelector("[data-lupp-feedback-options]")!;
     var starList = feedback.querySelector("[data-lupp-feedback-stars]")!;
-    var ratingCount = feedback.querySelector("[data-lupp-rating-count]")!;
 
     function renderStars() {
       starList.innerHTML = [1, 2, 3, 4, 5]
@@ -278,32 +324,13 @@ export function openFeedOverlay(
             rating +
             ' estrelas" style="border:0;background:transparent;color:' +
             (selectedRating >= rating ? "#facc15" : "rgba(255,255,255,.38)") +
-            ';font-size:30px;line-height:1;cursor:pointer;padding:0 2px;">★</button>'
-          );
-        })
-        .join("");
-      ratingCount.textContent = selectedRating + "/5";
-    }
-
-    function renderOptions() {
-      optionList.innerHTML = options
-        .map(function (option) {
-          var active = selected === option;
-          return (
-            '<button data-lupp-feedback-option="' +
-            escapeHtml(option) +
-            '" type="button" style="height:42px;display:flex;align-items:center;gap:14px;border:1px solid rgba(255,255,255,.34);border-radius:9px;background:' +
-            (active ? "rgba(255,255,255,.28)" : "rgba(255,255,255,.15)") +
-            ';color:#fff;text-align:left;padding:0 12px;font-family:inherit;font-size:14px;font-weight:800;line-height:1;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.16);"><span style="width:20px;height:20px;border-radius:999px;background:rgba(255,255,255,.86);color:#9ca3af;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;">✓</span><span>' +
-            escapeHtml(option) +
-            "</span></button>"
+            ';font-size:32px;line-height:1;cursor:pointer;padding:0 2px;">★</button>'
           );
         })
         .join("");
     }
 
     renderStars();
-    renderOptions();
     feedback.addEventListener("click", function (event) {
       event.stopPropagation();
       var eventTarget = event.target as HTMLElement;
@@ -316,26 +343,10 @@ export function openFeedOverlay(
         return;
       }
 
-      var optionButton = eventTarget.closest("[data-lupp-feedback-option]");
-      if (optionButton) {
-        selected =
-          optionButton.getAttribute("data-lupp-feedback-option") || "";
-        renderOptions();
-        return;
-      }
-
       if (eventTarget.closest("[data-lupp-feedback-submit]")) {
-        var text =
-          (
-            feedback.querySelector(
-              "[data-lupp-feedback-text]",
-            ) as HTMLTextAreaElement
-          ).value || "";
         ctx.track(store.id, "widget_view", videoId || null, null, {
           action: "feedback_submit",
-          feedback_option: selected,
           feedback_rating: selectedRating,
-          feedback_text: text,
         });
         destroyOverlay("feedback_submit");
         return;
@@ -365,6 +376,18 @@ export function openFeedOverlay(
   overlay.appendChild(frame);
   overlay.appendChild(close);
   document.body.appendChild(overlay);
+
+  if (!reduceMotion) {
+    // Flip to the "shown" state on the next frame so the browser has
+    // committed the initial opacity:0/translateY styles first — setting
+    // both in the same tick would skip the transition entirely.
+    requestAnimationFrame(function () {
+      overlay.style.opacity = "1";
+      frame.style.opacity = "1";
+      frame.style.transform = "translateY(0) scale(1)";
+    });
+  }
+
   ctx.track(store.id, "feed_open", videoId || null, null, {
     opened_from: "floating_launcher",
   });

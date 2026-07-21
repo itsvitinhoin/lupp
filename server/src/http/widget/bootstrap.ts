@@ -280,6 +280,24 @@ const VIDEOS_ORDER: Prisma.VideoOrderByWithRelationInput[] = [
   { created_at: "desc" },
 ];
 
+// Context mode always fetches in "manual" order (is_featured, sort_order,
+// created_at — VIDEOS_ORDER below) regardless of the widget's home_ordering
+// setting, since that setting isn't known until `widget`'s own concurrent
+// fetch resolves (see the Promise.all in widgetBootstrapHandler). When the
+// resolved config says "automatic", re-sort here instead of re-querying:
+// stable by is_featured first (feature pins always win), then by created_at.
+function applyHomeOrdering(videos: SerializedVideo[], homeOrdering: string): SerializedVideo[] {
+  if (homeOrdering !== "automatic") return videos;
+  return [...videos].sort((left, right) => {
+    const featuredDiff = Number(right.is_featured) - Number(left.is_featured);
+    if (featuredDiff !== 0) return featuredDiff;
+    return (
+      new Date(right.created_at as string).getTime() -
+      new Date(left.created_at as string).getTime()
+    );
+  });
+}
+
 async function loadVideos(storeId: string, mode: string): Promise<unknown[]> {
   if (mode === "preview") {
     const rows = await prisma.video.findMany({
@@ -425,7 +443,8 @@ export async function widgetBootstrapHandler(request: FastifyRequest, reply: Fas
 
   if (context) {
     const config = resolveWidgetConfig(widget, store);
-    const filtered = filterVideosForContext(videos as SerializedVideo[], config, context);
+    const orderedVideos = applyHomeOrdering(videos as SerializedVideo[], config.display.home_ordering);
+    const filtered = filterVideosForContext(orderedVideos, config, context);
     const display = resolveDisplay(config, context, filtered.length);
     const body = {
       active: Boolean(effectiveWidget),
