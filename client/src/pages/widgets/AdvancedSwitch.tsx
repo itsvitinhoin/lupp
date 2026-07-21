@@ -17,9 +17,9 @@ export function AdvancedSwitch({
     <div>
       <div className="flex items-center gap-3">
         <Switch checked={checked} disabled={disabled} onCheckedChange={onChange} />
-        <span className="text-sm font-semibold text-slate-600">{label}</span>
+        <span className="text-sm font-semibold text-muted-foreground">{label}</span>
       </div>
-      <p className="mt-2 rounded-xl bg-slate-50 px-4 py-3 text-sm font-medium leading-tight text-slate-500">
+      <p className="mt-2 rounded-xl bg-muted/50 px-4 py-3 text-sm font-medium leading-tight text-muted-foreground">
         {description}
       </p>
     </div>

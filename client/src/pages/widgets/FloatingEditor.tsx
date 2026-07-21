@@ -19,7 +19,6 @@ import {
   Code2,
   ExternalLink,
   LayoutGrid,
-  MessageCircle,
   Monitor,
   Move,
   Paintbrush,
@@ -75,10 +74,10 @@ export function FloatingEditor(props: {
   const currentSizeLabel =
     sizeOptions.find((option) => option.value === form.launcherSize)?.label ??
     "Média";
-  const [previewMode, setPreviewMode] = React.useState<"instant" | "real">(
-    "instant",
-  );
   const realPreviewSrc = useDebouncedRealPreviewSrc(props.storeSlug, form);
+  const [previewViewport, setPreviewViewport] = React.useState<
+    "desktop" | "mobile"
+  >("desktop");
 
   return (
     <>
@@ -88,15 +87,15 @@ export function FloatingEditor(props: {
             onClick={props.onBack}
             variant="ghost"
             size="icon"
-            className="mt-1 h-10 w-10 rounded-xl text-slate-700 hover:bg-white"
+            className="mt-1 h-10 w-10 rounded-xl text-foreground/80 hover:bg-card"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h2 className="text-2xl font-bold leading-tight tracking-tight text-slate-950">
+            <h2 className="text-2xl font-bold leading-tight tracking-tight text-foreground">
               Miniatura flutuante
             </h2>
-            <p className="mt-1 text-sm font-medium text-slate-500">
+            <p className="mt-1 text-sm font-medium text-muted-foreground">
               Personalize sua miniatura flutuante para que ela se destaque no
               site e ofereça uma experiência única aos seus clientes.
             </p>
@@ -110,7 +109,7 @@ export function FloatingEditor(props: {
             <Button
               variant="outline"
               asChild
-              className="h-11 rounded-xl bg-white px-4 text-sm font-semibold"
+              className="h-11 rounded-xl bg-card px-4 text-sm font-semibold"
             >
               <a
                 href={`/test-store/${props.storeSlug}?widget=floating_launcher`}
@@ -134,16 +133,16 @@ export function FloatingEditor(props: {
       </div>
 
       <div className="grid gap-7 xl:grid-cols-[minmax(360px,560px)_1fr]">
-        <aside className="max-h-[calc(100vh-250px)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center gap-3 border-b border-slate-100 p-6">
+        <aside className="max-h-[calc(100vh-250px)] overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+          <div className="flex items-center gap-3 border-b border-border p-6">
             <Paintbrush className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-bold text-slate-950">Personalizar</h3>
+            <h3 className="text-lg font-bold text-foreground">Personalizar</h3>
           </div>
           <div className="max-h-[calc(100vh-350px)] space-y-7 overflow-y-auto p-6">
             <section>
               <div className="mb-5 flex items-center gap-3">
-                <Palette className="h-5 w-5 text-slate-700" />
-                <h4 className="text-base font-bold text-slate-950">Cores</h4>
+                <Palette className="h-5 w-5 text-foreground/80" />
+                <h4 className="text-base font-bold text-foreground">Cores</h4>
               </div>
               <div className="grid grid-cols-2 gap-5">
                 <ColorField
@@ -163,7 +162,7 @@ export function FloatingEditor(props: {
                 />
               </div>
               <div className="mt-5 grid gap-3">
-                <Label className="text-sm font-semibold text-slate-500">
+                <Label className="text-sm font-semibold text-muted-foreground">
                   Texto da chamada
                 </Label>
                 <Input
@@ -171,7 +170,7 @@ export function FloatingEditor(props: {
                   onChange={(event) =>
                     setField("launcherLabel", event.target.value)
                   }
-                  className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-950"
+                  className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground"
                 />
               </div>
             </section>
@@ -179,7 +178,7 @@ export function FloatingEditor(props: {
             <SectionDivider />
 
             <section>
-              <h4 className="mb-4 text-base font-bold text-slate-950">
+              <h4 className="mb-4 text-base font-bold text-foreground">
                 Tamanho
               </h4>
               <div className="grid grid-cols-3 gap-3">
@@ -188,11 +187,11 @@ export function FloatingEditor(props: {
                     key={option.value}
                     type="button"
                     onClick={() => setField("launcherSize", option.value)}
-                    className="flex items-center gap-2 rounded-xl px-1 py-2 text-left text-sm font-semibold text-slate-500"
+                    className="flex items-center gap-2 rounded-xl px-1 py-2 text-left text-sm font-semibold text-muted-foreground"
                   >
                     <span
                       className={cn(
-                        "h-6 w-6 rounded-full border-4 border-slate-200 bg-white",
+                        "h-6 w-6 rounded-full border-4 border-border bg-card",
                         form.launcherSize === option.value &&
                           "border-primary bg-primary",
                       )}
@@ -209,7 +208,7 @@ export function FloatingEditor(props: {
               <div className="mb-5 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <Move className="h-7 w-7" />
-                  <h4 className="text-base font-bold text-slate-950">
+                  <h4 className="text-base font-bold text-foreground">
                     Posição da miniatura
                   </h4>
                 </div>
@@ -220,7 +219,7 @@ export function FloatingEditor(props: {
                   >
                     <Monitor className="h-5 w-5" />
                   </button>
-                  <button type="button" className="p-2 text-slate-400">
+                  <button type="button" className="p-2 text-muted-foreground/70">
                     <Smartphone className="h-5 w-5" />
                   </button>
                 </div>
@@ -229,7 +228,7 @@ export function FloatingEditor(props: {
                 value={form.launcherPosition}
                 onValueChange={(value) => setField("launcherPosition", value)}
               >
-                <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-950">
+                <SelectTrigger className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -241,7 +240,7 @@ export function FloatingEditor(props: {
               </Select>
               <div className="mt-4 grid grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-slate-500">
+                  <Label className="text-sm font-semibold text-muted-foreground">
                     Margem horizontal (px)
                   </Label>
                   <Input
@@ -252,11 +251,11 @@ export function FloatingEditor(props: {
                     onChange={(event) =>
                       setField("launcherOffsetX", event.target.value)
                     }
-                    className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-950"
+                    className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-slate-500">
+                  <Label className="text-sm font-semibold text-muted-foreground">
                     Margem vertical (px)
                   </Label>
                   <Input
@@ -267,11 +266,11 @@ export function FloatingEditor(props: {
                     onChange={(event) =>
                       setField("launcherOffsetY", event.target.value)
                     }
-                    className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-950"
+                    className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground"
                   />
                 </div>
               </div>
-              <div className="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-center text-sm font-medium leading-tight text-slate-500">
+              <div className="mt-4 rounded-xl bg-muted/50 px-4 py-3 text-center text-sm font-medium leading-tight text-muted-foreground">
                 As margens afastam a miniatura do canto escolhido — útil para
                 não sobrepor botões de WhatsApp ou cookies da loja.
               </div>
@@ -281,8 +280,8 @@ export function FloatingEditor(props: {
 
             <section>
               <div className="mb-5 flex items-center gap-3">
-                <LayoutGrid className="h-5 w-5 text-slate-700" />
-                <h4 className="text-base font-bold text-slate-950">Modelos</h4>
+                <LayoutGrid className="h-5 w-5 text-foreground/80" />
+                <h4 className="text-base font-bold text-foreground">Modelos</h4>
               </div>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                 {modelOptions.map((model) => (
@@ -291,7 +290,7 @@ export function FloatingEditor(props: {
                     type="button"
                     onClick={() => setField("launcherModel", model.value)}
                     className={cn(
-                      "min-h-36 rounded-2xl border border-slate-200 bg-white p-4 text-center transition hover:border-primary/50",
+                      "min-h-36 rounded-2xl border border-border bg-card p-4 text-center transition hover:border-primary/50",
                       form.launcherModel === model.value &&
                         "border-primary ring-1 ring-primary",
                     )}
@@ -315,7 +314,7 @@ export function FloatingEditor(props: {
                         </div>
                       </div>
                     </div>
-                    <span className="text-sm font-semibold text-slate-500">
+                    <span className="text-sm font-semibold text-muted-foreground">
                       {model.label}
                     </span>
                   </button>
@@ -327,7 +326,7 @@ export function FloatingEditor(props: {
 
             <section>
               <div className="mb-4 flex items-center justify-between">
-                <h4 className="text-base font-bold text-slate-950">
+                <h4 className="text-base font-bold text-foreground">
                   Configurações avançadas
                 </h4>
                 <ChevronDown className="h-6 w-6" />
@@ -358,8 +357,8 @@ export function FloatingEditor(props: {
 
             <section className="space-y-4">
               <div className="flex items-center gap-3">
-                <Settings2 className="h-5 w-5 text-slate-700" />
-                <h4 className="text-base font-bold text-slate-950">
+                <Settings2 className="h-5 w-5 text-foreground/80" />
+                <h4 className="text-base font-bold text-foreground">
                   Experiência na loja
                 </h4>
               </div>
@@ -370,14 +369,14 @@ export function FloatingEditor(props: {
                 onChange={(value) => setField("homeExperienceEnabled", value)}
               />
               <div className="space-y-2">
-                <Label className="font-semibold text-slate-500">
+                <Label className="font-semibold text-muted-foreground">
                   Ordenação da Home
                 </Label>
                 <Select
                   value={form.homeOrdering}
                   onValueChange={(value) => setField("homeOrdering", value)}
                 >
-                  <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-950">
+                  <SelectTrigger className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -393,14 +392,14 @@ export function FloatingEditor(props: {
                 onChange={(value) => setField("hideWithoutVideos", value)}
               />
               <div className="space-y-2">
-                <Label className="font-semibold text-slate-500">
+                <Label className="font-semibold text-muted-foreground">
                   Onde exibir
                 </Label>
                 <Select
                   value={form.displayMode}
                   onValueChange={(value) => setField("displayMode", value)}
                 >
-                  <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-950">
+                  <SelectTrigger className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -412,14 +411,14 @@ export function FloatingEditor(props: {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="font-semibold text-slate-500">
+                <Label className="font-semibold text-muted-foreground">
                   Vídeo nas páginas de produto
                 </Label>
                 <Select
                   value={form.productMode}
                   onValueChange={(value) => setField("productMode", value)}
                 >
-                  <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-950">
+                  <SelectTrigger className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -434,7 +433,7 @@ export function FloatingEditor(props: {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="font-semibold text-slate-500">
+                <Label className="font-semibold text-muted-foreground">
                   URLs incluídas (vazio = todas)
                 </Label>
                 <Textarea
@@ -444,11 +443,11 @@ export function FloatingEditor(props: {
                   }
                   rows={2}
                   placeholder={"/colecoes/verao\n/produto"}
-                  className="rounded-xl border-slate-200 bg-white text-sm text-slate-950"
+                  className="rounded-xl border-border bg-card text-sm text-foreground"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="font-semibold text-slate-500">
+                <Label className="font-semibold text-muted-foreground">
                   URLs excluídas
                 </Label>
                 <Textarea
@@ -458,7 +457,7 @@ export function FloatingEditor(props: {
                   }
                   rows={3}
                   placeholder={"/checkout\n/carrinho\n/cart"}
-                  className="rounded-xl border-slate-200 bg-white text-sm text-slate-950"
+                  className="rounded-xl border-border bg-card text-sm text-foreground"
                 />
               </div>
             </section>
@@ -467,8 +466,8 @@ export function FloatingEditor(props: {
 
             <section className="space-y-4">
               <div className="flex items-center gap-3">
-                <ShoppingBag className="h-5 w-5 text-slate-700" />
-                <h4 className="text-base font-bold text-slate-950">
+                <ShoppingBag className="h-5 w-5 text-foreground/80" />
+                <h4 className="text-base font-bold text-foreground">
                   Condições comerciais
                 </h4>
               </div>
@@ -482,7 +481,7 @@ export function FloatingEditor(props: {
               />
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="font-semibold text-slate-500">
+                  <Label className="font-semibold text-muted-foreground">
                     Parcelas
                   </Label>
                   <Input
@@ -493,11 +492,11 @@ export function FloatingEditor(props: {
                     onChange={(event) =>
                       setField("customInstallmentsCount", event.target.value)
                     }
-                    className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-950"
+                    className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="font-semibold text-slate-500">
+                  <Label className="font-semibold text-muted-foreground">
                     Desconto Pix (%)
                   </Label>
                   <Input
@@ -509,7 +508,7 @@ export function FloatingEditor(props: {
                     onChange={(event) =>
                       setField("customPixDiscountPercent", event.target.value)
                     }
-                    className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-950"
+                    className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground"
                   />
                 </div>
               </div>
@@ -528,7 +527,7 @@ export function FloatingEditor(props: {
                 onChange={(value) => setField("customPixDiscountEnabled", value)}
               />
               <div className="space-y-2">
-                <Label className="font-semibold text-slate-500">
+                <Label className="font-semibold text-muted-foreground">
                   Texto extra opcional
                 </Label>
                 <Input
@@ -537,7 +536,7 @@ export function FloatingEditor(props: {
                     setField("customPaymentNote", event.target.value)
                   }
                   placeholder="Cupom de primeira compra disponível na loja"
-                  className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-950"
+                  className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground"
                 />
               </div>
             </section>
@@ -546,14 +545,14 @@ export function FloatingEditor(props: {
 
             <section className="space-y-4 pb-6">
               <div className="flex items-center gap-3">
-                <Code2 className="h-5 w-5 text-slate-700" />
-                <h4 className="text-base font-bold text-slate-950">
+                <Code2 className="h-5 w-5 text-foreground/80" />
+                <h4 className="text-base font-bold text-foreground">
                   Instalação
                 </h4>
               </div>
               <Button
                 variant="outline"
-                className="h-11 w-full rounded-xl bg-white text-sm font-bold text-primary"
+                className="h-11 w-full rounded-xl bg-card text-sm font-bold text-primary"
                 onClick={props.onInstallNuvemshop}
                 disabled={props.isInstallingNuvemshop || !props.canPersist}
               >
@@ -574,50 +573,54 @@ export function FloatingEditor(props: {
         </aside>
 
         <div className="flex min-h-[560px] flex-col gap-3">
-          <div className="flex justify-end">
-            <div className="flex rounded-xl bg-[#f2f4f5] p-1 text-sm font-semibold">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="rounded-lg bg-muted/50 px-4 py-2 text-sm font-semibold text-muted-foreground">
+              Prévia instantânea
+            </span>
+            <div className="flex rounded-xl border border-border bg-muted/50 p-1 text-sm font-semibold">
               <button
                 type="button"
-                onClick={() => setPreviewMode("instant")}
+                onClick={() => setPreviewViewport("desktop")}
                 className={cn(
-                  "rounded-lg px-4 py-2 text-slate-500",
-                  previewMode === "instant" && "bg-white text-slate-950 shadow-sm",
+                  "flex items-center gap-2 rounded-lg px-4 py-2 text-muted-foreground",
+                  previewViewport === "desktop" &&
+                    "bg-card text-foreground shadow-sm",
                 )}
               >
-                Prévia instantânea
+                <Monitor className="h-4 w-4" />
+                Desktop
               </button>
               <button
                 type="button"
-                onClick={() => setPreviewMode("real")}
-                disabled={!props.storeSlug}
+                onClick={() => setPreviewViewport("mobile")}
                 className={cn(
-                  "rounded-lg px-4 py-2 text-slate-500 disabled:opacity-50",
-                  previewMode === "real" && "bg-white text-slate-950 shadow-sm",
+                  "flex items-center gap-2 rounded-lg px-4 py-2 text-muted-foreground",
+                  previewViewport === "mobile" &&
+                    "bg-card text-foreground shadow-sm",
                 )}
               >
-                Widget real
+                <Smartphone className="h-4 w-4" />
+                Mobile
               </button>
             </div>
           </div>
-          {previewMode === "real" && props.storeSlug ? (
+          {props.storeSlug ? (
+            // The real production widget bundle, styled by the pending edits
+            // (lupp_* overrides on the /test-store script src). The mobile
+            // viewport narrows the frame to a phone-width column.
             <iframe
               key={realPreviewSrc}
               src={realPreviewSrc}
-              title="Prévia real do widget"
-              className="min-h-[560px] w-full flex-1 rounded-2xl border border-slate-200 bg-white shadow-sm"
+              title="Prévia instantânea do widget"
+              className={cn(
+                "min-h-[560px] w-full flex-1 rounded-2xl border border-border bg-card shadow-sm",
+                previewViewport === "mobile" && "mx-auto max-w-sm",
+              )}
             />
           ) : (
-            <PreviewPanel
-              accent={form.launcherAccent}
-              background={form.launcherBackground}
-              font={form.launcherFont}
-              label={form.launcherLabel}
-              model={form.launcherModel}
-              position={form.launcherPosition}
-              size={form.launcherSize}
-              sizeLabel={currentSizeLabel}
-              textColor={form.launcherTextColor}
-            />
+            <div className="flex min-h-[560px] flex-1 items-center justify-center rounded-2xl border border-dashed border-border bg-card p-6 text-center text-sm font-medium text-muted-foreground">
+              Conclua o cadastro da loja para visualizar a prévia do widget.
+            </div>
           )}
         </div>
       </div>
@@ -662,7 +665,7 @@ function useDebouncedRealPreviewSrc(
 }
 
 function SectionDivider() {
-  return <div className="-mx-6 border-t border-slate-100" />;
+  return <div className="-mx-6 border-t border-border" />;
 }
 
 function ColorField({
@@ -683,152 +686,17 @@ function ColorField({
         className="h-16 w-16 shrink-0 rounded-xl border-0 p-1"
       />
       <span className="grid flex-1 gap-1">
-        <span className="block text-sm font-semibold text-slate-500">
+        <span className="block text-sm font-semibold text-muted-foreground">
           {label}
         </span>
         <Input
           aria-label={`${label} hexadecimal`}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="h-9 rounded-lg border-slate-200 bg-white font-mono text-sm font-semibold text-slate-950"
+          className="h-9 rounded-lg border-border bg-card font-mono text-sm font-semibold text-foreground"
         />
       </span>
     </label>
   );
 }
 
-function PreviewPanel({
-  accent,
-  background,
-  font,
-  label,
-  model,
-  position,
-  size,
-  sizeLabel,
-  textColor,
-}: {
-  accent: string;
-  background: string;
-  font: string;
-  label: string;
-  model: string;
-  position: string;
-  size: string;
-  sizeLabel: string;
-  textColor: string;
-}) {
-  const bubblePx = Math.max(60, Number(size) || 74);
-  const isRight = position.includes("right");
-  const isTop = position.includes("top");
-  const isRectangular = model === "rectangular";
-  const isSquare = model === "square";
-  const previewShape = isRectangular
-    ? "rounded-[22px]"
-    : isSquare
-      ? "rounded-[22px]"
-      : "rounded-full";
-  const launcherStyle: React.CSSProperties = {
-    [isRight ? "right" : "left"]: "7%",
-    [isTop ? "top" : "bottom"]: isTop ? "20%" : "45%",
-    fontFamily: font,
-  };
-
-  return (
-    <section className="min-h-[720px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex h-16 items-center justify-between border-b border-slate-100 px-6">
-        <div className="flex gap-3">
-          <span className="h-3.5 w-3.5 rounded-full bg-[#d7514e]" />
-          <span className="h-3.5 w-3.5 rounded-full bg-[#efcf4f]" />
-          <span className="h-3.5 w-3.5 rounded-full bg-[#72db92]" />
-        </div>
-        <div className="flex items-center gap-3 text-base font-bold text-slate-950">
-          Pré-visualização
-          <Monitor className="h-5 w-5" />
-        </div>
-      </div>
-      <div className="relative min-h-[640px] overflow-hidden bg-[#fbfbfb] p-8">
-        <SkeletonStorefront />
-        <div
-          className="absolute z-10 flex items-center drop-shadow-[0_14px_22px_rgba(0,0,0,.22)]"
-          style={launcherStyle}
-        >
-          <div
-            className={cn(
-              "relative shrink-0 overflow-hidden border-[4px] border-[#1e1e1e] bg-[#d7d2ce]",
-              previewShape,
-              model.includes("insta") &&
-                "border-transparent bg-[linear-gradient(135deg,#ffb13b,#f33f86,#7b4dff)] p-[4px]",
-            )}
-            style={{
-              width: isRectangular ? bubblePx * 1.35 : bubblePx,
-              height: isRectangular ? bubblePx * 0.78 : bubblePx,
-              boxShadow: `0 0 0 5px ${accent}`,
-            }}
-          >
-            <div
-              className={cn(
-                "h-full w-full bg-[linear-gradient(135deg,#b9b1aa,#5d514d)] bg-cover bg-center",
-                previewShape,
-              )}
-              style={{
-                backgroundImage:
-                  "linear-gradient(135deg, rgba(255,255,255,.12), rgba(0,0,0,.2)), radial-gradient(circle at 55% 34%, #d8c5b7 0 16%, transparent 17%), linear-gradient(120deg,#9e8d84,#2d2524)",
-              }}
-            />
-          </div>
-          <div
-            className="-ml-1 min-w-[210px] rounded-r-lg px-6 py-3 text-sm font-bold uppercase tracking-normal"
-            style={{ backgroundColor: accent, color: textColor }}
-          >
-            {label || "VIDEO DO PRODUTO"}
-          </div>
-        </div>
-        <div className="absolute bottom-6 left-8 rounded-full bg-white px-4 py-2 text-xs font-semibold text-slate-500 shadow-sm">
-          {sizeLabel} ·{" "}
-          {modelOptions.find((option) => option.value === model)?.label ??
-            "Circular"}
-        </div>
-        <div className="absolute bottom-8 right-8 flex h-[72px] w-[72px] items-center justify-center rounded-full bg-[#4cc231] text-white shadow-[0_18px_36px_rgba(36,135,60,.3)]">
-          <MessageCircle className="h-9 w-9" />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function SkeletonStorefront() {
-  return (
-    <div className="pointer-events-none select-none">
-      <div className="mb-7 flex items-start gap-8">
-        <div className="h-[104px] w-[104px] rounded-full bg-[#f0f0f0]" />
-        <div className="flex-1 pt-4">
-          <div className="mb-9 h-10 w-1/2 rounded-lg bg-[#f0f0f0]" />
-          <div className="h-10 w-28 rounded-lg bg-[#f0f0f0]" />
-        </div>
-      </div>
-      <div className="grid grid-cols-4 gap-8">
-        <div className="h-10 rounded-lg bg-[#f0f0f0]" />
-        <div className="h-10 rounded-lg bg-[#f0f0f0]" />
-        <div className="h-10 rounded-lg bg-[#f0f0f0]" />
-        <div className="h-10 rounded-lg bg-[#f0f0f0]" />
-      </div>
-      <div className="mt-5 grid grid-cols-[1fr_180px] gap-8">
-        <div className="space-y-5">
-          <div className="h-10 rounded-lg bg-[#f0f0f0]" />
-          <div className="h-10 w-3/4 rounded-lg bg-[#f0f0f0]" />
-          <div className="h-10 rounded-lg bg-[#f0f0f0]" />
-          <div className="mt-8 grid grid-cols-5 gap-8">
-            {Array.from({ length: 10 }).map((_, index) => (
-              <div key={index} className="h-64 rounded-lg bg-[#f2f2f2]">
-                <div className="mx-auto mt-14 h-[88px] w-[88px] rounded-full bg-[#f7f7f7]" />
-                <div className="mx-auto mt-10 h-8 w-1/2 rounded bg-[#f7f7f7]" />
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="h-40 rounded-lg bg-[#f0f0f0]" />
-      </div>
-    </div>
-  );
-}

@@ -122,7 +122,7 @@ export default function Comments() {
             onValueChange={setStatusTab}
             className="w-full"
           >
-            <TabsList className="mb-6 border border-slate-200 bg-white text-slate-500">
+            <TabsList className="mb-6 border border-border bg-card text-muted-foreground">
               <TabsTrigger value="todos">Todos</TabsTrigger>
               <TabsTrigger value="pendentes">Pendentes</TabsTrigger>
               <TabsTrigger value="aprovados">Aprovados</TabsTrigger>
@@ -132,16 +132,16 @@ export default function Comments() {
 
             <div className="space-y-4">
               {commentsQuery.isLoading && (
-                <Card className="border-slate-200 bg-white">
-                  <CardContent className="p-6 text-sm text-slate-500">
+                <Card className="border-border bg-card">
+                  <CardContent className="p-6 text-sm text-muted-foreground">
                     Carregando comentários...
                   </CardContent>
                 </Card>
               )}
 
               {!commentsQuery.isLoading && !comments.length && (
-                <Card className="border-slate-200 bg-white">
-                  <CardContent className="flex flex-col items-center gap-3 p-8 text-center text-slate-500">
+                <Card className="border-border bg-card">
+                  <CardContent className="flex flex-col items-center gap-3 p-8 text-center text-muted-foreground">
                     <MessageSquare className="h-8 w-8" />
                     <p>Nenhum comentário encontrado neste filtro.</p>
                   </CardContent>
@@ -149,7 +149,7 @@ export default function Comments() {
               )}
 
               {comments.map((comment: any) => (
-                <Card key={comment.id} className="border-slate-200 bg-white">
+                <Card key={comment.id} className="border-border bg-card">
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex flex-col gap-4 sm:flex-row">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/20 font-bold text-primary">
@@ -158,10 +158,10 @@ export default function Comments() {
                       <div className="flex-1 space-y-2">
                         <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
                           <div>
-                            <span className="mr-2 font-semibold text-slate-950">
+                            <span className="mr-2 font-semibold text-foreground">
                               {comment.author_name || "Cliente"}
                             </span>
-                            <span className="text-xs text-slate-500">
+                            <span className="text-xs text-muted-foreground">
                               {formatDate(comment.created_at)}
                             </span>
                           </div>
@@ -172,12 +172,12 @@ export default function Comments() {
                           />
                         </div>
 
-                        <p className="text-sm text-slate-700">{comment.body}</p>
+                        <p className="text-sm text-foreground/80">{comment.body}</p>
 
-                        <div className="flex w-fit items-center gap-2 rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-500">
+                        <div className="flex w-fit items-center gap-2 rounded-md bg-muted/50 px-2 py-1 text-xs text-muted-foreground">
                           <span>
                             Vídeo:{" "}
-                            <span className="font-medium text-slate-950">
+                            <span className="font-medium text-foreground">
                               {getVideoTitle(comment)}
                             </span>
                           </span>
@@ -199,7 +199,7 @@ export default function Comments() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-8 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/10"
+                              className="h-8 border-success/20 text-success hover:bg-success/10"
                               onClick={() =>
                                 handleStatusUpdate(
                                   comment,
@@ -215,7 +215,7 @@ export default function Comments() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-8 border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                              className="h-8 border-border bg-card text-foreground/80 hover:bg-muted/50"
                               onClick={() =>
                                 handleStatusUpdate(
                                   comment,
@@ -230,7 +230,7 @@ export default function Comments() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="ml-auto h-8 w-8 text-slate-500 hover:text-destructive"
+                            className="ml-auto h-8 w-8 text-muted-foreground hover:text-destructive"
                             onClick={() => handleDelete(comment)}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -246,7 +246,7 @@ export default function Comments() {
         </div>
 
         <div>
-          <Card className="sticky top-24 border-slate-200 bg-white">
+          <Card className="sticky top-24 border-border bg-card">
             <CardHeader>
               <CardTitle>Configurações de Moderação</CardTitle>
             </CardHeader>
@@ -259,15 +259,15 @@ export default function Comments() {
                 { label: "Mostrar contador de likes", checked: true },
               ].map((item, i) => (
                 <div key={i} className="flex items-center justify-between">
-                  <Label className="cursor-pointer text-sm text-slate-700">
+                  <Label className="cursor-pointer text-sm text-foreground/80">
                     {item.label}
                   </Label>
                   <Switch defaultChecked={item.checked} />
                 </div>
               ))}
 
-              <div className="border-t border-slate-100 pt-4">
-                <p className="text-sm italic text-slate-500">
+              <div className="border-t border-border pt-4">
+                <p className="text-sm italic text-muted-foreground">
                   Comentários enviados no feed entram como pendentes e aparecem
                   aqui para aprovação.
                 </p>

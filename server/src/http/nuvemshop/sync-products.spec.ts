@@ -122,6 +122,22 @@ describe("POST /api/integrations/nuvemshop/sync-products (e2e)", () => {
     expect(response.body).toEqual({ error: "store_access_denied" });
   });
 
+  it("lets an admin-role user through the membership gate", async () => {
+    const { store } = await createStore();
+    const admin = await createUser({ role: "admin" });
+    const token = app.jwt.sign({ sub: admin.id, role: "agent" });
+
+    const response = await request(app.server)
+      .post(SYNC_PATH)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ store_id: store.id });
+
+    // Past the 403 gate: the admin is no member, yet reaches the
+    // integration-missing check.
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "nuvemshop_not_connected" });
+  });
+
   it("returns nuvemshop_not_connected when there is no active integration", async () => {
     const { owner, store } = await createStore();
     const token = app.jwt.sign({ sub: owner.id, role: "agent" });

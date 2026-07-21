@@ -69,6 +69,20 @@ describe("POST /api/auth/sign-up (e2e)", () => {
     expect(await prisma.user.count({ where: { email } })).toBe(1);
   });
 
+  it("rejects a differently-cased duplicate email with 409", async () => {
+    const email = "cased-taken@example.com";
+    await request(app.server)
+      .post("/api/auth/sign-up")
+      .send({ name: "First", email, password: "secret-123" });
+
+    const response = await request(app.server)
+      .post("/api/auth/sign-up")
+      .send({ name: "Second", email: "Cased-Taken@Example.COM", password: "another-123" });
+
+    expect(response.status).toBe(409);
+    expect(await prisma.user.count({ where: { email } })).toBe(1);
+  });
+
   it("rejects an invalid payload with 400", async () => {
     const response = await request(app.server)
       .post("/api/auth/sign-up")

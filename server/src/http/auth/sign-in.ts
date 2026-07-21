@@ -39,7 +39,9 @@ export async function signInHandler(request: FastifyRequest, reply: FastifyReply
   const body = BodySchema.parse(request.body);
   const email = body.email.trim().toLowerCase();
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" } },
+  });
   // Single generic 401 for unknown email and wrong password. OAuth-provisioned
   // accounts (placeholder password_hash) also land here — their way into
   // password sign-in is the reset-password flow.

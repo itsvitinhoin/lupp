@@ -32,7 +32,9 @@ export async function resendConfirmationHandler(request: FastifyRequest, reply: 
   const body = BodySchema.parse(request.body);
   const email = body.email.trim().toLowerCase();
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" } },
+  });
   if (user && !user.email_confirmed_at) {
     const token = await issueAuthToken(user.id, "email_confirmation");
     await sendEmailConfirmation({

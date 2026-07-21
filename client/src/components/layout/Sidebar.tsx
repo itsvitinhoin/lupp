@@ -11,9 +11,9 @@ import {
   Blocks,
   Link as LinkIcon,
   ListOrdered,
-  MonitorPlay,
   Star,
 } from "lucide-react";
+import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useCurrentStore } from "@/hooks/useStore";
 
 const navItems = [
@@ -21,7 +21,6 @@ const navItems = [
   { icon: Film, label: "Vídeos", href: "/app/videos" },
   { icon: Smartphone, label: "Feed Vertical", href: "/app/feed" },
   { icon: Blocks, label: "Widgets", href: "/app/widgets" },
-  { icon: MonitorPlay, label: "Simulador", href: "/app/simulator" },
   { icon: Package, label: "Produtos", href: "/app/products" },
   { icon: MessageSquare, label: "Comentários", href: "/app/comments" },
   { icon: Star, label: "Feedbacks", href: "/app/feedbacks" },
@@ -45,11 +44,11 @@ export function Sidebar() {
       .join("") || "LP";
 
   return (
-    <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 flex-col border-r border-slate-200 bg-white lg:flex">
+    <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 flex-col border-r border-border bg-card lg:flex">
       <div className="flex h-20 items-center px-6">
         <Link href="/app" className="flex min-w-0 items-center gap-2">
           {logoUrl ? (
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-white">
               <img
                 src={logoUrl}
                 alt={storeName}
@@ -57,11 +56,11 @@ export function Sidebar() {
               />
             </span>
           ) : (
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-sm font-black text-white shadow-sm shadow-primary/20">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-sm font-black text-primary-foreground shadow-sm shadow-primary/20">
               {initials}
             </span>
           )}
-          <span className="truncate text-xl font-black tracking-tight text-slate-950">
+          <span className="truncate text-xl font-black tracking-tight text-foreground">
             {storeName}
           </span>
         </Link>
@@ -80,8 +79,8 @@ export function Sidebar() {
                 href={item.href}
                 className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all ${
                   isActive
-                    ? "bg-primary text-white shadow-sm shadow-primary/20"
-                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-950"
+                    ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
                 <item.icon className="h-4 w-4" />
@@ -92,10 +91,16 @@ export function Sidebar() {
         </nav>
       </div>
 
-      <div className="border-t border-slate-100 p-4">
-        <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
+      <div className="border-t border-border p-4">
+        <div className="mb-3 flex items-center justify-between rounded-2xl bg-muted/50 px-3 py-2 ring-1 ring-border">
+          <span className="text-xs font-semibold text-muted-foreground">
+            Tema
+          </span>
+          <ThemeToggle className="h-8 w-8 bg-card" />
+        </div>
+        <div className="flex items-center gap-3 rounded-2xl bg-muted/50 p-3 ring-1 ring-border">
           {logoUrl ? (
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-white">
               <img
                 src={logoUrl}
                 alt={storeName}
@@ -103,19 +108,19 @@ export function Sidebar() {
               />
             </div>
           ) : (
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
               {initials}
             </div>
           )}
           <div className="flex-1 overflow-hidden">
-            <p className="truncate text-sm font-semibold text-slate-950">
+            <p className="truncate text-sm font-semibold text-foreground">
               {storeName}
             </p>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span
-                className={`h-2 w-2 rounded-full ${store ? "bg-emerald-500" : "bg-slate-300"}`}
+                className={`h-2 w-2 rounded-full ${store ? "bg-success" : "bg-muted-foreground/30"}`}
               ></span>
-              <span className="text-xs font-medium text-slate-500">
+              <span className="text-xs font-medium text-muted-foreground">
                 {store ? "Conta ativa" : "Conclua o onboarding"}
               </span>
             </div>

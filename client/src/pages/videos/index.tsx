@@ -124,7 +124,7 @@ export default function VideosList() {
           onValueChange={setStatusTab}
           className="w-full sm:w-auto"
         >
-          <TabsList className="border border-slate-200 bg-white text-slate-500">
+          <TabsList className="border border-border bg-card text-muted-foreground">
             <TabsTrigger value="todos">Todos</TabsTrigger>
             <TabsTrigger value="ativos">Ativos</TabsTrigger>
             <TabsTrigger value="pausados">Pausados</TabsTrigger>
@@ -134,11 +134,11 @@ export default function VideosList() {
 
         <div className="flex items-center gap-2">
           <div className="relative w-full sm:w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground/70" />
             <Input
               type="search"
               placeholder="Buscar vídeos..."
-              className="border-slate-200 bg-white pl-9 text-slate-950 placeholder:text-slate-400"
+              className="border-border bg-card pl-9 text-foreground placeholder:text-muted-foreground/70"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -146,7 +146,7 @@ export default function VideosList() {
           <Button
             variant="outline"
             size="icon"
-            className="shrink-0 border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+            className="shrink-0 border-border bg-card text-foreground/80 hover:bg-muted/50"
           >
             <SlidersHorizontal className="h-4 w-4" />
           </Button>
@@ -160,19 +160,19 @@ export default function VideosList() {
       </div>
 
       {videosQuery.isLoading && (
-        <div className="mb-6 rounded-md border border-slate-200 bg-white p-4 text-sm text-slate-500">
+        <div className="mb-6 rounded-md border border-border bg-card p-4 text-sm text-muted-foreground">
           Carregando vídeos da loja...
         </div>
       )}
 
       {!videosQuery.isLoading && !videos.length && (
-        <div className="mb-6 rounded-md border border-primary/20 bg-primary/5 p-4 text-sm text-slate-600">
+        <div className="mb-6 rounded-md border border-primary/20 bg-primary/5 p-4 text-sm text-muted-foreground">
           Nenhum vídeo real ainda. Envie o primeiro vídeo para testar o feed
           vertical ao vivo.
         </div>
       )}
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
         {videos.map((video) => (
           <VideoCard
             key={video.id}

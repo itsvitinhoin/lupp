@@ -17,12 +17,12 @@ const buttonVariants = cva(
           // @replit Shows the background color of whatever card / sidebar / accent background it is inside of.
           // Inherits the current text color. Uses shadow-xs. no shadow on active
           // No hover state
-          "border border-slate-200 bg-white text-slate-900 shadow-sm hover:border-slate-300 hover:bg-slate-50",
+          "border border-border bg-card text-foreground shadow-sm hover:border-input hover:bg-muted/50",
         secondary:
           // @replit border, no hover, no shadow, secondary border.
-          "border border-slate-200 bg-secondary text-secondary-foreground hover:bg-slate-100",
+          "border border-border bg-secondary text-secondary-foreground hover:bg-muted",
         // @replit no hover, transparent border
-        ghost: "border border-transparent text-slate-700 hover:bg-slate-100 hover:text-slate-950",
+        ghost: "border border-transparent text-foreground/80 hover:bg-muted hover:text-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

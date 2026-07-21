@@ -29,10 +29,10 @@ export default function CustomPages() {
     <AppLayout title="Páginas Personalizadas">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-950">
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">
             Páginas de Vídeo
           </h2>
-          <p className="mt-1 text-slate-500">
+          <p className="mt-1 text-muted-foreground">
             Crie páginas exclusivas agrupando vídeos específicos.
           </p>
         </div>
@@ -42,12 +42,12 @@ export default function CustomPages() {
         </Button>
       </div>
 
-      <Card className="border-slate-200 bg-white text-slate-950 shadow-sm">
+      <Card className="border-border bg-card text-foreground shadow-sm">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="border-slate-100 bg-slate-50 hover:bg-slate-50">
+                <TableRow className="border-border bg-muted/50 hover:bg-muted/50">
                   <TableHead>Nome</TableHead>
                   <TableHead>URL</TableHead>
                   <TableHead className="text-right">Vídeos</TableHead>
@@ -57,16 +57,16 @@ export default function CustomPages() {
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody className="divide-y divide-slate-100">
+              <TableBody className="divide-y divide-border">
                 {mockPages.map((page) => (
                   <TableRow
                     key={page.id}
-                    className="border-slate-100 hover:bg-slate-50"
+                    className="border-border hover:bg-muted/50"
                   >
-                    <TableCell className="font-medium text-slate-950">
+                    <TableCell className="font-medium text-foreground">
                       {page.name}
                     </TableCell>
-                    <TableCell className="text-slate-500">
+                    <TableCell className="text-muted-foreground">
                       {page.path}
                     </TableCell>
                     <TableCell className="text-right">
@@ -86,14 +86,14 @@ export default function CustomPages() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                          className="h-8 w-8 text-muted-foreground hover:bg-muted hover:text-foreground"
                         >
                           <Edit2 className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                          className="h-8 w-8 text-muted-foreground hover:bg-muted hover:text-foreground"
                           asChild
                         >
                           <a

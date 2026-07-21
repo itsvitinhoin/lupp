@@ -24,21 +24,21 @@ export function StatusBadge({ status }: StatusBadgeProps) {
       case "ativo":
       case "aprovado":
       case "disponível":
-        return "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border-emerald-500/20";
+        return "bg-success/10 text-success hover:bg-success/20 border-success/20";
       case "inativo":
       case "pausado":
       case "oculto":
       case "em breve":
-        return "border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200";
+        return "border-border bg-muted text-muted-foreground hover:bg-muted";
       case "rascunho":
       case "pendente":
-        return "bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border-amber-500/20";
+        return "bg-warning/10 text-warning hover:bg-warning/20 border-warning/20";
       case "denunciado":
         return "bg-destructive/10 text-destructive hover:bg-destructive/20 border-destructive/20";
       case "enterprise":
         return "bg-primary/10 text-primary hover:bg-primary/20 border-primary/20";
       default:
-        return "border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200";
+        return "border-border bg-muted text-muted-foreground hover:bg-muted";
     }
   };
 

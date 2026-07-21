@@ -36,7 +36,10 @@ export async function signUpHandler(request: FastifyRequest, reply: FastifyReply
   const body = BodySchema.parse(request.body);
   const email = body.email.trim().toLowerCase();
 
-  const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  const existing = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" } },
+    select: { id: true },
+  });
   if (existing) throw new ResourceAlreadyExistError("user", "email", email);
 
   const password_hash = await bcrypt.hash(body.password, 6);

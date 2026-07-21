@@ -149,14 +149,14 @@ export default function Products() {
           <h2 className="text-2xl font-bold tracking-tight">
             Catálogo de Produtos
           </h2>
-          <p className="mt-1 text-slate-500">
+          <p className="mt-1 text-muted-foreground">
             Gerencie os produtos que aparecem nos seus vídeos.
           </p>
         </div>
         <div className="flex gap-2">
           <Button
             variant="outline"
-            className="border-slate-200 bg-white"
+            className="border-border bg-card"
             onClick={() => void handleSyncProducts()}
             disabled={isSyncing}
           >
@@ -167,7 +167,7 @@ export default function Products() {
           </Button>
           <Button
             variant="outline"
-            className="border-slate-200 bg-white"
+            className="border-border bg-card"
             onClick={() => handleAction("Importar")}
           >
             <DownloadCloud className="mr-2 h-4 w-4" />
@@ -198,13 +198,13 @@ export default function Products() {
         </Alert>
       )}
 
-      <Card className="border-slate-200 bg-white">
+      <Card className="border-border bg-card">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="border-slate-100 bg-slate-50 hover:bg-slate-50">
-                  <TableHead className="w-[300px] text-slate-500">
+                <TableRow className="border-border bg-muted/50 hover:bg-muted/50">
+                  <TableHead className="w-[300px] text-muted-foreground">
                     Produto
                   </TableHead>
                   <TableHead>Preço</TableHead>
@@ -213,41 +213,41 @@ export default function Products() {
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody className="divide-y divide-slate-100">
+              <TableBody className="divide-y divide-border">
                 {products.map((product: any) => (
                   <TableRow
                     key={product.id}
-                    className="border-slate-100 hover:bg-slate-50"
+                    className="border-border hover:bg-muted/50"
                   >
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div
-                          className="h-10 w-10 rounded-md bg-slate-100 bg-cover bg-center border border-slate-200 shrink-0"
+                          className="h-10 w-10 rounded-md bg-muted bg-cover bg-center border border-border shrink-0"
                           style={{
                             backgroundImage: product.image_url
                               ? `url(${product.image_url})`
                               : undefined,
                           }}
                         />
-                        <span className="font-medium text-slate-950">
+                        <span className="font-medium text-foreground">
                           {product.name}
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-slate-700">
+                    <TableCell className="text-foreground/80">
                       {formatMoney(product.price)}
                     </TableCell>
-                    <TableCell className="text-slate-700">
+                    <TableCell className="text-foreground/80">
                       {product.status ?? "mock"}
                     </TableCell>
-                    <TableCell className="max-w-[280px] truncate text-slate-500">
+                    <TableCell className="max-w-[280px] truncate text-muted-foreground">
                       {product.product_url ?? "-"}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-slate-500"
+                        className="h-8 w-8 text-muted-foreground"
                         onClick={() => handleAction("Editar " + product.name)}
                       >
                         <Edit2 className="h-4 w-4" />
@@ -262,7 +262,7 @@ export default function Products() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="border-slate-200 bg-white text-slate-950">
+        <DialogContent className="border-border bg-card text-foreground">
           <DialogHeader>
             <DialogTitle>Adicionar produto teste</DialogTitle>
           </DialogHeader>

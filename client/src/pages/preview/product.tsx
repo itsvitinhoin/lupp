@@ -39,7 +39,7 @@ export default function PreviewProduct() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-xs font-bold leading-tight">Veja em vídeo</span>
-                  <span className="text-[10px] text-white/70 leading-tight">Como fica no corpo</span>
+                  <span className="text-3xs text-white/70 leading-tight">Como fica no corpo</span>
                 </div>
               </div>
             </Link>
@@ -80,8 +80,8 @@ export default function PreviewProduct() {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <h2 className="text-xl font-bold">Veja este produto em vídeo</h2>
-              <div className="px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-                Powered by <LuppLogo className="scale-50 origin-left -ml-1 -mr-2" />
+              <div className="px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-3xs font-bold uppercase tracking-wider flex items-center gap-1">
+                Powered by <LuppLogo variant="brand" className="scale-50 origin-left -ml-1 -mr-2" />
               </div>
             </div>
             <Button variant="link" asChild className="text-blue-600 hidden sm:flex">

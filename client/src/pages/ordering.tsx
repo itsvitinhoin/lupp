@@ -164,18 +164,19 @@ export default function Ordering() {
 
   return (
     <AppLayout title="Ordenação">
+      <div className="max-w-5xl">
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-950">
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">
             Ordenação do Feed
           </h2>
-          <p className="mt-1 text-sm font-medium text-slate-500">
+          <p className="mt-1 text-sm font-medium text-muted-foreground">
             Defina quais vídeos aparecem primeiro na miniatura e no feed da Home.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
           <Select value={mode} onValueChange={(value) => applyMode(value as OrderingMode)}>
-            <SelectTrigger className="h-11 w-full border-slate-200 bg-white sm:w-56">
+            <SelectTrigger className="h-11 w-full border-border bg-card sm:w-56">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -189,7 +190,7 @@ export default function Ordering() {
           </Select>
           <Button
             variant="outline"
-            className="gap-2 border-slate-200 bg-white"
+            className="gap-2 border-border bg-card"
             onClick={() => applyMode("manual")}
           >
             <RotateCcw className="h-4 w-4" />
@@ -202,18 +203,18 @@ export default function Ordering() {
         </div>
       </div>
 
-      <Card className="border-slate-200 bg-white">
-        <CardHeader className="border-b border-slate-100">
+      <Card className="border-border bg-card">
+        <CardHeader className="border-b border-border">
           <CardTitle className="flex items-center justify-between gap-3">
             <span>Vídeos ativos</span>
-            <Badge variant="outline" className="bg-slate-50">
+            <Badge variant="outline" className="bg-muted/50">
               {pinnedCount}/3 fixados
             </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-4">
           {videosQuery.isLoading ? (
-            <p className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
+            <p className="rounded-xl border border-border bg-muted/50 p-5 text-sm text-muted-foreground">
               Carregando vídeos...
             </p>
           ) : orderedVideos.length ? (
@@ -225,10 +226,10 @@ export default function Ordering() {
                   onDragStart={() => setDraggedId(video.id)}
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={() => handleDrop(video.id)}
-                  className="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-primary/40 sm:grid-cols-[28px_64px_1fr_auto] sm:items-center"
+                  className="grid gap-3 rounded-xl border border-border bg-card p-3 shadow-sm transition hover:border-primary/40 sm:grid-cols-[28px_64px_1fr_auto] sm:items-center"
                 >
-                  <GripVertical className="h-5 w-5 cursor-move text-slate-400" />
-                  <div className="aspect-[9/16] h-20 overflow-hidden rounded-lg bg-slate-100">
+                  <GripVertical className="h-5 w-5 cursor-move text-muted-foreground/70" />
+                  <div className="aspect-[9/16] h-20 overflow-hidden rounded-lg bg-muted">
                     {previewImage(video) ? (
                       <div
                         className="h-full w-full bg-cover bg-center"
@@ -245,24 +246,24 @@ export default function Ordering() {
                         preload="metadata"
                       />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-slate-400">
+                      <div className="flex h-full w-full items-center justify-center text-3xs font-bold text-muted-foreground/70">
                         Sem prévia
                       </div>
                     )}
                   </div>
                   <div className="min-w-0">
                     <div className="mb-1 flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className="bg-slate-50">
+                      <Badge variant="outline" className="bg-muted/50">
                         #{index + 1}
                       </Badge>
                       {video.is_featured && (
                         <Badge className="bg-primary text-white">Fixado</Badge>
                       )}
                     </div>
-                    <p className="truncate text-sm font-bold text-slate-950">
+                    <p className="truncate text-sm font-bold text-foreground">
                       {videoTitle(video)}
                     </p>
-                    <div className="mt-1 flex flex-wrap gap-3 text-xs font-medium text-slate-500">
+                    <div className="mt-1 flex flex-wrap gap-3 text-xs font-medium text-muted-foreground">
                       <span>{video.metrics?.views ?? 0} views</span>
                       <span>{video.metrics?.clicks ?? 0} cliques</span>
                       <span>{video.metrics?.likes ?? 0} likes</span>
@@ -284,12 +285,13 @@ export default function Ordering() {
               ))}
             </div>
           ) : (
-            <p className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-sm font-medium text-slate-500">
+            <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm font-medium text-muted-foreground">
               Publique vídeos ativos no feed vertical para configurar a ordem da Home.
             </p>
           )}
         </CardContent>
       </Card>
+      </div>
     </AppLayout>
   );
 }

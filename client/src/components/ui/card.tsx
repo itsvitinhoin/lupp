@@ -9,7 +9,7 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-2xl border border-slate-200 bg-card text-card-foreground shadow-sm",
+      "rounded-2xl border border-card-border bg-card text-card-foreground shadow-sm",
       className
     )}
     {...props}
@@ -35,7 +35,7 @@ const CardTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("font-semibold leading-none tracking-tight text-slate-950", className)}
+    className={cn("text-card-title tracking-tight text-card-foreground", className)}
     {...props}
   />
 ))
@@ -57,6 +57,9 @@ const CardContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
+  // Keep the base padding unprefixed: pages override it with plain p-* classes,
+  // and a breakpoint-scoped pt-0 here would survive those merges and strip the
+  // top spacing (tailwind-merge only drops classes in the same modifier bucket).
   <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
 ))
 CardContent.displayName = "CardContent"

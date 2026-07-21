@@ -23,16 +23,16 @@ export function CodeBlock({ code, language = 'html' }: CodeBlockProps) {
   };
 
   return (
-    <div className="relative rounded-xl border border-slate-200 bg-slate-950 p-4 font-mono text-sm shadow-sm">
+    <div className="relative rounded-xl border border-border bg-foreground p-4 font-mono text-sm shadow-sm">
       <Button
         size="icon"
         variant="ghost"
-        className="absolute right-2 top-2 h-8 w-8 text-slate-400 hover:bg-white/10 hover:text-white"
+        className="absolute right-2 top-2 h-8 w-8 text-muted-foreground/70 hover:bg-background/10 hover:text-background"
         onClick={handleCopy}
       >
-        {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+        {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
       </Button>
-      <pre className="overflow-x-auto whitespace-pre-wrap break-words pr-8 text-slate-200">
+      <pre className="overflow-x-auto whitespace-pre-wrap break-words pr-8 text-background/90">
         <code>{code}</code>
       </pre>
     </div>

@@ -19,10 +19,7 @@ import {
   type WidgetView,
 } from "./widgets/Overview";
 import { asSettings, useWidgetSettingsForm } from "./widgets/useWidgetSettingsForm";
-
-function jsStringLiteral(value: string) {
-  return JSON.stringify(value).replace(/<\/script/gi, "<\\/script");
-}
+import { buildWidgetEmbedCode } from "@/lib/widget-embed";
 
 export default function Widgets() {
   const { toast } = useToast();
@@ -72,76 +69,27 @@ export default function Widgets() {
     setField("carouselEnabled", enabled);
   };
 
-  // Identity attributes from the logged-in store's context: id (primary),
-  // slug and storefront domain as fallbacks — the same resolution chain the
-  // server walks (store_id -> store_slug -> store_domain).
-  const storeIdentityAttrLines = () => {
-    if (!store) return "";
-    const lines = [
-      `  s.setAttribute('data-store-id', ${jsStringLiteral(store.id)});`,
-      `  s.setAttribute('data-store', ${jsStringLiteral(store.slug)});`,
-    ];
-    if (store.url) {
-      try {
-        lines.push(
-          `  s.setAttribute('data-store-domain', ${jsStringLiteral(new URL(store.url).hostname)});`,
-        );
-      } catch {
-        // stores.url isn't a parseable URL — skip the domain fallback
-      }
-    }
-    return lines.join("\n");
-  };
+  const getEmbedCode = () =>
+    buildWidgetEmbedCode({
+      store,
+      widgetType: launcherWidget.type,
+      commentLines: [
+        "Apenas identidade: aparência, exibição e carrossel vêm das configurações",
+        "salvas neste painel, resolvidas pelo servidor a cada página. Atributos",
+        "extras no snippet SOBRESCREVEM o painel — não adicione a menos que queira",
+        "fixar um valor para sempre.",
+      ],
+    });
 
-  const getEmbedCode = () => {
-    if (!store)
-      return "<!-- Crie uma loja para gerar o código de instalação da Lupp. -->";
-
-    return `<script>
-(function () {
-  var s = document.createElement('script');
-  s.async = true;
-  s.src = ${jsStringLiteral(env.widgetCdnUrl)};
-
-  // Apenas identidade: aparência, exibição e carrossel vêm das configurações
-  // salvas neste painel, resolvidas pelo servidor a cada página. Atributos
-  // extras no snippet SOBRESCREVEM o painel — não adicione a menos que queira
-  // fixar um valor para sempre.
-${storeIdentityAttrLines()}
-  s.setAttribute('data-widget', ${jsStringLiteral(launcherWidget.type)});
-  s.setAttribute('data-require-active', 'true');
-  s.setAttribute('data-lupp-url', ${jsStringLiteral(env.appUrl)});
-  s.setAttribute('data-api-url', ${jsStringLiteral(env.apiUrl)});
-
-  var firstScript = document.getElementsByTagName('script')[0];
-  firstScript.parentNode.insertBefore(s, firstScript);
-})();
-</script>`;
-  };
-
-  const getHomeCarouselEmbedCode = () => {
-    if (!store)
-      return "<!-- Crie uma loja para gerar o código de instalação da Lupp. -->";
-
-    return `<script>
-(function () {
-  var s = document.createElement('script');
-  s.async = true;
-  s.src = ${jsStringLiteral(env.widgetCdnUrl)};
-
-  // Apenas identidade: título, textos e limites do carrossel vêm das
-  // configurações salvas neste painel, resolvidas pelo servidor.
-${storeIdentityAttrLines()}
-  s.setAttribute('data-widget', 'home_carousel');
-  s.setAttribute('data-require-active', 'true');
-  s.setAttribute('data-lupp-url', ${jsStringLiteral(env.appUrl)});
-  s.setAttribute('data-api-url', ${jsStringLiteral(env.apiUrl)});
-
-  var firstScript = document.getElementsByTagName('script')[0];
-  firstScript.parentNode.insertBefore(s, firstScript);
-})();
-</script>`;
-  };
+  const getHomeCarouselEmbedCode = () =>
+    buildWidgetEmbedCode({
+      store,
+      widgetType: "home_carousel",
+      commentLines: [
+        "Apenas identidade: título, textos e limites do carrossel vêm das",
+        "configurações salvas neste painel, resolvidas pelo servidor.",
+      ],
+    });
 
   const saveLauncherSettings = async () => {
     if (!store || !floatingWidget) {
@@ -261,7 +209,7 @@ ${storeIdentityAttrLines()}
 
   return (
     <AppLayout title="Widgets">
-      <div className="space-y-6 text-slate-950">
+      <div className="space-y-6 text-foreground">
         {view === "overview" ? (
           <Overview
             cards={overviewCards}

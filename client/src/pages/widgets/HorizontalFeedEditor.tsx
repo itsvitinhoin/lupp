@@ -45,15 +45,15 @@ export function HorizontalFeedEditor(props: {
             onClick={props.onBack}
             variant="ghost"
             size="icon"
-            className="mt-1 h-10 w-10 rounded-xl text-slate-700 hover:bg-white"
+            className="mt-1 h-10 w-10 rounded-xl text-foreground/80 hover:bg-card"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h2 className="text-2xl font-bold leading-tight tracking-tight text-slate-950">
+            <h2 className="text-2xl font-bold leading-tight tracking-tight text-foreground">
               Feed Horizontal
             </h2>
-            <p className="mt-1 max-w-2xl text-sm font-medium text-slate-500">
+            <p className="mt-1 max-w-2xl text-sm font-medium text-muted-foreground">
               Configure o carrossel de vídeos que aparece na Home da loja antes
               de abrir o feed vertical completo.
             </p>
@@ -62,7 +62,7 @@ export function HorizontalFeedEditor(props: {
         <div className="flex flex-wrap gap-3">
           <Button
             variant="outline"
-            className="h-11 rounded-xl bg-white px-5 text-sm font-bold"
+            className="h-11 rounded-xl bg-card px-5 text-sm font-bold"
             onClick={() => void props.onCopyCode()}
           >
             <Code2 className="mr-2 h-5 w-5" />
@@ -80,23 +80,23 @@ export function HorizontalFeedEditor(props: {
       </div>
 
       <div className="grid gap-7 xl:grid-cols-[minmax(360px,560px)_1fr]">
-        <aside className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <aside className="rounded-2xl border border-border bg-card p-6 shadow-sm">
           <div className="mb-6 flex items-center gap-3">
             <Video className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-bold text-slate-950">
+            <h3 className="text-lg font-bold text-foreground">
               Aparência do carrossel
             </h3>
           </div>
 
           {props.isLockedByPlan ? (
-            <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="mb-6 rounded-2xl border border-warning-surface-border bg-warning-surface p-4">
               <div className="flex gap-3">
-                <LockKeyhole className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                <LockKeyhole className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
                 <div>
-                  <p className="text-sm font-black text-amber-900">
+                  <p className="text-sm font-black text-warning-surface-foreground">
                     Feed Horizontal disponível no {props.requiredPlanName}
                   </p>
-                  <p className="mt-1 text-sm font-semibold leading-5 text-amber-800">
+                  <p className="mt-1 text-sm font-semibold leading-5 text-warning-surface-foreground">
                     O plano {props.currentPlanName} permite{" "}
                     {props.widgetLimit} widget ativo. A bolinha flutuante já
                     conta como 1 widget; o carrossel da Home é o segundo.
@@ -105,7 +105,7 @@ export function HorizontalFeedEditor(props: {
               </div>
             </div>
           ) : (
-            <div className="mb-6 rounded-2xl border border-primary/15 bg-primary/5 p-4 text-sm font-semibold text-slate-600">
+            <div className="mb-6 rounded-2xl border border-primary/15 bg-primary/5 p-4 text-sm font-semibold text-muted-foreground">
               Uso atual: {props.activeWidgetCount} de{" "}
               {props.widgetLimit >= 999 ? "widgets ilimitados" : `${props.widgetLimit} widgets`}{" "}
               no plano {props.currentPlanName}.
@@ -126,19 +126,19 @@ export function HorizontalFeedEditor(props: {
             />
 
             <div className="space-y-2">
-              <Label className="font-semibold text-slate-500">Título</Label>
+              <Label className="font-semibold text-muted-foreground">Título</Label>
               <Input
                 value={form.carouselTitle}
                 onChange={(event) =>
                   setField("carouselTitle", event.target.value)
                 }
                 placeholder="Descubra cada detalhe e Compre"
-                className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-950"
+                className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground"
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="font-semibold text-slate-500">
+              <Label className="font-semibold text-muted-foreground">
                 Descrição opcional
               </Label>
               <Textarea
@@ -148,12 +148,12 @@ export function HorizontalFeedEditor(props: {
                 }
                 rows={3}
                 placeholder="Veja os produtos em vídeo e compre sem sair da experiência."
-                className="rounded-xl border-slate-200 bg-white text-sm text-slate-950"
+                className="rounded-xl border-border bg-card text-sm text-foreground"
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="font-semibold text-slate-500">
+              <Label className="font-semibold text-muted-foreground">
                 Inserir antes da seção
               </Label>
               <Input
@@ -162,16 +162,16 @@ export function HorizontalFeedEditor(props: {
                   setField("carouselBeforeHeading", event.target.value)
                 }
                 placeholder="Com Capa"
-                className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-950"
+                className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground"
               />
-              <p className="text-xs font-semibold leading-5 text-slate-500">
+              <p className="text-xs font-semibold leading-5 text-muted-foreground">
                 A Luup procura esse título na Home. Se não encontrar, tenta
                 posicionar logo depois da faixa de benefícios da loja.
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label className="font-semibold text-slate-500">
+              <Label className="font-semibold text-muted-foreground">
                 Âncora avançada (seletor CSS)
               </Label>
               <div className="grid grid-cols-[1fr_auto] gap-3">
@@ -181,7 +181,7 @@ export function HorizontalFeedEditor(props: {
                     setField("carouselAnchorSelector", event.target.value)
                   }
                   placeholder="#main .products"
-                  className="h-11 rounded-xl border-slate-200 bg-white font-mono text-sm text-slate-950"
+                  className="h-11 rounded-xl border-border bg-card font-mono text-sm text-foreground"
                 />
                 <Select
                   value={form.carouselAnchorPlacement}
@@ -189,7 +189,7 @@ export function HorizontalFeedEditor(props: {
                     setField("carouselAnchorPlacement", value)
                   }
                 >
-                  <SelectTrigger className="h-11 w-28 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-950">
+                  <SelectTrigger className="h-11 w-28 rounded-xl border-border bg-card text-sm font-semibold text-foreground">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -198,7 +198,7 @@ export function HorizontalFeedEditor(props: {
                   </SelectContent>
                 </Select>
               </div>
-              <p className="text-xs font-semibold leading-5 text-slate-500">
+              <p className="text-xs font-semibold leading-5 text-muted-foreground">
                 Quando preenchida, a âncora tem prioridade sobre o título: o
                 carrossel é inserido antes ou depois do primeiro elemento que
                 casar com o seletor.
@@ -207,7 +207,7 @@ export function HorizontalFeedEditor(props: {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="font-semibold text-slate-500">
+                <Label className="font-semibold text-muted-foreground">
                   Vídeos no desktop
                 </Label>
                 <Input
@@ -218,11 +218,11 @@ export function HorizontalFeedEditor(props: {
                   onChange={(event) =>
                     setField("carouselDesktopCount", event.target.value)
                   }
-                  className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-950"
+                  className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="font-semibold text-slate-500">
+                <Label className="font-semibold text-muted-foreground">
                   Vídeos no mobile
                 </Label>
                 <Input
@@ -233,7 +233,7 @@ export function HorizontalFeedEditor(props: {
                   onChange={(event) =>
                     setField("carouselMobileCount", event.target.value)
                   }
-                  className="h-11 rounded-xl border-slate-200 bg-white text-sm font-semibold text-slate-950"
+                  className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground"
                 />
               </div>
             </div>
@@ -242,22 +242,22 @@ export function HorizontalFeedEditor(props: {
           </div>
         </aside>
 
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 p-6">
+        <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+          <div className="border-b border-border p-6">
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary">
               preview
             </p>
-            <h3 className="mt-2 text-xl font-black text-slate-950">
+            <h3 className="mt-2 text-xl font-black text-foreground">
               Como aparece na Home
             </h3>
           </div>
-          <div className="bg-slate-50 p-6">
-            <div className="rounded-xl bg-white py-8 shadow-sm">
-              <h2 className="px-6 text-center text-2xl font-semibold text-slate-950">
+          <div className="bg-muted/50 p-6">
+            <div className="rounded-xl bg-card py-8 shadow-sm">
+              <h2 className="px-6 text-center text-2xl font-semibold text-foreground">
                 {form.carouselTitle || "Descubra cada detalhe e Compre"}
               </h2>
               {form.carouselDescription ? (
-                <p className="mx-auto mt-3 max-w-xl px-6 text-center text-sm font-semibold leading-6 text-slate-500">
+                <p className="mx-auto mt-3 max-w-xl px-6 text-center text-sm font-semibold leading-6 text-muted-foreground">
                   {form.carouselDescription}
                 </p>
               ) : null}
@@ -270,12 +270,12 @@ export function HorizontalFeedEditor(props: {
                     >
                       <div className="absolute inset-x-2 bottom-2 rounded-lg border border-white/20 bg-slate-700/80 p-2 text-white backdrop-blur">
                         <div className="flex items-center gap-2">
-                          <span className="h-10 w-10 rounded-md bg-white/80" />
+                          <span className="h-10 w-10 rounded-md bg-card/80" />
                           <span className="min-w-0 text-xs font-bold">
                             Produto em vídeo
                           </span>
                         </div>
-                        <div className="mt-2 rounded-lg border-2 border-primary bg-white px-3 py-2 text-center text-xs font-black text-slate-950">
+                        <div className="mt-2 rounded-lg border-2 border-primary bg-card px-3 py-2 text-center text-xs font-black text-foreground">
                           Comprar
                         </div>
                       </div>
@@ -283,7 +283,7 @@ export function HorizontalFeedEditor(props: {
                   ),
                 )}
               </div>
-              <div className="mt-5 px-6 text-xs font-semibold text-slate-500">
+              <div className="mt-5 px-6 text-xs font-semibold text-muted-foreground">
                 Mobile exibe até {mobileCount} vídeos; desktop exibe até{" "}
                 {desktopCount}.
               </div>

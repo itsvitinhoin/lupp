@@ -3,24 +3,22 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
 import { app } from "@/app";
-import { env } from "@/env";
 import { prisma } from "@/lib/prisma";
 import { createPlans } from "../../../test/utils/create-plans";
 import { createStore } from "../../../test/utils/create-store";
 import { createUser } from "../../../test/utils/create-user";
-import { MasterConsoleRoutes } from "./routes";
+import { AdminConsoleRoutes } from "./routes";
 
-// The orchestrator wires MasterConsoleRoutes into src/routes.ts; until then
+// The orchestrator wires AdminConsoleRoutes into src/routes.ts; until then
 // the spec registers the domain itself (guarded to avoid duplicate routes).
 const routesWired = readFileSync(new URL("../../routes.ts", import.meta.url), "utf8").includes(
-  "MasterConsoleRoutes",
+  "AdminConsoleRoutes",
 );
 
-const adminEmail = env.MASTER_ADMIN_EMAILS.split(",")[0].trim();
 
-describe("GET /api/master-console (e2e)", () => {
+describe("GET /api/admin-console (e2e)", () => {
   beforeAll(async () => {
-    if (!routesWired) await app.register(MasterConsoleRoutes);
+    if (!routesWired) await app.register(AdminConsoleRoutes);
     await app.ready();
     await createPlans();
   });
@@ -30,37 +28,49 @@ describe("GET /api/master-console (e2e)", () => {
   });
 
   it("requires authentication", async () => {
-    const response = await request(app.server).get("/api/master-console");
+    const response = await request(app.server).get("/api/admin-console");
 
     expect(response.status).toBe(401);
   });
 
   it("rejects a valid JWT whose user row is gone with invalid_user", async () => {
-    const token = app.jwt.sign({ sub: randomUUID(), role: "agent" });
+    const token = app.jwt.sign({ sub: randomUUID(), role: "admin" });
 
     const response = await request(app.server)
-      .get("/api/master-console")
+      .get("/api/admin-console")
       .set("Authorization", `Bearer ${token}`);
 
     expect(response.status).toBe(401);
     expect(response.body).toEqual({ error: "invalid_user" });
   });
 
-  it("denies a user whose email is not in the MASTER_ADMIN_EMAILS allowlist", async () => {
+  it("denies a non-admin JWT claim at the middleware", async () => {
     const outsider = await createUser();
     const token = app.jwt.sign({ sub: outsider.id, role: "agent" });
 
     const response = await request(app.server)
-      .get("/api/master-console")
+      .get("/api/admin-console")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({ message: "Unauthorized." });
+  });
+
+  it("denies a stale admin claim once the DB role is no longer admin", async () => {
+    const outsider = await createUser();
+    const token = app.jwt.sign({ sub: outsider.id, role: "admin" });
+
+    const response = await request(app.server)
+      .get("/api/admin-console")
       .set("Authorization", `Bearer ${token}`);
 
     expect(response.status).toBe(403);
-    expect(response.body).toEqual({ error: "master_access_denied" });
+    expect(response.body).toEqual({ error: "admin_access_denied" });
   });
 
-  it("returns the full cross-store snapshot for an allowlisted admin", async () => {
-    const admin = await createUser({ email: adminEmail });
-    const token = app.jwt.sign({ sub: admin.id, role: "agent" });
+  it("returns the full cross-store snapshot for an admin-role user", async () => {
+    const admin = await createUser({ role: "admin" });
+    const token = app.jwt.sign({ sub: admin.id, role: "admin" });
 
     // Paid store: active growth subscription with a 10% discount → MRR 179.1.
     const { owner: ownerA, store: storeA } = await createStore({ plan_id: "growth" });
@@ -109,10 +119,10 @@ describe("GET /api/master-console (e2e)", () => {
     // Trialing store (7-day trial subscription from the builder).
     const { store: storeB } = await createStore({ withTrialSubscription: true });
 
-    const auditLog = await prisma.masterConsoleAuditLog.create({
+    const auditLog = await prisma.adminConsoleAuditLog.create({
       data: {
         action: "pause_store",
-        admin_email: adminEmail,
+        admin_email: admin.email,
         admin_user_id: admin.id,
         target_store_id: storeA.id,
         payload: { store_id: storeA.id },
@@ -121,7 +131,7 @@ describe("GET /api/master-console (e2e)", () => {
     });
 
     const response = await request(app.server)
-      .get("/api/master-console")
+      .get("/api/admin-console")
       .set("Authorization", `Bearer ${token}`);
 
     expect(response.status).toBe(200);

@@ -11,8 +11,6 @@ import { useCurrentStore } from '@/hooks/useStore';
 interface AppLayoutProps {
   children: React.ReactNode;
   title: string;
-  /** Lets the page span the full content width instead of the max-w-7xl column. */
-  fullWidth?: boolean;
 }
 
 function TrialBanner() {
@@ -28,13 +26,13 @@ function TrialBanner() {
 
   if (access.isTrialExpired) {
     return (
-      <div className="border-b border-red-200 bg-red-50 px-4 py-3 text-red-900 sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="border-b border-destructive-surface-border bg-destructive-surface px-4 py-3 text-destructive-surface-foreground sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-3">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
             <div>
               <p className="font-bold">Seu teste gratuito acabou.</p>
-              <p className="text-sm font-medium text-red-700">
+              <p className="text-sm font-medium text-destructive">
                 Os vídeos foram pausados na loja. Assine um plano para voltar a
                 exibir a experiência Luup.
               </p>
@@ -42,7 +40,7 @@ function TrialBanner() {
           </div>
           <Link
             href="/app/billing"
-            className="inline-flex h-10 items-center justify-center rounded-md bg-red-600 px-4 text-sm font-bold text-white hover:bg-red-700"
+            className="inline-flex h-10 items-center justify-center rounded-md bg-destructive px-4 text-sm font-bold text-destructive-foreground hover:bg-destructive/90"
           >
             Assinar agora
           </Link>
@@ -52,17 +50,17 @@ function TrialBanner() {
   }
 
   return (
-    <div className="border-b border-blue-100 bg-blue-50 px-4 py-3 text-blue-950 sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="border-b border-info-surface-border bg-info-surface px-4 py-3 text-info-surface-foreground sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex gap-3">
-          <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
+          <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
           <div>
             <p className="font-bold">
               Teste gratuito: {access.daysLeft > 1
                 ? `${access.daysLeft} dias restantes`
                 : `${Math.max(access.hoursLeft, 1)} horas restantes`}
             </p>
-            <p className="text-sm font-medium text-blue-700">
+            <p className="text-sm font-medium text-info-surface-foreground">
               Sua loja está usando a Luup sem cobrança. Assine antes do fim do
               teste para manter os vídeos no ar.
             </p>
@@ -70,7 +68,7 @@ function TrialBanner() {
         </div>
         <Link
           href="/app/billing"
-          className="inline-flex h-10 items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700"
+          className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground hover:bg-primary/90"
         >
           Ver planos
         </Link>
@@ -79,18 +77,16 @@ function TrialBanner() {
   );
 }
 
-export function AppLayout({ children, title, fullWidth = false }: AppLayoutProps) {
+export function AppLayout({ children, title }: AppLayoutProps) {
   return (
-    <div className="min-h-[100dvh] bg-[#f6f8fb] text-slate-950">
+    <div className="min-h-dvh bg-background text-foreground">
       <Sidebar />
-      <div className="flex min-h-[100dvh] flex-col lg:pl-64">
+      <div className="flex min-h-dvh flex-col lg:pl-64">
         <Header title={title} />
         <TrialBanner />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">
-          <div className={fullWidth ? "w-full" : "mx-auto max-w-7xl"}>
-            {children}
-          </div>
-        </main>
+        {/* Full-width content column: pages own their internal max widths
+            (forms cap themselves; grids add 2xl column steps). */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
     </div>
   );

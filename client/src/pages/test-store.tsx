@@ -88,7 +88,7 @@ export default function TestStore() {
           <Card className="border-slate-200 bg-white">
             <CardContent className="p-5">
               <div className="mb-3 flex items-center gap-2 rounded-md bg-slate-950 px-3 py-2">
-                <LuppLogo className="h-6" />
+                <LuppLogo variant="brand" className="h-6" />
                 <span className="text-sm font-medium text-white/80">Widget instalado via script</span>
               </div>
               <div ref={widgetHostRef} />

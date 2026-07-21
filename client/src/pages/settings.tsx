@@ -178,17 +178,17 @@ export default function Settings() {
   return (
     <AppLayout title="Configurações">
       <div className="mb-8">
-        <h2 className="text-2xl font-bold tracking-tight text-slate-950">
+        <h2 className="text-2xl font-bold tracking-tight text-foreground">
           Configurações da loja
         </h2>
-        <p className="mt-1 text-sm font-medium text-slate-500">
+        <p className="mt-1 text-sm font-medium text-muted-foreground">
           Esses dados alimentam Perfil, Integrações, widgets e scripts
           instalados no e-commerce.
         </p>
       </div>
 
-      <Tabs defaultValue="loja" className="w-full">
-        <TabsList className="mb-6 h-auto w-full justify-start overflow-x-auto rounded-none border-b border-slate-200 bg-transparent p-0">
+      <Tabs defaultValue="loja" className="w-full max-w-5xl">
+        <TabsList className="mb-6 h-auto w-full justify-start overflow-x-auto rounded-none border-b border-border bg-transparent p-0">
           <TabsTrigger
             value="loja"
             className="rounded-none py-3 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent"
@@ -210,13 +210,13 @@ export default function Settings() {
         </TabsList>
 
         <TabsContent value="loja">
-          <Card className="border-slate-200 bg-white text-slate-950">
+          <Card className="border-border bg-card text-foreground">
             <CardHeader>
               <CardTitle>Dados da loja</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               {isLoading ? (
-                <p className="text-sm font-medium text-slate-500">
+                <p className="text-sm font-medium text-muted-foreground">
                   Carregando loja...
                 </p>
               ) : (
@@ -284,7 +284,7 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="marca">
-          <Card className="border-slate-200 bg-white text-slate-950">
+          <Card className="border-border bg-card text-foreground">
             <CardHeader>
               <CardTitle>Configurações da marca</CardTitle>
             </CardHeader>
@@ -304,10 +304,10 @@ export default function Settings() {
                     />
                     <button
                       type="button"
-                      className="flex w-full items-center gap-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-left transition hover:border-primary/50 hover:bg-primary/5"
+                      className="flex w-full items-center gap-4 rounded-2xl border border-dashed border-input bg-muted/50 p-4 text-left transition hover:border-primary/50 hover:bg-primary/5"
                       onClick={() => logoInputRef.current?.click()}
                     >
-                      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-white">
                         {logoPreview ? (
                           <img
                             src={logoPreview}
@@ -315,14 +315,14 @@ export default function Settings() {
                             className="h-full w-full object-contain p-2"
                           />
                         ) : (
-                          <UploadCloud className="h-6 w-6 text-slate-400" />
+                          <UploadCloud className="h-6 w-6 text-muted-foreground/70" />
                         )}
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-slate-950">
+                        <p className="text-sm font-bold text-foreground">
                           {logoPreview ? "Trocar logo" : "Enviar logo"}
                         </p>
-                        <p className="mt-1 text-xs font-medium text-slate-500">
+                        <p className="mt-1 text-xs font-medium text-muted-foreground">
                           PNG, JPG, WebP ou SVG até 10MB. Ela aparece no topo do
                           feed vertical.
                         </p>
@@ -349,13 +349,13 @@ export default function Settings() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                  <p className="mb-4 text-sm font-bold text-slate-950">
+                <div className="rounded-2xl border border-border bg-muted/50 p-5">
+                  <p className="mb-4 text-sm font-bold text-foreground">
                     Preview da marca
                   </p>
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="rounded-2xl border border-border bg-card p-4">
                     <div className="mb-4 flex items-center gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                      <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-border bg-white">
                         {logoPreview ? (
                           <img
                             src={logoPreview}
@@ -363,16 +363,16 @@ export default function Settings() {
                             className="h-full w-full object-contain p-1.5"
                           />
                         ) : (
-                          <span className="text-xs font-black text-slate-400">
+                          <span className="text-xs font-black text-muted-foreground/70">
                             LOGO
                           </span>
                         )}
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-slate-950">
+                        <p className="text-sm font-bold text-foreground">
                           {name || store?.name || "Sua loja"}
                         </p>
-                        <p className="text-xs font-medium text-slate-500">
+                        <p className="text-xs font-medium text-muted-foreground">
                           {url || store?.url || "sualoja.com.br"}
                         </p>
                       </div>
@@ -395,7 +395,7 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="notificacoes">
-          <Card className="border-slate-200 bg-white text-slate-950">
+          <Card className="border-border bg-card text-foreground">
             <CardHeader>
               <CardTitle>Preferências de notificação</CardTitle>
             </CardHeader>
@@ -424,11 +424,11 @@ export default function Settings() {
               ].map((item) => (
                 <div
                   key={item.title}
-                  className="flex items-center justify-between border-b border-slate-100 pb-4 last:border-0 last:pb-0"
+                  className="flex items-center justify-between border-b border-border pb-4 last:border-0 last:pb-0"
                 >
                   <div className="space-y-0.5">
                     <Label className="text-base">{item.title}</Label>
-                    <p className="text-sm text-slate-500">{item.desc}</p>
+                    <p className="text-sm text-muted-foreground">{item.desc}</p>
                   </div>
                   <Switch defaultChecked={item.checked} />
                 </div>
@@ -453,10 +453,10 @@ function ColorField({
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
-      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-2">
+      <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-2">
         <input
           aria-label={label}
-          className="h-10 w-10 cursor-pointer rounded-lg border border-slate-200 bg-transparent"
+          className="h-10 w-10 cursor-pointer rounded-lg border border-border bg-transparent"
           type="color"
           value={value}
           onChange={(event) => onChange(event.target.value)}

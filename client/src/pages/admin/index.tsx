@@ -1,6 +1,6 @@
 import { formatBRL } from "@/lib/utils";
 import React from "react";
-import { LuppLogo } from "@/components/shared/LuppLogo";
+import { useLocation } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,19 +13,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAuth } from "@/hooks/useAuth";
+import { BrandIcon } from "@/components/shared/BrandIcons";
+import { StatCard } from "@/components/shared/StatCard";
 import { useToast } from "@/hooks/use-toast";
-import { authService } from "@/services/auth.service";
-import { masterConsoleService } from "@/services/master-console.service";
+import { adminConsoleService } from "@/services/admin-console.service";
 import type {
-  MasterConsoleAction,
-  MasterConsoleStoreRow,
-} from "@/types/master-console";
+  AdminConsoleAction,
+  AdminConsoleStoreRow,
+} from "@/types/admin-console";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   AlertTriangle,
   Building2,
+  ChevronRight,
   Clock3,
   DollarSign,
   Eye,
@@ -35,86 +36,29 @@ import {
   RefreshCcw,
   Search,
   ShieldCheck,
-  LockKeyhole,
-  LogOut,
   ShoppingCart,
   Sparkles,
 } from "lucide-react";
+import {
+  AdminGate,
+  AdminShell,
+  formatDate,
+  formatNumber,
+  initials,
+  statusTone,
+} from "./shared";
 
-
-function formatNumber(value?: number | null) {
-  return new Intl.NumberFormat("pt-BR").format(Number(value || 0));
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "Sem data";
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-  }).format(new Date(value));
-}
-
-function statusTone(status?: string | null) {
-  if (status === "active") return "bg-emerald-50 text-emerald-700 border-emerald-200";
-  if (status === "trialing") return "bg-blue-50 text-blue-700 border-blue-200";
-  if (status === "paused") return "bg-amber-50 text-amber-700 border-amber-200";
-  if (status === "disabled" || status === "canceled") return "bg-red-50 text-red-700 border-red-200";
-  return "bg-slate-50 text-slate-600 border-slate-200";
-}
-
-function initials(name: string) {
+export default function AdminConsolePage() {
   return (
-    name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase())
-      .join("") || "LP"
+    <AdminGate>
+      {({ adminEmail, onSignOut }) => (
+        <AdminDashboard adminEmail={adminEmail} onSignOut={onSignOut} />
+      )}
+    </AdminGate>
   );
 }
 
-export default function MasterConsole() {
-  const auth = useAuth();
-  const queryClient = useQueryClient();
-
-  if (auth.loading) {
-    return (
-      <MasterShell>
-        <div className="flex min-h-[60vh] items-center justify-center">
-          <Card className="border-slate-200 bg-white shadow-sm">
-            <CardContent className="p-6 text-sm font-semibold text-slate-500">
-              Carregando sessão master...
-            </CardContent>
-          </Card>
-        </div>
-      </MasterShell>
-    );
-  }
-
-  if (!auth.user) {
-    return (
-      <MasterLogin
-        onAuthenticated={async () => {
-          await auth.refresh();
-          await queryClient.invalidateQueries({ queryKey: ["master-console"] });
-        }}
-      />
-    );
-  }
-
-  return (
-    <MasterDashboard
-      adminEmail={auth.user.email || "admin"}
-      onSignOut={async () => {
-        await auth.signOut();
-        queryClient.removeQueries({ queryKey: ["master-console"] });
-      }}
-    />
-  );
-}
-
-function MasterDashboard({
+function AdminDashboard({
   adminEmail,
   onSignOut,
 }: {
@@ -127,8 +71,8 @@ function MasterDashboard({
   const [statusFilter, setStatusFilter] = React.useState("all");
 
   const snapshotQuery = useQuery({
-    queryKey: ["master-console"],
-    queryFn: () => masterConsoleService.getSnapshot(),
+    queryKey: ["admin-console"],
+    queryFn: () => adminConsoleService.getSnapshot(),
     retry: false,
   });
 
@@ -140,23 +84,23 @@ function MasterDashboard({
       planId,
       storeId,
     }: {
-      action: MasterConsoleAction;
+      action: AdminConsoleAction;
       currentTrialEndsAt?: string | null;
       days?: number;
       planId?: string;
       storeId: string;
     }) =>
-      masterConsoleService.runAction(action, {
+      adminConsoleService.runAction(action, {
         current_trial_ends_at: currentTrialEndsAt,
         days,
         plan_id: planId,
         store_id: storeId,
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["master-console"] });
+      await queryClient.invalidateQueries({ queryKey: ["admin-console"] });
       toast({
         title: "Ação executada",
-        description: "O Master Console foi atualizado.",
+        description: "O Admin Console foi atualizado.",
       });
     },
     onError: (error) => {
@@ -185,8 +129,8 @@ function MasterDashboard({
   });
 
   const runStoreAction = (
-    store: MasterConsoleStoreRow,
-    action: MasterConsoleAction,
+    store: AdminConsoleStoreRow,
+    action: AdminConsoleAction,
     options?: { days?: number; planId?: string },
   ) => {
     actionMutation.mutate({
@@ -200,71 +144,79 @@ function MasterDashboard({
 
   if (snapshotQuery.error) {
     return (
-      <MasterShell adminEmail={adminEmail} onSignOut={onSignOut}>
-        <Card className="border-red-200 bg-red-50 text-red-950">
+      <AdminShell adminEmail={adminEmail} onSignOut={onSignOut}>
+        <Card className="border-destructive-surface-border bg-destructive-surface text-destructive-surface-foreground">
           <CardContent className="flex gap-3 p-6">
             <AlertTriangle className="mt-1 h-5 w-5 shrink-0" />
             <div>
               <h2 className="text-lg font-black">Acesso bloqueado</h2>
-              <p className="mt-1 text-sm font-semibold text-red-700">
+              <p className="mt-1 text-sm font-semibold text-destructive">
                 {snapshotQuery.error instanceof Error
                   ? snapshotQuery.error.message
-                  : "Seu usuário não tem permissão para acessar o Master Console."}
+                  : "Seu usuário não tem permissão para acessar o Admin Console."}
               </p>
             </div>
           </CardContent>
         </Card>
-      </MasterShell>
+      </AdminShell>
     );
   }
 
+  const isLoading = snapshotQuery.isPending;
+
   return (
-    <MasterShell adminEmail={adminEmail} onSignOut={onSignOut}>
+    <AdminShell adminEmail={adminEmail} onSignOut={onSignOut}>
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-blue-700">
+          <div className="inline-flex items-center gap-2 rounded-full border border-info-surface-border bg-info-surface px-3 py-1 text-overline uppercase text-info-surface-foreground">
             <ShieldCheck className="h-4 w-4" />
             Área interna Luup
           </div>
-          <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+          <h2 className="mt-3 text-page-title text-foreground">
             Clientes, receita e operação
           </h2>
-          <p className="mt-1 text-sm font-semibold text-slate-500">
+          <p className="mt-1 text-sm font-semibold text-muted-foreground">
             Visão global das lojas, assinaturas, uso e ações administrativas.
           </p>
         </div>
         <Button
           variant="outline"
-          className="w-fit gap-2 bg-white"
+          className="w-fit gap-2"
           onClick={() => void snapshotQuery.refetch()}
           disabled={snapshotQuery.isFetching}
         >
-          <RefreshCcw className="h-4 w-4" />
+          <RefreshCcw
+            className={`h-4 w-4 ${snapshotQuery.isFetching ? "animate-spin" : ""}`}
+          />
           {snapshotQuery.isFetching ? "Atualizando..." : "Atualizar"}
         </Button>
       </div>
 
       <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MasterMetric
+        <StatCard
           icon={DollarSign}
+          isLoading={isLoading}
           label="MRR"
           value={formatBRL(snapshotQuery.data?.metrics.mrr)}
           detail={`ARR ${formatBRL(snapshotQuery.data?.metrics.arr)}`}
         />
-        <MasterMetric
+        <StatCard
           icon={Building2}
+          isLoading={isLoading}
           label="Clientes ativos"
           value={formatNumber(snapshotQuery.data?.metrics.activeStores)}
           detail={`${formatNumber(snapshotQuery.data?.metrics.paidStores)} pagantes`}
         />
-        <MasterMetric
+        <StatCard
           icon={Clock3}
+          isLoading={isLoading}
           label="Trials"
           value={formatNumber(snapshotQuery.data?.metrics.trialStores)}
           detail={`${formatNumber(snapshotQuery.data?.metrics.trialsEndingSoon)} vencendo em 3 dias`}
         />
-        <MasterMetric
+        <StatCard
           icon={AlertTriangle}
+          isLoading={isLoading}
           label="Atenção"
           value={formatNumber(snapshotQuery.data?.metrics.expiredTrials)}
           detail={`${formatNumber(snapshotQuery.data?.metrics.pausedStores)} lojas pausadas`}
@@ -272,53 +224,58 @@ function MasterDashboard({
       </div>
 
       <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MasterMetric
+        <StatCard
           icon={Film}
+          isLoading={isLoading}
           label="Vídeos ativos"
           value={formatNumber(snapshotQuery.data?.metrics.activeVideos)}
           detail={`${formatNumber(snapshotQuery.data?.metrics.processingVideos)} processando`}
         />
-        <MasterMetric
+        <StatCard
           icon={Eye}
+          isLoading={isLoading}
           label="Views no mês"
           value={formatNumber(snapshotQuery.data?.metrics.monthViews)}
           detail="Eventos Luup registrados"
         />
-        <MasterMetric
+        <StatCard
           icon={ShoppingCart}
+          isLoading={isLoading}
           label="Carrinho no mês"
           value={formatNumber(snapshotQuery.data?.metrics.monthAddToCart)}
           detail="Adições ao carrinho"
         />
-        <MasterMetric
+        <StatCard
           icon={Sparkles}
+          isLoading={isLoading}
           label="Lojas monitoradas"
           value={formatNumber(stores.length)}
           detail={`Gerado em ${formatDate(snapshotQuery.data?.generated_at)}`}
         />
       </div>
 
-      <Card className="border-slate-200 bg-white shadow-sm">
-        <CardHeader className="gap-4 border-b border-slate-100">
+      <Card>
+        <CardHeader className="gap-4 border-b border-border">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <CardTitle>Assinantes e lojas</CardTitle>
-              <p className="mt-1 text-sm font-medium text-slate-500">
-                {formatNumber(filteredStores.length)} resultado(s)
+              <p className="mt-1 text-sm font-medium text-muted-foreground">
+                {formatNumber(filteredStores.length)} resultado(s) · clique em
+                uma loja para abrir o painel completo
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
                 <Input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Buscar loja, URL ou e-mail"
-                  className="w-full min-w-72 bg-white pl-9"
+                  className="w-full bg-card pl-9 sm:min-w-72"
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full bg-white sm:w-44">
+                <SelectTrigger className="w-full bg-card sm:w-44">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -334,8 +291,8 @@ function MasterDashboard({
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1180px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-500">
+            <table className="w-full min-w-table-min text-left text-sm">
+              <thead className="sticky top-0 bg-muted/50 text-overline uppercase text-muted-foreground">
                 <tr>
                   <th className="px-5 py-3">Loja</th>
                   <th className="px-5 py-3">Plano</th>
@@ -346,47 +303,62 @@ function MasterDashboard({
                   <th className="px-5 py-3">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredStores.map((store) => (
-                  <StoreRow
-                    key={store.id}
-                    isActing={actionMutation.isPending}
-                    store={store}
-                    onAction={runStoreAction}
-                  />
-                ))}
+              <tbody className="divide-y divide-border">
+                {isLoading ? (
+                  <SkeletonRows />
+                ) : filteredStores.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-12 text-center">
+                      <p className="font-bold text-foreground/80">
+                        Nenhuma loja encontrada
+                      </p>
+                      <p className="mt-1 text-sm font-medium text-muted-foreground">
+                        Ajuste a busca ou o filtro de status.
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredStores.map((store) => (
+                    <StoreRow
+                      key={store.id}
+                      isActing={actionMutation.isPending}
+                      store={store}
+                      onAction={runStoreAction}
+                    />
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="mt-6 border-slate-200 bg-white shadow-sm">
+      <Card className="mt-6 border-border bg-card shadow-sm">
         <CardHeader>
           <CardTitle>Últimas ações administrativas</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3">
             {(snapshotQuery.data?.audit_logs ?? []).length === 0 ? (
-              <p className="text-sm font-medium text-slate-500">
+              <p className="text-sm font-medium text-muted-foreground">
                 Nenhuma ação registrada ainda.
               </p>
             ) : (
               snapshotQuery.data?.audit_logs.map((log) => (
                 <div
                   key={log.id}
-                  className="flex flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-1 rounded-xl border border-border bg-muted/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div>
-                    <p className="font-bold text-slate-950">
+                    <p className="font-bold text-foreground">
                       {log.action.replace(/_/g, " ")}
                     </p>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-muted-foreground">
                       {log.admin_email || "admin"} · loja{" "}
                       {log.target_store_id || "global"}
                     </p>
                   </div>
-                  <span className="text-xs font-bold text-slate-500">
+                  <span className="text-xs font-bold text-muted-foreground">
                     {formatDate(log.created_at)}
                   </span>
                 </div>
@@ -395,188 +367,45 @@ function MasterDashboard({
           </div>
         </CardContent>
       </Card>
-    </MasterShell>
+    </AdminShell>
   );
 }
 
-function MasterLogin({
-  onAuthenticated,
-}: {
-  onAuthenticated: () => Promise<void>;
-}) {
-  const { toast } = useToast();
-  const [email, setEmail] = React.useState("playluup@gmail.com");
-  const [password, setPassword] = React.useState("");
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!email.trim() || !password) {
-      toast({ title: "Preencha e-mail e senha master." });
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      await authService.signIn({ email: email.trim(), password });
-      await onAuthenticated();
-      toast({
-        title: "Master Console liberado",
-        description: "Sessão interna autenticada com sucesso.",
-      });
-    } catch (error) {
-      toast({
-        title: "Não foi possível entrar no Master",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Confira suas credenciais e tente novamente.",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
+function SkeletonRows() {
   return (
-    <MasterShell>
-      <div className="grid min-h-[calc(100dvh-96px)] place-items-center px-4 py-10">
-        <Card className="w-full max-w-md border-slate-200 bg-white shadow-xl shadow-slate-200/70">
-          <CardHeader className="space-y-4 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-              <LockKeyhole className="h-7 w-7" />
-            </div>
-            <div>
-              <CardTitle className="text-2xl font-black text-slate-950">
-                Master Console
-              </CardTitle>
-              <p className="mt-2 text-sm font-medium text-slate-500">
-                Acesso interno da Luup para clientes, assinaturas e operação.
-              </p>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-4" onSubmit={handleSubmit}>
-              <div className="space-y-2">
-                <Label htmlFor="master-email">E-mail master</Label>
-                <Input
-                  id="master-email"
-                  autoComplete="email"
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  className="bg-white"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="master-password">Senha</Label>
-                <Input
-                  id="master-password"
-                  autoComplete="current-password"
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="bg-white"
-                />
-              </div>
-              <Button className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? "Entrando..." : "Entrar no Master"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    </MasterShell>
+    <>
+      {Array.from({ length: 5 }, (_, index) => (
+        <tr key={index}>
+          {Array.from({ length: 7 }, (_, cell) => (
+            <td key={cell} className="px-5 py-5">
+              <div className="h-4 w-full max-w-40 animate-pulse rounded bg-muted" />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
   );
 }
 
-function MasterShell({
-  adminEmail,
-  children,
-  onSignOut,
-}: {
-  adminEmail?: string;
-  children: React.ReactNode;
-  onSignOut?: () => Promise<void>;
-}) {
-  const [isSigningOut, setIsSigningOut] = React.useState(false);
-
+function TrialBadge({ store }: { store: AdminConsoleStoreRow }) {
+  if (store.trial_days_left === null) {
+    return <p className="mt-1 text-xs text-muted-foreground">Sem trial</p>;
+  }
+  if (store.trial_days_left <= 0) {
+    return (
+      <p className="mt-1 text-xs font-bold text-destructive">Trial expirado</p>
+    );
+  }
   return (
-    <div className="min-h-[100dvh] bg-[#f6f8fb] text-slate-950">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <LuppLogo className="h-9 w-auto" />
-            <div className="hidden h-8 w-px bg-slate-200 sm:block" />
-            <div className="hidden sm:block">
-              <p className="text-sm font-black text-slate-950">
-                Master Console
-              </p>
-              <p className="text-xs font-semibold text-slate-500">
-                Operação interna
-              </p>
-            </div>
-          </div>
-          {adminEmail && onSignOut ? (
-            <div className="flex items-center gap-3">
-              <div className="hidden text-right sm:block">
-                <p className="text-sm font-bold text-slate-950">
-                  {adminEmail}
-                </p>
-                <p className="text-xs font-semibold text-slate-500">
-                  Admin Luup
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                className="gap-2 bg-white"
-                disabled={isSigningOut}
-                onClick={async () => {
-                  setIsSigningOut(true);
-                  try {
-                    await onSignOut();
-                  } finally {
-                    setIsSigningOut(false);
-                  }
-                }}
-              >
-                <LogOut className="h-4 w-4" />
-                Sair
-              </Button>
-            </div>
-          ) : null}
-        </div>
-      </header>
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {children}
-      </main>
-    </div>
-  );
-}
-
-function MasterMetric({
-  detail,
-  icon: Icon,
-  label,
-  value,
-}: {
-  detail: string;
-  icon: React.ElementType;
-  label: string;
-  value: string;
-}) {
-  return (
-    <Card className="border-slate-200 bg-white shadow-sm">
-      <CardContent className="p-5">
-        <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-          <Icon className="h-5 w-5" />
-        </div>
-        <p className="text-sm font-bold text-slate-500">{label}</p>
-        <p className="mt-1 text-2xl font-black tracking-tight text-slate-950">
-          {value}
-        </p>
-        <p className="mt-1 text-xs font-semibold text-slate-500">{detail}</p>
-      </CardContent>
-    </Card>
+    <p
+      className={`mt-1 text-xs ${
+        store.trial_days_left <= 3
+          ? "font-bold text-warning"
+          : "text-muted-foreground"
+      }`}
+    >
+      Trial: {store.trial_days_left} dias
+    </p>
   );
 }
 
@@ -587,52 +416,59 @@ function StoreRow({
 }: {
   isActing: boolean;
   onAction: (
-    store: MasterConsoleStoreRow,
-    action: MasterConsoleAction,
+    store: AdminConsoleStoreRow,
+    action: AdminConsoleAction,
     options?: { days?: number; planId?: string },
   ) => void;
-  store: MasterConsoleStoreRow;
+  store: AdminConsoleStoreRow;
 }) {
+  const [, navigate] = useLocation();
   const [planId, setPlanId] = React.useState(store.plan_id || "start");
 
   React.useEffect(() => {
     setPlanId(store.plan_id || "start");
   }, [store.plan_id]);
 
+  const openDetail = () => navigate(`/admin/${store.id}`);
+
   return (
-    <tr className="align-top hover:bg-slate-50/70">
+    <tr
+      className="cursor-pointer align-top transition-colors hover:bg-primary/5"
+      onClick={openDetail}
+    >
       <td className="px-5 py-4">
         <div className="flex min-w-72 gap-3">
           {store.logo_url ? (
             <img
               src={store.logo_url}
               alt={store.name}
-              className="h-11 w-11 rounded-xl border border-slate-200 object-contain"
+              className="h-11 w-11 rounded-xl border border-border bg-white object-contain"
             />
           ) : (
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-sm font-black text-white">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-sm font-black text-primary-foreground">
               {initials(store.name)}
             </div>
           )}
           <div className="min-w-0">
-            <p className="font-black text-slate-950">{store.name}</p>
-            <p className="truncate text-xs font-semibold text-slate-500">
+            <p className="flex items-center gap-1 font-black text-foreground">
+              {store.name}
+              <ChevronRight className="h-4 w-4 text-muted-foreground/70" />
+            </p>
+            <p className="truncate text-xs font-semibold text-muted-foreground">
               {store.url || store.slug}
             </p>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-muted-foreground">
               {store.owner_email || "Sem e-mail do dono"}
             </p>
           </div>
         </div>
       </td>
       <td className="px-5 py-4">
-        <p className="font-black text-slate-950">{store.plan_name}</p>
-        <p className="text-xs font-bold text-emerald-600">
+        <p className="font-black text-foreground">{store.plan_name}</p>
+        <p className="text-xs font-bold text-success">
           {formatBRL(store.mrr)}/mês
         </p>
-        <p className="mt-1 text-xs text-slate-500">
-          Trial: {store.trial_days_left ?? "?"} dias
-        </p>
+        <TrialBadge store={store} />
       </td>
       <td className="px-5 py-4">
         <div className="grid gap-2">
@@ -647,7 +483,7 @@ function StoreRow({
         </div>
       </td>
       <td className="px-5 py-4">
-        <div className="grid gap-1 text-xs font-semibold text-slate-600">
+        <div className="grid gap-1 text-xs font-semibold text-muted-foreground">
           <span>{formatNumber(store.active_videos)} vídeos ativos</span>
           <span>{formatNumber(store.processing_videos)} processando</span>
           <span>{formatNumber(store.products)} produtos</span>
@@ -655,7 +491,7 @@ function StoreRow({
         </div>
       </td>
       <td className="px-5 py-4">
-        <div className="grid gap-1 text-xs font-semibold text-slate-600">
+        <div className="grid gap-1 text-xs font-semibold text-muted-foreground">
           <span>{formatNumber(store.video_views_month)} views</span>
           <span>{formatNumber(store.feed_opens_month)} aberturas</span>
           <span>{formatNumber(store.add_to_cart_month)} carrinhos</span>
@@ -665,7 +501,7 @@ function StoreRow({
       <td className="px-5 py-4">
         <div className="flex max-w-48 flex-wrap gap-2">
           {store.active_integrations.length === 0 ? (
-            <Badge variant="outline" className="border-slate-200 text-slate-500">
+            <Badge variant="outline" className="border-border text-muted-foreground">
               Manual
             </Badge>
           ) : (
@@ -673,17 +509,27 @@ function StoreRow({
               <Badge
                 key={`${store.id}-${integration.provider}`}
                 variant="outline"
-                className="border-blue-200 bg-blue-50 text-blue-700"
+                className="gap-1 border-info-surface-border bg-info-surface text-info-surface-foreground"
               >
+                <BrandIcon brand={integration.provider} className="h-3.5 w-3.5" />
                 {integration.provider}
               </Badge>
             ))
           )}
         </div>
       </td>
-      <td className="px-5 py-4">
+      <td className="px-5 py-4" onClick={(event) => event.stopPropagation()}>
         <div className="grid min-w-56 gap-2">
           <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1"
+              onClick={openDetail}
+            >
+              <Eye className="h-3.5 w-3.5" />
+              Detalhes
+            </Button>
             {store.status === "active" ? (
               <Button
                 size="sm"
@@ -721,7 +567,7 @@ function StoreRow({
             <div>
               <Label className="sr-only">Plano</Label>
               <Select value={planId} onValueChange={setPlanId}>
-                <SelectTrigger className="h-8 bg-white text-xs font-bold">
+                <SelectTrigger className="h-8 bg-card text-xs font-bold">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

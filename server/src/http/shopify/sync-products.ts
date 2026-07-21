@@ -9,7 +9,7 @@ import {
   shopifyTokenExpiresAt,
   ShopifyTokenResponse,
 } from "@/lib/shopify";
-import { findStoreMembership } from "@/lib/store-membership";
+import { canOperateStore } from "@/lib/store-membership";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
 import { asRecord } from "@/lib/text";
 
@@ -509,8 +509,9 @@ export async function shopifySyncProductsHandler(
   const storeId = (body.store_id ?? "").trim();
   if (!storeId) return reply.status(400).send({ error: "missing_store_id" });
 
-  const member = await findStoreMembership(request.user.sub, storeId);
-  if (!member) return reply.status(403).send({ error: "store_access_denied" });
+  if (!(await canOperateStore(request.user.sub, storeId))) {
+    return reply.status(403).send({ error: "store_access_denied" });
+  }
 
   const integration = await prisma.integration.findFirst({
     where: { store_id: storeId, provider: "shopify", status: "active" },

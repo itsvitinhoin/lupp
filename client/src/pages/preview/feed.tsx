@@ -1944,7 +1944,7 @@ export default function PreviewFeed() {
   );
 
   return (
-    <div className="h-[100dvh] w-full bg-black overflow-hidden flex justify-center text-white">
+    <div className="h-dvh w-full bg-black overflow-hidden flex justify-center text-white">
       <div className="relative flex h-full w-full max-w-[420px] flex-col bg-slate-950">
         <div className="absolute left-0 right-0 top-0 z-50 flex items-center justify-between bg-gradient-to-b from-black/60 to-transparent p-4">
           {isEmbedded ? (
@@ -2132,7 +2132,7 @@ export default function PreviewFeed() {
                           {customerAccessLabel}
                         </p>
                       )}
-                      <div className="mt-2 flex items-center gap-1 text-xs text-amber-500">
+                      <div className="mt-2 flex items-center gap-1 text-xs text-warning">
                         {Array.from({ length: 5 }).map((_, index) => (
                           <Star
                             key={index}
@@ -2356,7 +2356,7 @@ export default function PreviewFeed() {
 
                         {hasColorOptions && (
                           <div className="mt-4">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            <p className="text-3xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                               Cor
                             </p>
                             <div className="mt-2 flex flex-wrap gap-2">
@@ -2406,7 +2406,7 @@ export default function PreviewFeed() {
 
                         {hasSizeOptions && (
                           <div className="mt-5">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            <p className="text-3xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                               Tamanho
                             </p>
                             <div className="mt-2 flex flex-wrap gap-2">
@@ -2576,7 +2576,7 @@ export default function PreviewFeed() {
                                     "Produto"
                                   }
                                 />
-                                <span className="line-clamp-2 text-[10px] font-bold uppercase leading-tight text-slate-600">
+                                <span className="line-clamp-2 text-3xs font-bold uppercase leading-tight text-slate-600">
                                   {color.color_name ||
                                     color.color_code ||
                                     "Produto"}
@@ -2639,7 +2639,7 @@ export default function PreviewFeed() {
                                           <Minus className="h-4 w-4" />
                                         </button>
                                         {formatVariantPrice(variant.price) && (
-                                          <span className="mt-1 text-[10px] font-semibold text-slate-500">
+                                          <span className="mt-1 text-3xs font-semibold text-slate-500">
                                             {formatVariantPrice(variant.price)}
                                           </span>
                                         )}
@@ -2704,7 +2704,7 @@ export default function PreviewFeed() {
                 <p className="truncate text-sm font-semibold">
                   {selectedCheckout.product.name}
                 </p>
-                <p className="truncate text-[11px] text-slate-500">
+                <p className="truncate text-2xs text-slate-500">
                   {selectedCheckout.product.productUrl}
                 </p>
               </div>
@@ -3107,7 +3107,7 @@ const FeedItem = React.memo(function FeedItem({
               stroke={liked ? "#fe2c55" : "white"}
               strokeWidth={2.3}
             />
-            <span className="text-[11px] font-black leading-none text-white [text-shadow:0_1px_4px_rgba(0,0,0,.8)]">
+            <span className="text-2xs font-black leading-none text-white [text-shadow:0_1px_4px_rgba(0,0,0,.8)]">
               {formatTikTokCount(likes)}
             </span>
           </button>
@@ -3125,7 +3125,7 @@ const FeedItem = React.memo(function FeedItem({
               stroke="white"
               strokeWidth={2.4}
             />
-            <span className="text-[11px] font-black leading-none text-white [text-shadow:0_1px_4px_rgba(0,0,0,.8)]">
+            <span className="text-2xs font-black leading-none text-white [text-shadow:0_1px_4px_rgba(0,0,0,.8)]">
               {formatTikTokCount(comments)}
             </span>
           </button>
@@ -3143,7 +3143,7 @@ const FeedItem = React.memo(function FeedItem({
               stroke="white"
               strokeWidth={2.4}
             />
-            <span className="text-[11px] font-black leading-none text-white [text-shadow:0_1px_4px_rgba(0,0,0,.8)]">
+            <span className="text-2xs font-black leading-none text-white [text-shadow:0_1px_4px_rgba(0,0,0,.8)]">
               Compart.
             </span>
           </button>

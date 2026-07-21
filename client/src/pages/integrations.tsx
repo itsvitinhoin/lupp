@@ -2,7 +2,7 @@ import React from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { IntegrationCard } from "@/components/shared/IntegrationCard";
 import { mockIntegrations, Integration } from "@/data/mock";
-import { CodeBlock } from "@/components/shared/CodeBlock";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -25,9 +25,10 @@ import {
   type NuvemshopScriptInstallResult,
   type WidgetBootstrapProbe,
 } from "@/services/widgets.service";
-import { env } from "@/lib/env";
+import { buildWidgetEmbedCode } from "@/lib/widget-embed";
 import type { LuppStore } from "@/types/store";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Copy } from "lucide-react";
 import { useLocation } from "wouter";
 
 function getProviderKey(integration: Integration) {
@@ -121,10 +122,6 @@ function inferStoreNameFromUrl(value: string) {
   } catch {
     return "Loja UP Zero";
   }
-}
-
-function jsStringLiteral(value: string) {
-  return JSON.stringify(value).replace(/<\/script/gi, "<\\/script");
 }
 
 function hasNuvemshopScriptInstalled(settings: unknown) {
@@ -281,44 +278,6 @@ function isShopifyCustomManualSettings(settings: unknown) {
   return value.connected_via === "custom_app_manual";
 }
 
-function getManualSnippet(store: LuppStore | null) {
-  const storeId = store?.id || "id-da-loja";
-  const storeSlug = store?.slug || "sua-loja";
-  // Identity fallback chain mirrors the server resolution
-  // (store_id -> store_slug -> store_domain); the domain comes from the
-  // storefront URL's hostname when it parses.
-  let storeDomain = "";
-  if (store?.url) {
-    try {
-      storeDomain = new URL(store.url).hostname;
-    } catch {
-      storeDomain = "";
-    }
-  }
-
-  return `<script>
-(function () {
-  var s = document.createElement('script');
-  s.async = true;
-  s.src = ${jsStringLiteral(env.widgetCdnUrl)};
-
-  // Apenas identidade: aparência, exibição e vídeos vêm das configurações
-  // salvas no painel Luup, resolvidas pelo servidor a cada página. Atributos
-  // extras SOBRESCREVEM o painel — não adicione a menos que queira fixar um
-  // valor para sempre.
-  s.setAttribute('data-store-id', ${jsStringLiteral(storeId)});
-  s.setAttribute('data-store', ${jsStringLiteral(storeSlug)});
-${storeDomain ? `  s.setAttribute('data-store-domain', ${jsStringLiteral(storeDomain)});\n` : ""}  s.setAttribute('data-widget', 'floating_launcher');
-  s.setAttribute('data-require-active', 'true');
-  s.setAttribute('data-lupp-url', ${jsStringLiteral(env.appUrl)});
-  s.setAttribute('data-api-url', ${jsStringLiteral(env.apiUrl)});
-
-  var firstScript = document.getElementsByTagName('script')[0];
-  firstScript.parentNode.insertBefore(s, firstScript);
-})();
-</script>`;
-}
-
 export default function Integrations() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -363,9 +322,12 @@ export default function Integrations() {
     enabled: Boolean(store?.id),
   });
   const manualSnippet = React.useMemo(
-    () => getManualSnippet(store ?? null),
-    [store?.slug, store?.name, store?.url],
+    () => buildWidgetEmbedCode({ store: store ?? null }),
+    [store?.id, store?.slug, store?.url],
   );
+  // null = follow the generated snippet; a string means the user edited it.
+  const [editedSnippet, setEditedSnippet] = React.useState<string | null>(null);
+  const displayedSnippet = editedSnippet ?? manualSnippet;
   const activeProviders = new Set(
     (integrationsQuery.data ?? [])
       .filter((integration) => integration.status === "active")
@@ -954,7 +916,7 @@ export default function Integrations() {
 
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
             {mockIntegrations.map((integration) => {
               const normalizedProvider = getProviderKey(integration);
               const isProviderActive = isActiveProviderKey(normalizedProvider);
@@ -996,9 +958,9 @@ export default function Integrations() {
           </div>
 
           {widgetInstallChecks && (
-            <Card className="mt-6 border-slate-200 bg-white text-slate-950 shadow-sm">
+            <Card className="mt-6 border-border bg-card text-foreground shadow-sm">
               <CardHeader>
-                <CardTitle className="text-base text-slate-950">
+                <CardTitle className="text-base text-foreground">
                   Status do widget na vitrine
                 </CardTitle>
               </CardHeader>
@@ -1010,20 +972,20 @@ export default function Integrations() {
                         aria-hidden="true"
                         className={
                           check.status === "ok"
-                            ? "mt-0.5 text-emerald-600"
+                            ? "mt-0.5 text-success"
                             : check.status === "warning"
-                              ? "mt-0.5 text-amber-500"
-                              : "mt-0.5 text-red-600"
+                              ? "mt-0.5 text-warning"
+                              : "mt-0.5 text-destructive"
                         }
                       >
                         ●
                       </span>
                       <div>
-                        <p className="font-medium text-slate-950">
+                        <p className="font-medium text-foreground">
                           {check.label}
                         </p>
                         {check.detail && (
-                          <p className="mt-0.5 text-slate-500">
+                          <p className="mt-0.5 text-muted-foreground">
                             {check.detail}
                           </p>
                         )}
@@ -1037,35 +999,66 @@ export default function Integrations() {
         </div>
 
         <div>
-          <Card className="sticky top-24 border-slate-200 bg-white text-slate-950 shadow-sm">
+          <Card className="sticky top-24 border-border bg-card text-foreground shadow-sm">
             <CardHeader>
-              <CardTitle className="text-slate-950">
+              <CardTitle className="text-foreground">
                 Instalação Manual
               </CardTitle>
             </CardHeader>
             <CardContent>
               {store && (
-                <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
-                  <p className="font-semibold text-slate-950">{store.name}</p>
-                  <p className="mt-1 truncate text-slate-500">
+                <div className="mb-4 rounded-xl border border-border bg-muted/50 p-3 text-sm">
+                  <p className="font-semibold text-foreground">{store.name}</p>
+                  <p className="mt-1 truncate text-muted-foreground">
                     {store.url || "URL da loja ainda não cadastrada"}
                   </p>
                 </div>
               )}
-              <p className="mb-4 text-sm leading-relaxed text-slate-600">
+              <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
                 Se a sua plataforma não permitir instalação automática, insira
                 este script antes do fechamento da tag{" "}
                 <code>&lt;/head&gt;</code> ou <code>&lt;/body&gt;</code>. Ele é
-                gerado com os dados da loja selecionada.
+                gerado com os dados da loja selecionada e pode ser editado
+                antes de copiar.
               </p>
 
-              <CodeBlock code={manualSnippet} />
+              <Textarea
+                aria-label="Script de instalação manual"
+                value={displayedSnippet}
+                onChange={(event) => setEditedSnippet(event.target.value)}
+                spellCheck={false}
+                className="min-h-64 whitespace-pre font-mono text-xs leading-relaxed"
+              />
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  className="gap-2"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(displayedSnippet);
+                    toast({
+                      title: "Código copiado!",
+                      description:
+                        "Cole antes do fechamento da tag </head> da sua loja.",
+                    });
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                  Copiar código
+                </Button>
+                {editedSnippet !== null && editedSnippet !== manualSnippet ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => setEditedSnippet(null)}
+                  >
+                    Restaurar padrão
+                  </Button>
+                ) : null}
+              </div>
 
               <div className="mt-6 space-y-4 text-sm">
-                <h4 className="font-semibold text-slate-950">
+                <h4 className="font-semibold text-foreground">
                   Próximos passos:
                 </h4>
-                <ol className="list-decimal space-y-2 pl-4 text-slate-600">
+                <ol className="list-decimal space-y-2 pl-4 text-muted-foreground">
                   <li>Copie o código acima</li>
                   <li>
                     Cole antes do fechamento da tag <code>&lt;/head&gt;</code>
@@ -1080,7 +1073,7 @@ export default function Integrations() {
       </div>
 
       <Dialog open={shopifyDialogOpen} onOpenChange={setShopifyDialogOpen}>
-        <DialogContent className="border-slate-200 bg-white text-slate-950 sm:max-w-lg">
+        <DialogContent className="border-border bg-card text-foreground sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
               {showShopifyCustomApp
@@ -1109,7 +1102,7 @@ export default function Integrations() {
               />
             </div>
             {!showShopifyCustomApp && (
-              <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm leading-relaxed text-blue-900">
+              <div className="rounded-xl border border-info-surface-border bg-info-surface p-3 text-sm leading-relaxed text-info-surface-foreground">
                 A Luup vai redirecionar para a Shopify. Depois que o lojista
                 aprovar o app, a Shopify retorna para a Luup com os dados de
                 autorização para sincronizar produtos e ativar carrinho.
@@ -1117,12 +1110,12 @@ export default function Integrations() {
             )}
 
             {showShopifyCustomApp && (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-xl border border-border bg-muted/50 p-4">
                 <div className="mb-3">
-                  <p className="text-sm font-semibold text-slate-950">
+                  <p className="text-sm font-semibold text-foreground">
                     App personalizado Shopify
                   </p>
-                  <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                     Use Client ID e Client Secret do app personalizado. Se
                     você já tiver um Admin API access token antigo, também pode
                     usar o campo opcional abaixo.
@@ -1221,7 +1214,7 @@ export default function Integrations() {
       </Dialog>
 
       <Dialog open={upzeroDialogOpen} onOpenChange={setUpzeroDialogOpen}>
-        <DialogContent className="border-slate-200 bg-white text-slate-950 sm:max-w-xl">
+        <DialogContent className="border-border bg-card text-foreground sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Conectar UP Zero</DialogTitle>
             <DialogDescription>
@@ -1263,7 +1256,7 @@ export default function Integrations() {
                 />
               </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="upzero-storefront">URL pública da loja</Label>
                 <Input
@@ -1289,7 +1282,7 @@ export default function Integrations() {
                 />
               </div>
             </div>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
               O sync usa a Storefront API da UP Zero para trazer produtos,
               imagens e preços. A URL pública é usada pelo botão Comprar agora
               no feed.

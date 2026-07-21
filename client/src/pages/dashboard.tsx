@@ -102,14 +102,14 @@ export default function Dashboard() {
     <AppLayout title="Dashboard">
       <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-sm font-semibold text-slate-500">
+          <p className="text-sm font-semibold text-muted-foreground">
             Funil de video commerce dos últimos 30 dias
           </p>
-          <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
+          <h2 className="mt-1 text-section-title text-foreground">
             Da bolinha ao carrinho, sem inflar conversão
           </h2>
         </div>
-        <div className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm">
+        <div className="inline-flex w-fit items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-bold text-foreground/80 shadow-sm">
           <span className="h-2 w-2 rounded-full bg-primary" />
           {capabilities.integrationName}
         </div>
@@ -215,11 +215,11 @@ export default function Dashboard() {
       </div>
 
       <div className="mb-8 grid gap-6 xl:grid-cols-[1.45fr_.95fr]">
-        <Card className="border-slate-200 bg-white">
+        <Card className="border-border bg-card">
           <CardHeader className="flex-row items-center justify-between gap-4">
             <div>
               <CardTitle>Performance diária</CardTitle>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Impressões, aberturas, views e carrinho nos últimos 30 dias.
               </p>
             </div>
@@ -335,10 +335,10 @@ function MetricCard({
     <Card
       className={
         locked
-          ? "border-slate-200 bg-slate-100 text-slate-400"
+          ? "border-border bg-muted text-muted-foreground/70"
           : tone === "strong"
-            ? "border-primary/25 bg-primary/5 text-slate-950"
-            : "border-slate-200 bg-white text-slate-950"
+            ? "border-primary/25 bg-primary/5 text-foreground"
+            : "border-border bg-card text-foreground"
       }
     >
       <CardContent className="p-5">
@@ -346,21 +346,21 @@ function MetricCard({
           <div
             className={
               locked
-                ? "flex h-11 w-11 items-center justify-center rounded-md bg-white text-slate-400"
+                ? "flex h-11 w-11 items-center justify-center rounded-md bg-card text-muted-foreground/70"
                 : "flex h-11 w-11 items-center justify-center rounded-md bg-primary/10 text-primary"
             }
           >
             {locked ? <Lock className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
           </div>
           {locked && (
-            <span className="rounded-full bg-white px-2 py-1 text-[11px] font-black uppercase tracking-wide text-slate-400">
+            <span className="rounded-full bg-card px-2 py-1 text-2xs font-black uppercase tracking-wide text-muted-foreground/70">
               Em breve
             </span>
           )}
         </div>
-        <p className="mt-4 text-sm font-bold text-slate-500">{label}</p>
-        <h3 className="mt-1 text-2xl font-black tracking-tight">{value}</h3>
-        <p className="mt-1 min-h-[36px] text-xs font-medium leading-relaxed text-slate-500">
+        <p className="mt-4 text-sm font-bold text-muted-foreground">{label}</p>
+        <h3 className="mt-1 text-section-title">{value}</h3>
+        <p className="mt-1 min-h-[36px] text-xs font-medium leading-relaxed text-muted-foreground">
           {detail}
         </p>
       </CardContent>
@@ -372,10 +372,10 @@ function FunnelCard({ funnel }: { funnel: DashboardFunnelStep[] }) {
   const maxValue = Math.max(1, ...funnel.map((step) => step.value));
 
   return (
-    <Card className="border-slate-200 bg-white">
+    <Card className="border-border bg-card">
       <CardHeader>
         <CardTitle>Funil da experiência</CardTitle>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted-foreground">
           Etapas cinzas dependem da integração da plataforma.
         </p>
       </CardHeader>
@@ -391,36 +391,36 @@ function FunnelCard({ funnel }: { funnel: DashboardFunnelStep[] }) {
                       className={
                         step.enabled
                           ? "flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-black text-white"
-                          : "flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-xs font-black text-slate-400"
+                          : "flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-black text-muted-foreground/70"
                       }
                     >
                       {index + 1}
                     </span>
-                    <p className="truncate text-sm font-black text-slate-950">
+                    <p className="truncate text-sm font-black text-foreground">
                       {step.title}
                     </p>
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     {step.description}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-black text-slate-950">
+                  <p className="text-sm font-black text-foreground">
                     {formatNumber(step.value)}
                   </p>
                   {step.rateFromPrevious !== null && (
-                    <p className="text-xs font-bold text-slate-500">
+                    <p className="text-xs font-bold text-muted-foreground">
                       {formatPercent(step.rateFromPrevious)}
                     </p>
                   )}
                 </div>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-2 overflow-hidden rounded-full bg-muted">
                 <div
                   className={
                     step.enabled
                       ? "h-full rounded-full bg-primary"
-                      : "h-full rounded-full bg-slate-300"
+                      : "h-full rounded-full bg-muted-foreground/30"
                   }
                   style={{ width: `${width}%` }}
                 />
@@ -447,7 +447,7 @@ function RankingCard({
   title: string;
 }) {
   return (
-    <Card className="border-slate-200 bg-white">
+    <Card className="border-border bg-card">
       <CardHeader className="flex-row items-center justify-between gap-4">
         <CardTitle>{title}</CardTitle>
         <Button asChild size="sm" variant="outline">
@@ -463,9 +463,9 @@ function RankingCard({
             {items.map((item) => (
               <div
                 key={item.id}
-                className="grid grid-cols-[48px_1fr_auto] items-center gap-3 rounded-md border border-slate-100 p-3"
+                className="grid grid-cols-[48px_1fr_auto] items-center gap-3 rounded-md border border-border p-3"
               >
-                <div className="h-12 w-12 overflow-hidden rounded-md bg-slate-100">
+                <div className="h-12 w-12 overflow-hidden rounded-md bg-muted">
                   {item.imageUrl ? (
                     <img
                       alt=""
@@ -473,24 +473,24 @@ function RankingCard({
                       src={item.imageUrl}
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-slate-400">
+                    <div className="flex h-full w-full items-center justify-center text-muted-foreground/70">
                       <Film className="h-5 w-5" />
                     </div>
                   )}
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-black text-slate-950">
+                  <p className="truncate text-sm font-black text-foreground">
                     {item.label}
                   </p>
-                  <p className="truncate text-xs font-medium text-slate-500">
+                  <p className="truncate text-xs font-medium text-muted-foreground">
                     {item.subtitle}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-black text-slate-950">
+                  <p className="text-sm font-black text-foreground">
                     {formatNumber(item.addToCart)}
                   </p>
-                  <p className="text-xs font-bold text-slate-500">
+                  <p className="text-xs font-bold text-muted-foreground">
                     {formatPercent(item.rate)}
                   </p>
                 </div>
@@ -498,8 +498,8 @@ function RankingCard({
             ))}
           </div>
         ) : (
-          <div className="rounded-md border border-dashed border-slate-200 p-6 text-center">
-            <p className="text-sm font-semibold text-slate-500">{emptyText}</p>
+          <div className="rounded-md border border-dashed border-border p-6 text-center">
+            <p className="text-sm font-semibold text-muted-foreground">{emptyText}</p>
           </div>
         )}
       </CardContent>

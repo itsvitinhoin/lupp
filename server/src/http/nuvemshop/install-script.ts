@@ -2,7 +2,7 @@ import { z } from "zod";
 import { FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "@/lib/prisma";
 import { env } from "@/env";
-import { findStoreMembership } from "@/lib/store-membership";
+import { canOperateStore } from "@/lib/store-membership";
 import { nuvemshopRequest, nuvemshopScriptsApiBase } from "@/lib/nuvemshop";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
 import { asRecord } from "@/lib/text";
@@ -214,8 +214,9 @@ export async function nuvemshopInstallScriptHandler(
     return reply.status(500).send({ error: "missing_nuvemshop_script_id" });
   }
 
-  const member = await findStoreMembership(request.user.sub, storeId);
-  if (!member) return reply.status(403).send({ error: "store_access_denied" });
+  if (!(await canOperateStore(request.user.sub, storeId))) {
+    return reply.status(403).send({ error: "store_access_denied" });
+  }
 
   const store = await prisma.store.findUnique({
     where: { id: storeId },

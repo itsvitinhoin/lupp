@@ -45,7 +45,7 @@ export function CommerceProductCard({
   return (
     <div
       className={cn(
-        "mb-2 overflow-hidden rounded-md border border-white/18 bg-white/26 text-white shadow-2xl shadow-black/25 backdrop-blur-xl",
+        "mb-2 overflow-hidden rounded-md border border-white/18 bg-card/26 text-white shadow-2xl shadow-black/25 backdrop-blur-xl",
         className,
       )}
     >
@@ -55,7 +55,7 @@ export function CommerceProductCard({
         onClick={onDetails}
       >
         <div
-          className="h-[70px] w-[70px] shrink-0 rounded-sm bg-white/20 bg-cover bg-center ring-1 ring-white/25"
+          className="h-[70px] w-[70px] shrink-0 rounded-sm bg-card/20 bg-cover bg-center ring-1 ring-white/25"
           style={{
             backgroundImage: product.imageUrl
               ? `url(${product.imageUrl})`
@@ -74,7 +74,7 @@ export function CommerceProductCard({
             </p>
           )}
           {product.paymentTerms && (
-            <p className="mt-0.5 line-clamp-1 text-[11px] font-medium text-white/75">
+            <p className="mt-0.5 line-clamp-1 text-2xs font-medium text-white/75">
               {product.paymentTerms}
             </p>
           )}
@@ -90,7 +90,7 @@ export function CommerceProductCard({
           {!singleAction && (
             <Button
               variant="outline"
-              className="h-9 border-white/18 bg-white/14 text-xs font-semibold text-white backdrop-blur-md hover:bg-white/22 hover:text-white"
+              className="h-9 border-white/18 bg-card/14 text-xs font-semibold text-white backdrop-blur-md hover:bg-card/22 hover:text-white"
               onClick={onDetails}
               type="button"
             >
@@ -98,7 +98,7 @@ export function CommerceProductCard({
             </Button>
           )}
           <Button
-            className="h-9 bg-white/92 text-xs font-bold text-slate-950 hover:bg-white"
+            className="h-9 bg-card/92 text-xs font-bold text-foreground hover:bg-card"
             onClick={singleAction ? handlePrimaryAction : onBuy}
             type="button"
           >

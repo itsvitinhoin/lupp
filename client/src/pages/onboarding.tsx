@@ -276,8 +276,8 @@ export default function Onboarding() {
               {/* Step 5: Concluído */}
               {step === 4 && (
                 <div className="text-center space-y-6 animate-in fade-in zoom-in-95 duration-500">
-                  <div className="mx-auto w-24 h-24 bg-emerald-500/20 rounded-full flex items-center justify-center mb-8">
-                    <CheckCircle2 className="h-12 w-12 text-emerald-500" />
+                  <div className="mx-auto w-24 h-24 bg-success/20 rounded-full flex items-center justify-center mb-8">
+                    <CheckCircle2 className="h-12 w-12 text-success" />
                   </div>
                   <h2 className="text-3xl font-bold">Tudo pronto!</h2>
                   <p className="text-lg text-muted-foreground max-w-md mx-auto">

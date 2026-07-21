@@ -46,8 +46,9 @@ cd client && npm run build:widget   # esbuild widget-src/*.ts -> public/widget*.
   `resolve-store.ts`).
 - **Billing gate**: `storeHasBillingAccess` (trial `trial_ends_at > now()` or
   live subscription) empties the widget's video list (`trial_expired`).
-  Admin trial extension: master console (`/master`, `MASTER_ADMIN_EMAILS`
-  allowlist) or `POST /api/master-console {action:"extend_trial"}`.
+  Admin trial extension: admin console (`/admin`; access requires
+  `users.role = 'admin'`, roles admin|manager|agent) or
+  `POST /api/admin-console {action:"extend_trial"}`. `/master` redirects.
 - **Auth**: 15-min access JWT in localStorage + 7-day httpOnly refresh cookie.
   The refresh call in `client/src/services/auth.service.ts` deliberately uses
   raw `fetch` — routing it through the shared client re-enters the bearer
@@ -123,6 +124,17 @@ cd client && npm run build:widget   # esbuild widget-src/*.ts -> public/widget*.
 ## Conventions
 
 - Conventional Commits; branch off `main` (PRs usually target `main`).
+- **SPA design tokens** (Tailwind v4, `client/src/index.css` `@theme`): never
+  hardcode palette classes (`bg-white`, `text-slate-*`, `bg-blue-50`) or
+  arbitrary sizes (`text-[11px]`, `max-h-[28rem]`) in app/admin surfaces — use
+  the semantic tokens (`bg-card`, `text-foreground`/`text-muted-foreground`,
+  `border-border`, status `*-surface` scales for success/warning/info/
+  destructive), typography presets (`text-page-title`, `text-section-title`,
+  `text-overline`, `text-2xs`…) and named sizes (`max-h-scroll-panel`,
+  `min-w-table-min`…). All tokens have light **and** dark values (`.dark`
+  via `ThemeProvider`/`ThemeToggle`); raw palette classes are only allowed on
+  deliberately theme-independent visuals (landing/marketing, phone bezels,
+  video overlays).
 - Server responses use loose zod schemas with typed known fields — extra row
   fields must keep passing through (`.loose()`), and response schemas are
   serialized/validated by fastify, so a wrongly-typed field breaks the route.

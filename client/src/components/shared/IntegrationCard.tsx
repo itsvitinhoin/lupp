@@ -2,8 +2,9 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Integration } from '@/data/mock';
+import { BrandIcon, brandIconFor } from './BrandIcons';
 import { StatusBadge } from './StatusBadge';
-import { Globe, ShoppingBag, ShoppingCart } from 'lucide-react';
+import { Globe, ShoppingBag } from 'lucide-react';
 
 interface IntegrationCardProps {
   integration: Integration;
@@ -28,10 +29,12 @@ export function IntegrationCard({
   onInstallWidget,
   onSync,
 }: IntegrationCardProps) {
-  // Mock icons based on name
   const getIcon = () => {
+    if (brandIconFor(integration.name)) {
+      return <BrandIcon brand={integration.name} className="h-6 w-6" />;
+    }
     const name = integration.name.toLowerCase();
-    if (name.includes('shop') || name.includes('commerce') || name.includes('vtex')) return <ShoppingBag className="h-6 w-6" />;
+    if (name.includes('shop') || name.includes('commerce')) return <ShoppingBag className="h-6 w-6" />;
     return <Globe className="h-6 w-6" />;
   };
 
@@ -48,16 +51,16 @@ export function IntegrationCard({
   const badgeIntegration = isConnected ? { ...integration, status: 'ativo' as const } : integration;
 
   return (
-    <Card className={`bg-white transition-all hover:border-primary/30 hover:shadow-md ${isDisabled ? 'opacity-60' : ''}`}>
+    <Card className={`bg-card transition-all hover:border-primary/30 hover:shadow-md ${isDisabled ? 'opacity-60' : ''}`}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-border bg-muted/50 text-primary">
           {getIcon()}
         </div>
         <StatusBadge status={badgeIntegration.status} />
       </CardHeader>
       <CardContent>
         <CardTitle className="mb-2 text-lg">{integration.name}</CardTitle>
-        <p className="mb-4 text-sm text-slate-500">{integration.description}</p>
+        <p className="mb-4 text-sm text-muted-foreground">{integration.description}</p>
         <div className="grid gap-2">
           <Button
             variant={isConnected ? 'outline' : integration.status === 'disponível' ? 'default' : 'outline'}
@@ -70,7 +73,7 @@ export function IntegrationCard({
           {isConnected && (
             <Button
               variant="ghost"
-              className="w-full border border-slate-200"
+              className="w-full border border-border"
               disabled={isSyncing}
               onClick={() => onSync?.(integration)}
             >

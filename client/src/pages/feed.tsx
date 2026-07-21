@@ -217,9 +217,9 @@ export default function FeedConfig() {
     <AppLayout title="Configuração do Feed Vertical">
       <div className="grid gap-8 lg:grid-cols-2">
         <div className="space-y-6">
-          <Card className="border-slate-200 bg-white text-slate-950 shadow-sm">
+          <Card className="border-border bg-card text-foreground shadow-sm">
             <CardHeader>
-              <CardTitle className="text-slate-950">Status</CardTitle>
+              <CardTitle className="text-foreground">Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <ToggleRow
@@ -228,15 +228,15 @@ export default function FeedConfig() {
                 onChange={(value) => setOption("enabled", value)}
               />
               <div className="space-y-2">
-                <Label className="text-slate-700">URL pública do feed</Label>
+                <Label className="text-foreground/80">URL pública do feed</Label>
                 <div className="flex gap-2">
-                  <div className="flex flex-1 items-center rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                  <div className="flex flex-1 items-center rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                     {publicFeedPath}
                   </div>
                   <Button
                     variant="outline"
                     size="icon"
-                    className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    className="border-border bg-card text-foreground/80 hover:bg-muted/50"
                     onClick={copyUrl}
                   >
                     <Copy className="h-4 w-4" />
@@ -246,9 +246,9 @@ export default function FeedConfig() {
             </CardContent>
           </Card>
 
-          <Card className="border-slate-200 bg-white text-slate-950 shadow-sm">
+          <Card className="border-border bg-card text-foreground shadow-sm">
             <CardHeader>
-              <CardTitle className="text-slate-950">Aparência</CardTitle>
+              <CardTitle className="text-foreground">Aparência</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <ToggleRow
@@ -294,9 +294,9 @@ export default function FeedConfig() {
             </CardContent>
           </Card>
 
-          <Card className="border-slate-200 bg-white text-slate-950 shadow-sm">
+          <Card className="border-border bg-card text-foreground shadow-sm">
             <CardHeader>
-              <CardTitle className="text-slate-950">Comportamento</CardTitle>
+              <CardTitle className="text-foreground">Comportamento</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <ToggleRow
@@ -329,7 +329,7 @@ export default function FeedConfig() {
         </div>
 
         <div className="sticky top-24 flex h-[calc(100vh-8rem)] flex-col">
-          <div className="flex flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="flex flex-1 items-center justify-center rounded-xl border border-border bg-card p-8 shadow-sm">
             <PhonePreview className="scale-90 lg:scale-100">
               <FeedPhonePreview
                 options={options}
@@ -350,7 +350,7 @@ export default function FeedConfig() {
             </Button>
             <Button
               variant="outline"
-              className="flex-1 border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              className="flex-1 border-border bg-card text-foreground/80 hover:bg-muted/50"
               asChild
             >
               <a
@@ -380,7 +380,7 @@ function ToggleRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <Label className="text-slate-700">{label}</Label>
+      <Label className="text-foreground/80">{label}</Label>
       <Switch checked={checked} onCheckedChange={onChange} />
     </div>
   );
@@ -445,10 +445,10 @@ function FeedPhonePreview({
         )}
 
         {product && (
-          <div className="overflow-hidden rounded-md border border-white/18 bg-white/26 text-white shadow-2xl shadow-black/25 backdrop-blur-xl">
+          <div className="overflow-hidden rounded-md border border-white/18 bg-card/26 text-white shadow-2xl shadow-black/25 backdrop-blur-xl">
             <div className="flex items-center gap-2 p-2">
               <div
-                className="h-[70px] w-[70px] shrink-0 rounded-sm bg-white/20 bg-cover bg-center ring-1 ring-white/25"
+                className="h-[70px] w-[70px] shrink-0 rounded-sm bg-card/20 bg-cover bg-center ring-1 ring-white/25"
                 style={{
                   backgroundImage: product.image_url
                     ? `url(${product.image_url})`
@@ -472,7 +472,7 @@ function FeedPhonePreview({
               <div className="border-t border-white/10 p-2">
                 <button
                   type="button"
-                  className="h-9 w-full rounded-md bg-white/92 text-xs font-bold text-slate-950"
+                  className="h-9 w-full rounded-md bg-card/92 text-xs font-bold text-foreground"
                 >
                   Adicionar ao carrinho
                 </button>
@@ -494,7 +494,7 @@ function FeedPhonePreview({
 
       {!options.enabled && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/72 px-8 text-center">
-          <div className="rounded-md border border-white/12 bg-white/10 p-5 backdrop-blur">
+          <div className="rounded-md border border-white/12 bg-card/10 p-5 backdrop-blur">
             <ShoppingBag className="mx-auto mb-3 h-7 w-7" />
             <p className="text-sm font-semibold">Feed vertical desativado</p>
           </div>
@@ -523,7 +523,7 @@ function PreviewAction({
       <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/25 [&_svg]:h-6 [&_svg]:w-6">
         {icon}
       </div>
-      <span className="text-[10px] font-bold">{label}</span>
+      <span className="text-3xs font-bold">{label}</span>
     </div>
   );
 }

@@ -9,7 +9,7 @@ interface StepperProps {
 export function Stepper({ steps, currentStep }: StepperProps) {
   return (
     <div className="mb-8 flex items-center justify-between w-full relative">
-      <div className="absolute left-0 top-1/2 -z-10 h-1 w-full -translate-y-1/2 rounded-full bg-slate-200"></div>
+      <div className="absolute left-0 top-1/2 -z-10 h-1 w-full -translate-y-1/2 rounded-full bg-muted"></div>
       <div
         className="absolute left-0 top-1/2 -z-10 h-1 -translate-y-1/2 bg-primary rounded-full transition-all duration-300"
         style={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}
@@ -26,8 +26,8 @@ export function Stepper({ steps, currentStep }: StepperProps) {
                 isCompleted
                   ? "bg-primary border-primary text-primary-foreground"
                   : isCurrent
-                    ? "border-primary bg-white text-primary"
-                    : "border-slate-200 bg-white text-slate-400"
+                    ? "border-primary bg-card text-primary"
+                    : "border-border bg-card text-muted-foreground/70"
               }`}
             >
               {isCompleted ? (
@@ -38,7 +38,7 @@ export function Stepper({ steps, currentStep }: StepperProps) {
             </div>
             <span
               className={`mt-2 text-xs font-medium absolute -bottom-6 whitespace-nowrap ${
-                isCurrent ? "text-slate-950" : "text-slate-500"
+                isCurrent ? "text-foreground" : "text-muted-foreground"
               }`}
             >
               {step}

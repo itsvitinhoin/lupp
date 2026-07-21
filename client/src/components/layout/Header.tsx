@@ -27,7 +27,7 @@ export function Header({ title }: { title: string }) {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-20 items-center justify-between border-b border-slate-200 bg-white/85 px-4 backdrop-blur-md sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-30 flex h-20 items-center justify-between border-b border-border bg-card/85 px-4 backdrop-blur-md sm:px-6 lg:px-8">
       <div className="flex items-center gap-4">
         <Sheet>
           <SheetTrigger asChild>
@@ -35,22 +35,22 @@ export function Header({ title }: { title: string }) {
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-64 border-r-slate-200">
+          <SheetContent side="left" className="p-0 w-64 border-r-border">
             {/* Simple mobile nav re-using sidebar contents somewhat */}
-            <div className="h-full flex flex-col bg-white">
+            <div className="h-full flex flex-col bg-card">
                {/* We'd normally use the Sidebar component here, but need to adapt it for Sheet. For now, simple text */}
                <div className="p-6 font-bold">Menu</div>
             </div>
           </SheetContent>
         </Sheet>
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-950">{title}</h1>
-          <p className="hidden text-sm font-medium text-slate-500 sm:block">Gerencie vídeos, widgets e performance da sua loja.</p>
+          <h1 className="text-xl font-bold tracking-tight text-foreground">{title}</h1>
+          <p className="hidden text-sm font-medium text-muted-foreground sm:block">Gerencie vídeos, widgets e performance da sua loja.</p>
         </div>
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="hidden h-10 min-w-[220px] items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-400 xl:flex">
+        <div className="hidden h-10 min-w-[220px] items-center gap-2 rounded-xl border border-border bg-muted/50 px-3 text-sm font-medium text-muted-foreground/70 xl:flex">
           <Search className="h-4 w-4" />
           Buscar...
         </div>

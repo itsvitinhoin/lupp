@@ -537,7 +537,7 @@ export default function VideosNew() {
           <div className="mb-5 flex items-center justify-between gap-4">
             <Button
               variant="ghost"
-              className="gap-2 text-slate-600"
+              className="gap-2 text-muted-foreground"
               onClick={goBack}
               disabled={isSubmitting}
             >
@@ -635,7 +635,7 @@ function StepHeader({
     : activeIndex;
 
   return (
-    <div className="hidden min-w-[560px] items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 shadow-sm md:flex">
+    <div className="hidden min-w-[560px] items-center justify-center rounded-full border border-border bg-card px-5 py-3 shadow-sm md:flex">
       {visibleSteps.map((item, index) => {
         const done = index < visibleActiveIndex;
         const active = index === visibleActiveIndex;
@@ -647,17 +647,17 @@ function StepHeader({
                   "flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold",
                   done || active
                     ? "bg-primary text-white"
-                    : "bg-slate-100 text-slate-400",
+                    : "bg-muted text-muted-foreground/70",
                 )}
               >
                 {done ? <Check className="h-3.5 w-3.5" /> : index + 1}
               </span>
-              <span className={active ? "text-slate-950" : "text-slate-500"}>
+              <span className={active ? "text-foreground" : "text-muted-foreground"}>
                 {item.label}
               </span>
             </div>
             {index < visibleSteps.length - 1 && (
-              <div className="mx-4 h-px w-10 bg-slate-200" />
+              <div className="mx-4 h-px w-10 bg-muted" />
             )}
           </React.Fragment>
         );
@@ -669,16 +669,16 @@ function StepHeader({
 function ChoiceStep({ onStart }: { onStart: (flow: UploadFlow) => void }) {
   return (
     <div className="flex min-h-[620px] items-center justify-center">
-      <Card className="w-full max-w-3xl border-slate-200 bg-white text-slate-950 shadow-xl shadow-slate-200/70">
+      <Card className="w-full max-w-3xl border-border bg-card text-foreground shadow-xl shadow-black/5">
         <CardContent className="p-8 sm:p-10">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-muted text-muted-foreground/70">
             <UploadCloud className="h-8 w-8" />
           </div>
           <div className="text-center">
             <h2 className="text-xl font-bold">
               Como você deseja adicionar seu vídeo?
             </h2>
-            <p className="mx-auto mt-2 max-w-md text-sm font-medium leading-tight text-slate-500">
+            <p className="mx-auto mt-2 max-w-md text-sm font-medium leading-tight text-muted-foreground">
               Escolha vincular seu vídeo a um produto ou subir um vídeo sem
               vínculo para promoções e campanhas.
             </p>
@@ -716,7 +716,7 @@ function ChoiceCard({
   type: UploadFlow;
 }) {
   return (
-    <div className="grid gap-5 rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-primary/40 hover:shadow-md sm:grid-cols-[128px_1fr_auto] sm:items-center">
+    <div className="grid gap-5 rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40 hover:shadow-md sm:grid-cols-[128px_1fr_auto] sm:items-center">
       <div className="flex h-28 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-blue-50 via-slate-50 to-slate-100">
         {type === "product" ? (
           <PackageSearch className="h-12 w-12 text-primary" />
@@ -725,8 +725,8 @@ function ChoiceCard({
         )}
       </div>
       <div>
-        <h3 className="text-lg font-bold text-slate-950">{title}</h3>
-        <p className="mt-2 max-w-md text-sm font-medium leading-tight text-slate-500">
+        <h3 className="text-lg font-bold text-foreground">{title}</h3>
+        <p className="mt-2 max-w-md text-sm font-medium leading-tight text-muted-foreground">
           {description}
         </p>
       </div>
@@ -766,16 +766,16 @@ function ProductStep({
   };
 
   return (
-    <Card className="mx-auto max-w-3xl border-slate-200 bg-white text-slate-950 shadow-xl shadow-slate-200/70">
+    <Card className="mx-auto max-w-3xl border-border bg-card text-foreground shadow-xl shadow-black/5">
       <CardContent className="p-0">
-        <div className="border-b border-slate-100 p-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+        <div className="border-b border-border p-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted text-muted-foreground/70">
             <PackageSearch className="h-7 w-7" />
           </div>
           <h2 className="text-xl font-bold">
             Escolha os produtos ({products.length})
           </h2>
-          <p className="mx-auto mt-2 max-w-md text-sm font-medium leading-tight text-slate-500">
+          <p className="mx-auto mt-2 max-w-md text-sm font-medium leading-tight text-muted-foreground">
             Selecione um ou mais produtos que aparecem no vídeo. O primeiro
             selecionado será o produto principal.
           </p>
@@ -783,9 +783,9 @@ function ProductStep({
             Seleção múltipla ativada
           </div>
           <div className="relative mx-auto mt-6 max-w-md">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
             <Input
-              className="h-12 rounded-xl border-slate-200 bg-white pl-11 font-semibold text-slate-950"
+              className="h-12 rounded-xl border-border bg-card pl-11 font-semibold text-foreground"
               placeholder="Buscar por produto"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -795,7 +795,7 @@ function ProductStep({
 
         <div className="max-h-[420px] overflow-y-auto p-5">
           {isLoading ? (
-            <p className="py-10 text-center text-sm font-semibold text-slate-500">
+            <p className="py-10 text-center text-sm font-semibold text-muted-foreground">
               Carregando produtos...
             </p>
           ) : products.length ? (
@@ -806,13 +806,13 @@ function ProductStep({
                   type="button"
                   onClick={() => toggleProduct(product.id)}
                   className={cn(
-                    "grid gap-4 rounded-2xl border border-slate-200 bg-white p-3 text-left transition hover:border-primary/40 sm:grid-cols-[64px_1fr_auto] sm:items-center",
+                    "grid gap-4 rounded-2xl border border-border bg-card p-3 text-left transition hover:border-primary/40 sm:grid-cols-[64px_1fr_auto] sm:items-center",
                     selectedProductIds.includes(product.id) &&
                       "border-primary bg-primary/5 ring-1 ring-primary",
                   )}
                 >
                   <span
-                    className="block h-16 w-16 rounded-xl bg-slate-100 bg-cover bg-center"
+                    className="block h-16 w-16 rounded-xl bg-muted bg-cover bg-center"
                     style={{
                       backgroundImage: product.image_url
                         ? `url(${product.image_url})`
@@ -820,14 +820,14 @@ function ProductStep({
                     }}
                   />
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-bold text-slate-950">
+                    <span className="block truncate text-sm font-bold text-foreground">
                       {product.name}
                     </span>
-                    <span className="mt-1 block truncate text-xs font-medium text-slate-500">
+                    <span className="mt-1 block truncate text-xs font-medium text-muted-foreground">
                       {productSubtitle(product)}
                     </span>
                     {selectedProductIds[0] === product.id && (
-                      <span className="mt-2 inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
+                      <span className="mt-2 inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-2xs font-bold text-primary">
                         Produto principal
                       </span>
                     )}
@@ -837,7 +837,7 @@ function ProductStep({
                       "flex h-8 w-8 items-center justify-center rounded-full border text-sm font-bold",
                       selectedProductIds.includes(product.id)
                         ? "border-primary bg-primary text-white"
-                        : "border-slate-200 text-slate-300",
+                        : "border-border text-muted-foreground/50",
                     )}
                   >
                     {selectedProductIds.includes(product.id) ? (
@@ -853,18 +853,18 @@ function ProductStep({
             </div>
           ) : (
             <div className="py-10 text-center">
-              <p className="text-lg font-semibold text-slate-950">
+              <p className="text-lg font-semibold text-foreground">
                 Nenhum produto encontrado
               </p>
-              <p className="mt-1 text-sm font-medium text-slate-500">
+              <p className="mt-1 text-sm font-medium text-muted-foreground">
                 Sincronize os produtos em Integrações ou refaça sua busca.
               </p>
             </div>
           )}
         </div>
 
-        <div className="flex justify-end gap-3 border-t border-slate-100 p-5">
-          <div className="mr-auto flex items-center text-sm font-semibold text-slate-500">
+        <div className="flex justify-end gap-3 border-t border-border p-5">
+          <div className="mr-auto flex items-center text-sm font-semibold text-muted-foreground">
             {selectedProductIds.length} selecionado
             {selectedProductIds.length === 1 ? "" : "s"}
           </div>
@@ -933,7 +933,7 @@ function UploadStepCard({
 
   return (
     <>
-      <Card className="border-dashed border-2 border-slate-200 bg-white text-slate-950">
+      <Card className="border-dashed border-2 border-border bg-card text-foreground">
         <CardContent
           className="flex min-h-[250px] flex-col items-center justify-center p-8"
           onDragOver={(event) => event.preventDefault()}
@@ -961,7 +961,7 @@ function UploadStepCard({
               </div>
               <div>
                 <p className="text-lg font-bold">Arraste seu vídeo aqui</p>
-                <p className="mt-1 text-sm font-medium text-slate-500">
+                <p className="mt-1 text-sm font-medium text-muted-foreground">
                   MP4, MOV ou WebM até {MAX_VIDEO_UPLOAD_MB}MB
                 </p>
               </div>
@@ -981,7 +981,7 @@ function UploadStepCard({
                 </Button>
               </div>
               <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+                <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
                   <span>
                     {isSubmitting && uploadProgress
                       ? uploadPhaseLabels[uploadProgress.phase]
@@ -991,12 +991,12 @@ function UploadStepCard({
                 </div>
                 <Progress value={progress} />
                 {isSubmitting && uploadProgress ? (
-                  <p className="text-center text-xs font-medium text-slate-500">
+                  <p className="text-center text-xs font-medium text-muted-foreground">
                     {formatBytes(uploadProgress.bytesUploaded)} de{" "}
                     {formatBytes(uploadProgress.bytesTotal)}
                   </p>
                 ) : (
-                  <p className="text-center text-xs font-medium text-slate-500">
+                  <p className="text-center text-xs font-medium text-muted-foreground">
                     O progresso aparece assim que você publicar.
                   </p>
                 )}
@@ -1006,12 +1006,12 @@ function UploadStepCard({
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200 bg-white text-slate-950">
+      <Card className="border-border bg-card text-foreground">
         <CardContent className="space-y-5 p-6">
           {flow === "product" && selectedProduct && (
             <div className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-3">
               <div
-                className="h-12 w-12 rounded-xl bg-slate-100 bg-cover bg-center"
+                className="h-12 w-12 rounded-xl bg-muted bg-cover bg-center"
                 style={{
                   backgroundImage: selectedProduct.image_url
                     ? `url(${selectedProduct.image_url})`
@@ -1019,10 +1019,10 @@ function UploadStepCard({
                 }}
               />
               <div className="min-w-0">
-                <p className="truncate text-sm font-bold text-slate-950">
+                <p className="truncate text-sm font-bold text-foreground">
                   {selectedProduct.name}
                 </p>
-                <p className="truncate text-xs font-medium text-slate-500">
+                <p className="truncate text-xs font-medium text-muted-foreground">
                   {selectedProducts.length > 1
                     ? `${selectedProducts.length} produtos vinculados`
                     : productSubtitle(selectedProduct)}
@@ -1069,12 +1069,12 @@ function UploadStepCard({
           </div>
 
           {flow === "product" && selectedProduct && (
-            <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="space-y-3 rounded-2xl border border-border bg-muted/50 p-4">
               <div>
-                <Label className="text-sm font-bold text-slate-950">
+                <Label className="text-sm font-bold text-foreground">
                   Cores
                 </Label>
-                <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">
+                <p className="mt-1 text-xs font-medium leading-relaxed text-muted-foreground">
                   Escolha se este vídeo deve ser priorizado em todas as cores do
                   modelo ou em uma cor específica sincronizada.
                 </p>
@@ -1084,16 +1084,16 @@ function UploadStepCard({
                   type="button"
                   onClick={() => setProductVisibilityScope("product")}
                   className={cn(
-                    "rounded-xl border bg-white p-3 text-left transition",
+                    "rounded-xl border bg-card p-3 text-left transition",
                     productVisibilityScope === "product"
                       ? "border-primary ring-1 ring-primary"
-                      : "border-slate-200 hover:border-primary/40",
+                      : "border-border hover:border-primary/40",
                   )}
                 >
-                  <span className="block text-sm font-bold text-slate-950">
+                  <span className="block text-sm font-bold text-foreground">
                     Produto inteiro
                   </span>
-                  <span className="mt-1 block text-xs font-medium leading-relaxed text-slate-500">
+                  <span className="mt-1 block text-xs font-medium leading-relaxed text-muted-foreground">
                     Usa {productWideUrl(selectedProduct) ?? "a URL do produto"}{" "}
                     para cobrir todas as cores do modelo.
                   </span>
@@ -1102,24 +1102,24 @@ function UploadStepCard({
                   type="button"
                   onClick={() => setProductVisibilityScope("variant")}
                   className={cn(
-                    "rounded-xl border bg-white p-3 text-left transition",
+                    "rounded-xl border bg-card p-3 text-left transition",
                     productVisibilityScope === "variant"
                       ? "border-primary ring-1 ring-primary"
-                      : "border-slate-200 hover:border-primary/40",
+                      : "border-border hover:border-primary/40",
                   )}
                 >
-                  <span className="block text-sm font-bold text-slate-950">
+                  <span className="block text-sm font-bold text-foreground">
                     Somente cor atual
                   </span>
-                  <span className="mt-1 block text-xs font-medium leading-relaxed text-slate-500">
+                  <span className="mt-1 block text-xs font-medium leading-relaxed text-muted-foreground">
                     Usa {selectedProduct.product_url ?? "a URL sincronizada"}{" "}
                     ou uma cor abaixo, sem ampliar para outras cores.
                   </span>
                 </button>
               </div>
               {productVisibilityScope === "variant" && (
-                <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
-                  <Label className="text-xs font-bold uppercase text-slate-500">
+                <div className="space-y-2 rounded-xl border border-border bg-card p-3">
+                  <Label className="text-xs font-bold uppercase text-muted-foreground">
                     Cor vinculada
                   </Label>
                   {colorOptions.length > 1 ? (
@@ -1133,22 +1133,22 @@ function UploadStepCard({
                             "rounded-lg border p-3 text-left transition",
                             selectedColorProduct?.id === product.id
                               ? "border-primary bg-primary/5 ring-1 ring-primary"
-                              : "border-slate-200 hover:border-primary/40",
+                              : "border-border hover:border-primary/40",
                           )}
                         >
-                          <span className="block text-sm font-bold text-slate-950">
+                          <span className="block text-sm font-bold text-foreground">
                             {productColorLabel(product)}
                           </span>
-                          <span className="mt-1 block truncate text-xs font-medium text-slate-500">
+                          <span className="mt-1 block truncate text-xs font-medium text-muted-foreground">
                             {product.product_url}
                           </span>
                         </button>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm font-medium text-slate-500">
+                    <p className="text-sm font-medium text-muted-foreground">
                       Só encontrei a cor atual para este produto sincronizado:{" "}
-                      <span className="font-bold text-slate-700">
+                      <span className="font-bold text-foreground/80">
                         {productColorLabel(selectedProduct)}
                       </span>
                       .
@@ -1219,18 +1219,18 @@ function PublishStepCard({
   ];
 
   return (
-    <Card className="border-slate-200 bg-white text-slate-950">
+    <Card className="border-border bg-card text-foreground">
       <CardContent className="space-y-6 p-6">
         <div>
           <h2 className="text-xl font-bold">Pronto para publicar</h2>
-          <p className="mt-1 text-sm font-medium text-slate-500">
+          <p className="mt-1 text-sm font-medium text-muted-foreground">
             Revise onde este vídeo deve aparecer. Ao publicar com produto, a
             Lupp prioriza esse vídeo na página do produto e mantém o feed da
             marca em seguida.
           </p>
         </div>
 
-        <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div className="grid gap-3 rounded-2xl border border-border bg-muted/50 p-4">
           <ReviewLine
             label="Arquivo"
             value={file?.name ?? "Nenhum vídeo selecionado"}
@@ -1260,11 +1260,11 @@ function PublishStepCard({
           {items.map((toggle) => (
             <div
               key={toggle.key}
-              className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-3"
+              className="flex items-center justify-between gap-4 rounded-xl border border-border p-3"
             >
               <Label
                 htmlFor={toggle.key}
-                className="cursor-pointer text-sm font-semibold text-slate-700"
+                className="cursor-pointer text-sm font-semibold text-foreground/80"
               >
                 {toggle.label}
               </Label>
@@ -1279,12 +1279,12 @@ function PublishStepCard({
 
         {isSubmitting && uploadProgress && (
           <div className="space-y-2 rounded-2xl border border-primary/20 bg-primary/5 p-4">
-            <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
+            <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
               <span>{uploadPhaseLabels[uploadProgress.phase]}</span>
               <span>{Math.round(progress)}%</span>
             </div>
             <Progress value={progress} />
-            <p className="text-center text-xs font-medium text-slate-500">
+            <p className="text-center text-xs font-medium text-muted-foreground">
               {formatBytes(uploadProgress.bytesUploaded)} de{" "}
               {formatBytes(uploadProgress.bytesTotal)}
             </p>
@@ -1327,8 +1327,8 @@ type PublishStepCardProps = {
 function ReviewLine({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-4 text-sm">
-      <span className="font-semibold text-slate-500">{label}</span>
-      <span className="truncate text-right font-bold text-slate-950">
+      <span className="font-semibold text-muted-foreground">{label}</span>
+      <span className="truncate text-right font-bold text-foreground">
         {value}
       </span>
     </div>
@@ -1347,7 +1347,7 @@ function PreviewColumn({
   selectedProducts: LuppProduct[];
 }) {
   return (
-    <div className="flex min-h-[650px] flex-col items-center justify-center rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+    <div className="flex min-h-[650px] flex-col items-center justify-center rounded-3xl border border-border bg-card p-8 shadow-sm">
       <PhonePreview className="scale-90 transform-origin-center lg:scale-100">
         <div className="relative h-full w-full bg-black">
           {previewUrl ? (
@@ -1360,7 +1360,7 @@ function PreviewColumn({
               autoPlay
             />
           ) : (
-            <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-slate-900 text-slate-400">
+            <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-foreground text-muted-foreground/70">
               <VideoIcon className="h-8 w-8" />
               Preview do vídeo
             </div>
@@ -1402,7 +1402,7 @@ function PreviewColumn({
                 stroke="white"
                 strokeWidth={2.3}
               />
-              <span className="text-[11px] font-black leading-none [text-shadow:0_1px_4px_rgba(0,0,0,.8)]">
+              <span className="text-2xs font-black leading-none [text-shadow:0_1px_4px_rgba(0,0,0,.8)]">
                 0
               </span>
             </button>
@@ -1417,7 +1417,7 @@ function PreviewColumn({
                 stroke="white"
                 strokeWidth={2.4}
               />
-              <span className="text-[11px] font-black leading-none [text-shadow:0_1px_4px_rgba(0,0,0,.8)]">
+              <span className="text-2xs font-black leading-none [text-shadow:0_1px_4px_rgba(0,0,0,.8)]">
                 0
               </span>
             </button>
@@ -1432,7 +1432,7 @@ function PreviewColumn({
                 stroke="white"
                 strokeWidth={2.4}
               />
-              <span className="text-[11px] font-black leading-none [text-shadow:0_1px_4px_rgba(0,0,0,.8)]">
+              <span className="text-2xs font-black leading-none [text-shadow:0_1px_4px_rgba(0,0,0,.8)]">
                 Compart.
               </span>
             </button>
@@ -1440,7 +1440,7 @@ function PreviewColumn({
         </div>
       </PhonePreview>
 
-      <div className="mt-5 flex items-center gap-2 text-sm font-semibold text-slate-500">
+      <div className="mt-5 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
         <Link2 className="h-4 w-4" />
         {selectedProduct?.product_url
           ? "A miniatura será liberada para a URL do produto."

@@ -1,5 +1,5 @@
 import React from "react";
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 
 import { AuthRoute, ProtectedRoute } from "./ProtectedRoute";
 import { isShopifyEmbeddedSession } from "@/lib/shopify-embedded";
@@ -16,7 +16,6 @@ const VideosList = React.lazy(() => import("@/pages/videos/index"));
 const VideosNew = React.lazy(() => import("@/pages/videos/new"));
 const FeedConfig = React.lazy(() => import("@/pages/feed"));
 const Widgets = React.lazy(() => import("@/pages/widgets"));
-const Simulator = React.lazy(() => import("@/pages/simulator"));
 const CustomPages = React.lazy(() => import("@/pages/custom-pages"));
 const Products = React.lazy(() => import("@/pages/products"));
 const Comments = React.lazy(() => import("@/pages/comments"));
@@ -25,7 +24,8 @@ const Ordering = React.lazy(() => import("@/pages/ordering"));
 const Integrations = React.lazy(() => import("@/pages/integrations"));
 const Billing = React.lazy(() => import("@/pages/billing"));
 const Settings = React.lazy(() => import("@/pages/settings"));
-const MasterConsole = React.lazy(() => import("@/pages/master-console"));
+const AdminConsole = React.lazy(() => import("@/pages/admin"));
+const AdminStore = React.lazy(() => import("@/pages/admin/store"));
 const PreviewFeed = React.lazy(() => import("@/pages/preview/feed"));
 const PreviewProduct = React.lazy(() => import("@/pages/preview/product"));
 const TestStore = React.lazy(() => import("@/pages/test-store"));
@@ -42,8 +42,8 @@ const SupportPage = React.lazy(() =>
 
 function PageLoader() {
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-[#f6f8fb]">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
+    <div className="flex min-h-dvh items-center justify-center bg-background">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-input border-t-primary" />
     </div>
   );
 }
@@ -109,11 +109,6 @@ export function AppRoutes() {
             <Widgets />
           </ProtectedRoute>
         </Route>
-        <Route path="/app/simulator">
-          <ProtectedRoute>
-            <Simulator />
-          </ProtectedRoute>
-        </Route>
         <Route path="/app/pages">
           <ProtectedRoute>
             <CustomPages />
@@ -154,8 +149,18 @@ export function AppRoutes() {
             <Settings />
           </ProtectedRoute>
         </Route>
+        <Route path="/admin">
+          <AdminConsole />
+        </Route>
+        <Route path="/admin/:storeId">
+          <AdminStore />
+        </Route>
+        {/* Old bookmarks: the console lived at /master before the rename. */}
         <Route path="/master">
-          <MasterConsole />
+          <Redirect to="/admin" replace />
+        </Route>
+        <Route path="/master/:storeId">
+          {(params) => <Redirect to={`/admin/${params.storeId}`} replace />}
         </Route>
 
         <Route path="/preview/feed" component={PreviewFeed} />

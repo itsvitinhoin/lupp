@@ -2,9 +2,9 @@ import { z } from "zod";
 import { FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "@/lib/prisma";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
-import { clean, requireMasterAdmin } from "./master-admin";
+import { clean, requireAdmin } from "./admin-gate";
 
-// Ported from supabase/functions/master-console (GET / action "snapshot").
+// Ported from supabase/functions/admin-console (GET / action "snapshot").
 // The original read `profiles` for owner name/email; profiles are merged into
 // the users table in this server, so owners come from `users`.
 
@@ -53,7 +53,7 @@ function groupByStore<T extends { store_id: string }>(rows: T[]) {
   return map;
 }
 
-function planRevenue(
+export function planRevenue(
   plan: { price_monthly?: unknown } | undefined,
   subscription: {
     discount_amount?: unknown;
@@ -69,7 +69,7 @@ function planRevenue(
   return Math.max(0, price - discount);
 }
 
-export async function getMasterConsoleSnapshot() {
+export async function getAdminConsoleSnapshot() {
   const since = monthStart();
 
   const [
@@ -142,7 +142,7 @@ export async function getMasterConsoleSnapshot() {
         },
       },
     }),
-    prisma.masterConsoleAuditLog.findMany({
+    prisma.adminConsoleAuditLog.findMany({
       orderBy: { created_at: "desc" },
       take: 20,
     }),
@@ -279,7 +279,7 @@ export async function getMasterConsoleSnapshot() {
   };
 }
 
-export const MasterConsoleSnapshotResponseSchema = z.object({
+export const AdminConsoleSnapshotResponseSchema = z.object({
   audit_logs: z.array(z.any()),
   generated_at: z.string(),
   metrics: z
@@ -301,37 +301,37 @@ export const MasterConsoleSnapshotResponseSchema = z.object({
   stores: z.array(z.any()),
 });
 
-export const MasterConsoleSnapshotSchema = {
+export const AdminConsoleSnapshotSchema = {
   schema: {
-    summary: "Master console snapshot",
+    summary: "Admin console snapshot",
     description:
-      "Cross-store operational snapshot for the master console: per-store MRR, trial state, " +
+      "Cross-store operational snapshot for the admin console: per-store MRR, trial state, " +
       "video/product/widget counts, current-month analytics event counts, latest subscription " +
       "and active integrations, plus aggregate metrics (MRR/ARR, trials ending soon) and the " +
-      "20 most recent audit logs. Caller's email must be in the MASTER_ADMIN_EMAILS allowlist " +
-      "(403 master_access_denied otherwise).",
-    tags: ["master-console"],
-    operationId: "getMasterConsoleSnapshot",
+      "20 most recent audit logs. Caller's account must hold the admin role " +
+      "(403 admin_access_denied otherwise).",
+    tags: ["admin-console"],
+    operationId: "getAdminConsoleSnapshot",
     security: [{ bearerAuth: [] }],
     response: {
-      200: MasterConsoleSnapshotResponseSchema,
+      200: AdminConsoleSnapshotResponseSchema,
       ...edgeErrorSchemas,
     },
   },
 };
 
-export async function masterConsoleSnapshotHandler(
+export async function adminConsoleSnapshotHandler(
   request: FastifyRequest,
   reply: FastifyReply,
 ) {
-  const gate = await requireMasterAdmin(request.user.sub);
+  const gate = await requireAdmin(request.user.sub);
   if ("error" in gate) return reply.status(gate.status).send({ error: gate.error });
 
   try {
-    return reply.status(200).send(await getMasterConsoleSnapshot());
+    return reply.status(200).send(await getAdminConsoleSnapshot());
   } catch (error) {
     return reply
       .status(500)
-      .send({ error: error instanceof Error ? error.message : "master_console_failed" });
+      .send({ error: error instanceof Error ? error.message : "admin_console_failed" });
   }
 }

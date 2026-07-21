@@ -23,7 +23,7 @@ function PublicShell({
       <header className="border-b border-slate-200 px-4 py-5 sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <Link href="/">
-            <LuppLogo />
+            <LuppLogo variant="brand" />
           </Link>
           <Button asChild className="bg-blue-600 text-white hover:bg-blue-700">
             <Link href="/login">Entrar</Link>

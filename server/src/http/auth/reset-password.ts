@@ -32,7 +32,9 @@ export async function resetPasswordHandler(request: FastifyRequest, reply: Fasti
   const body = BodySchema.parse(request.body);
   const email = body.email.trim().toLowerCase();
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" } },
+  });
   if (user) {
     const token = await issueAuthToken(user.id, "password_reset");
     await sendPasswordReset({

@@ -49,6 +49,22 @@ describe("POST /api/auth/sessions (e2e)", () => {
     expect(response.body.user.id).toBe(user.id);
   });
 
+  it("accepts a legacy row stored with a mixed-case email", async () => {
+    // Rows predating lowercase-on-write normalization keep their casing until
+    // the lowercase_user_emails migration runs — the lookup must still match.
+    const user = await createUser({
+      email: "Legacy.Cased@Example.com",
+      password: "secret-123",
+    });
+
+    const response = await request(app.server)
+      .post("/api/auth/sessions")
+      .send({ email: "legacy.cased@example.com", password: "secret-123" });
+
+    expect(response.status).toBe(200);
+    expect(response.body.user.id).toBe(user.id);
+  });
+
   it("rejects a wrong password and an unknown email with the same 401", async () => {
     const user = await createUser({ password: "secret-123" });
 

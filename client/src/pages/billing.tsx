@@ -563,16 +563,16 @@ export default function Billing() {
   return (
     <AppLayout title="Planos e Assinatura">
       <div className="mb-8">
-        <h2 className="text-2xl font-bold tracking-tight text-slate-950">
+        <h2 className="text-2xl font-bold tracking-tight text-foreground">
           Assinatura Atual
         </h2>
-        <p className="mt-1 text-sm font-medium text-slate-500">
+        <p className="mt-1 text-sm font-medium text-muted-foreground">
           Gerencie o plano, acompanhe uso real e ajuste sua assinatura.
         </p>
       </div>
 
       <div className="mb-10 grid gap-6 lg:grid-cols-3">
-        <Card className="border-primary/20 bg-white shadow-sm">
+        <Card className="border-primary/20 bg-card shadow-sm">
           <CardHeader>
             <div className="mb-2 inline-flex w-fit items-center rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
               {access.isTrialing && !access.isPaid
@@ -580,15 +580,15 @@ export default function Billing() {
                 : "Plano atual"}
             </div>
             <CardTitle className="text-2xl">{currentPlan.name}</CardTitle>
-            <p className="mt-2 text-3xl font-bold text-slate-950">
+            <p className="mt-2 text-3xl font-bold text-foreground">
               {formatBRL(currentPlan.priceMonthly)}
-              <span className="text-sm font-normal text-slate-500">/mês</span>
+              <span className="text-sm font-normal text-muted-foreground">/mês</span>
             </p>
           </CardHeader>
-          <CardContent className="space-y-4 text-sm text-slate-600">
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
             <div className="flex justify-between gap-4">
               <span>Status</span>
-              <span className="font-semibold capitalize text-slate-950">
+              <span className="font-semibold capitalize text-foreground">
                 {access.isTrialExpired
                   ? "Teste expirado"
                   : access.isTrialing
@@ -599,7 +599,7 @@ export default function Billing() {
             {access.isTrialing && (
               <div className="flex justify-between gap-4">
                 <span>Tempo restante</span>
-                <span className="font-semibold text-slate-950">
+                <span className="font-semibold text-foreground">
                   {access.isTrialExpired
                     ? "Encerrado"
                     : access.daysLeft > 1
@@ -610,7 +610,7 @@ export default function Billing() {
             )}
             <div className="flex justify-between gap-4">
               <span>Ciclo de faturamento</span>
-              <span className="font-semibold text-slate-950">Mensal</span>
+              <span className="font-semibold text-foreground">Mensal</span>
             </div>
             <div className="flex justify-between gap-4">
               <span>
@@ -620,7 +620,7 @@ export default function Billing() {
                     ? "Fim do teste"
                     : "Próxima cobrança"}
               </span>
-              <span className="font-semibold text-slate-950">
+              <span className="font-semibold text-foreground">
                 {formatDate(access.accessEndsAt)}
               </span>
             </div>
@@ -629,7 +629,7 @@ export default function Billing() {
                 type="button"
                 onClick={() => void cancelSubscription()}
                 disabled={isCancelingSubscription}
-                className="mt-2 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-rose-200 bg-white px-4 text-sm font-bold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60"
+                className="mt-2 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-destructive-surface-border bg-card px-4 text-sm font-bold text-destructive transition hover:bg-destructive-surface disabled:opacity-60"
               >
                 <XCircle className="h-4 w-4" />
                 {isCancelingSubscription
@@ -640,7 +640,7 @@ export default function Billing() {
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200 bg-white shadow-sm lg:col-span-2">
+        <Card className="border-border bg-card shadow-sm lg:col-span-2">
           <CardHeader>
             <CardTitle>Uso do Plano</CardTitle>
           </CardHeader>
@@ -651,12 +651,12 @@ export default function Billing() {
               return (
                 <div key={item.label} className="space-y-2">
                   <div className="flex justify-between gap-4 text-sm">
-                    <span className="font-medium text-slate-600">
+                    <span className="font-medium text-muted-foreground">
                       {item.label}
                     </span>
                     <span
                       className={`font-semibold ${
-                        nearLimit ? "text-amber-600" : "text-slate-950"
+                        nearLimit ? "text-warning" : "text-foreground"
                       }`}
                     >
                       {usageLabel(item)}
@@ -664,32 +664,32 @@ export default function Billing() {
                     </span>
                   </div>
                   {item.unlimited ? (
-                    <div className="flex h-2 items-center rounded-full bg-slate-100">
-                      <div className="h-2 w-full rounded-full bg-slate-200" />
+                    <div className="flex h-2 items-center rounded-full bg-muted">
+                      <div className="h-2 w-full rounded-full bg-muted" />
                     </div>
                   ) : (
                     <Progress
                       value={progress}
-                      className="h-2 bg-slate-100"
+                      className="h-2 bg-muted"
                       indicatorClassName={
-                        nearLimit ? "bg-amber-500" : "bg-primary"
+                        nearLimit ? "bg-warning" : "bg-primary"
                       }
                     />
                   )}
                 </div>
               );
             })}
-            <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+            <div className="rounded-xl border border-border bg-muted/50 p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <p className="text-sm font-bold text-slate-950">
+                  <p className="text-sm font-bold text-foreground">
                     Consumo dos limites
                   </p>
-                  <p className="text-xs font-medium text-slate-500">
+                  <p className="text-xs font-medium text-muted-foreground">
                     Percentual usado no plano {currentPlan.name}
                   </p>
                 </div>
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 shadow-sm">
+                <span className="rounded-full bg-card px-3 py-1 text-xs font-bold text-muted-foreground shadow-sm">
                   Ciclo mensal
                 </span>
               </div>
@@ -754,10 +754,10 @@ export default function Billing() {
       </div>
 
       {nearLimitItem && (
-        <Alert className="mb-8 border-amber-200 bg-amber-50 text-amber-900">
+        <Alert className="mb-8 border-warning-surface-border bg-warning-surface text-warning-surface-foreground">
           <AlertTriangle className="h-4 w-4 stroke-amber-600" />
           <AlertTitle>Atenção ao limite</AlertTitle>
-          <AlertDescription className="text-amber-800">
+          <AlertDescription className="text-warning-surface-foreground">
             {nearLimitItem.label} está em{" "}
             {usagePercent(nearLimitItem.value, nearLimitItem.limit)}% do limite
             do plano {currentPlan.name}. Faça upgrade para continuar crescendo
@@ -781,10 +781,10 @@ export default function Billing() {
         )}
 
       {access.isCanceling && (
-        <Alert className="mb-8 border-amber-200 bg-amber-50 text-amber-900">
+        <Alert className="mb-8 border-warning-surface-border bg-warning-surface text-warning-surface-foreground">
           <CalendarClock className="h-4 w-4 stroke-amber-600" />
           <AlertTitle>Assinatura cancelada no fim do ciclo</AlertTitle>
-          <AlertDescription className="text-amber-800">
+          <AlertDescription className="text-warning-surface-foreground">
             A Luup permanece ativa até {formatDate(access.accessEndsAt)}. Depois
             dessa data, os vídeos e widgets deixam de aparecer até uma nova
             assinatura ser ativada.
@@ -793,7 +793,7 @@ export default function Billing() {
       )}
 
       <div className="mb-10 grid gap-6 lg:grid-cols-3">
-        <Card className="bg-white shadow-sm lg:col-span-2">
+        <Card className="bg-card shadow-sm lg:col-span-2">
           <CardHeader>
             <CardTitle>Uso real dos últimos 30 dias</CardTitle>
           </CardHeader>
@@ -857,7 +857,7 @@ export default function Billing() {
               </ResponsiveContainer>
             </div>
             {!hasTrendData && !isLoading && (
-              <p className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+              <p className="mt-3 rounded-lg border border-dashed border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
                 Ainda não há eventos suficientes neste período. Assim que os
                 vídeos forem vistos, o gráfico passa a mostrar os dados reais.
               </p>
@@ -865,45 +865,45 @@ export default function Billing() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm">
+        <Card className="bg-card shadow-sm">
           <CardHeader>
             <CardTitle>Eventos do mês</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="mb-5 grid grid-cols-2 gap-3">
-              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+              <div className="rounded-lg border border-border bg-muted/50 p-3">
                 <BarChart3 className="mb-2 h-4 w-4 text-primary" />
-                <p className="text-xs font-semibold uppercase text-slate-500">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">
                   CTR
                 </p>
-                <p className="text-xl font-bold text-slate-950">
+                <p className="text-xl font-bold text-foreground">
                   {conversionRate.toFixed(1)}%
                 </p>
               </div>
-              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+              <div className="rounded-lg border border-border bg-muted/50 p-3">
                 <MousePointerClick className="mb-2 h-4 w-4 text-primary" />
-                <p className="text-xs font-semibold uppercase text-slate-500">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">
                   Cliques
                 </p>
-                <p className="text-xl font-bold text-slate-950">
+                <p className="text-xl font-bold text-foreground">
                   {formatNumber(summary.productClicks)}
                 </p>
               </div>
-              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-                <ShoppingCart className="mb-2 h-4 w-4 text-emerald-500" />
-                <p className="text-xs font-semibold uppercase text-slate-500">
+              <div className="rounded-lg border border-border bg-muted/50 p-3">
+                <ShoppingCart className="mb-2 h-4 w-4 text-success" />
+                <p className="text-xs font-semibold uppercase text-muted-foreground">
                   Carrinho
                 </p>
-                <p className="text-xl font-bold text-slate-950">
+                <p className="text-xl font-bold text-foreground">
                   {formatNumber(summary.addToCart)}
                 </p>
               </div>
-              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+              <div className="rounded-lg border border-border bg-muted/50 p-3">
                 <Share2 className="mb-2 h-4 w-4 text-sky-500" />
-                <p className="text-xs font-semibold uppercase text-slate-500">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">
                   Shares
                 </p>
-                <p className="text-xl font-bold text-slate-950">
+                <p className="text-xl font-bold text-foreground">
                   {formatNumber(summary.shares)}
                 </p>
               </div>
@@ -953,7 +953,7 @@ export default function Billing() {
       </div>
 
       <section>
-        <h3 className="mb-6 text-xl font-bold text-slate-950">
+        <h3 className="mb-6 text-xl font-bold text-foreground">
           Mudar de Plano
         </h3>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -1003,8 +1003,8 @@ export default function Billing() {
           }
         }}
       >
-        <DialogContent className="max-h-[92dvh] max-w-3xl overflow-hidden border-slate-200 bg-white p-0 text-slate-950">
-          <DialogHeader className="border-b border-slate-100 p-6 pb-4">
+        <DialogContent className="max-h-[92dvh] max-w-3xl overflow-hidden border-border bg-card p-0 text-foreground">
+          <DialogHeader className="border-b border-border p-6 pb-4">
             <div className="flex items-start gap-3">
               <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <CreditCard className="h-5 w-5" />
@@ -1023,14 +1023,14 @@ export default function Billing() {
 
           {checkoutSucceeded ? (
             <div className="grid gap-4 p-8 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-success-surface text-success">
                 <CheckCircle2 className="h-7 w-7" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-slate-950">
+                <h3 className="text-xl font-bold text-foreground">
                   Assinatura criada
                 </h3>
-                <p className="mt-2 text-sm text-slate-500">
+                <p className="mt-2 text-sm text-muted-foreground">
                   Estamos aguardando a confirmação automática do pagamento para
                   ativar o plano na loja.
                 </p>
@@ -1048,14 +1048,14 @@ export default function Billing() {
             </div>
           ) : (
             <div className="grid max-h-[72dvh] gap-4 overflow-y-auto p-6">
-              <div className="rounded-md border border-primary/15 bg-primary/5 p-4 text-sm text-slate-600">
+              <div className="rounded-md border border-primary/15 bg-primary/5 p-4 text-sm text-muted-foreground">
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <strong className="text-slate-950">
+                    <strong className="text-foreground">
                       {checkoutPlan ? PLAN_LIMITS[checkoutPlan.id].name : ""}
                     </strong>{" "}
                     por{" "}
-                    <strong className="text-slate-950">
+                    <strong className="text-foreground">
                       {checkoutPlan
                         ? formatBRL(
                             checkoutDiscount?.finalPrice ??
@@ -1066,13 +1066,13 @@ export default function Billing() {
                     </strong>
                   </div>
                   {checkoutDiscount && (
-                    <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                    <span className="rounded-full bg-success-surface px-2.5 py-1 text-xs font-bold text-success-surface-foreground">
                       Cupom {checkoutDiscount.code} aplicado
                     </span>
                   )}
                 </div>
               </div>
-              <div className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-4">
+              <div className="grid gap-2 rounded-md border border-border bg-muted/50 p-4">
                 <Label htmlFor="luup-coupon">Cupom de desconto</Label>
                 <div className="flex gap-2">
                   <Input
@@ -1087,7 +1087,7 @@ export default function Billing() {
                     type="button"
                     onClick={() => void applyCoupon()}
                     disabled={isCheckingCoupon || !couponCode.trim()}
-                    className="h-10 rounded-md border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 disabled:opacity-50"
+                    className="h-10 rounded-md border border-border bg-card px-4 text-sm font-bold text-foreground/90 disabled:opacity-50"
                   >
                     {isCheckingCoupon ? "..." : "Aplicar"}
                   </button>
@@ -1215,8 +1215,8 @@ export default function Billing() {
                   />
                 </div>
               </div>
-              <div className="rounded-md border border-slate-200 bg-white p-4">
-                <div className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-950">
+              <div className="rounded-md border border-border bg-card p-4">
+                <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
                   <LockKeyhole className="h-4 w-4 text-primary" />
                   Pagamento
                 </div>

@@ -38,10 +38,10 @@ function WorkspaceHeader({
   return (
     <div className="mb-7">
       <div>
-        <h2 className="text-2xl font-bold leading-tight tracking-tight text-slate-950">
+        <h2 className="text-2xl font-bold leading-tight tracking-tight text-foreground">
           {title}
         </h2>
-        <p className="mt-1 text-sm font-medium text-slate-500">{subtitle}</p>
+        <p className="mt-1 text-sm font-medium text-muted-foreground">{subtitle}</p>
       </div>
     </div>
   );
@@ -75,18 +75,18 @@ export function Overview({
             type="button"
             onClick={() => onOpenCard(card)}
             className={cn(
-              "group flex min-h-[360px] flex-col rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-lg",
+              "group flex min-h-[360px] flex-col rounded-2xl border border-border bg-card p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-lg",
               card.soon && "cursor-default opacity-85 hover:translate-y-0",
             )}
           >
             <WidgetPreviewStrip tone={card.tone} />
             <div className="mt-7 flex flex-1 flex-col">
               <div className="flex items-center gap-3">
-                <h3 className="text-xl font-bold tracking-tight text-slate-950">
+                <h3 className="text-xl font-bold tracking-tight text-foreground">
                   {card.title}
                 </h3>
                 {card.soon && (
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">
+                  <span className="rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground">
                     Em breve
                   </span>
                 )}
@@ -96,16 +96,16 @@ export function Overview({
                   </span>
                 )}
                 {card.id === "horizontal-feed" && !canUseHorizontalFeed && (
-                  <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
+                  <span className="rounded-full bg-warning-surface px-3 py-1 text-xs font-bold text-warning-surface-foreground">
                     Growth+
                   </span>
                 )}
               </div>
-              <p className="mt-2 max-w-[520px] text-sm font-medium leading-6 text-slate-500">
+              <p className="mt-2 max-w-[520px] text-sm font-medium leading-6 text-muted-foreground">
                 {card.description}
               </p>
               {card.id === "horizontal-feed" && !canUseHorizontalFeed ? (
-                <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold leading-5 text-amber-800">
+                <p className="mt-3 rounded-xl border border-warning-surface-border bg-warning-surface px-4 py-3 text-sm font-semibold leading-5 text-warning-surface-foreground">
                   Seu plano {currentPlanName} permite 1 widget ativo. Para usar
                   a bolinha e o Feed Horizontal juntos, altere para Growth.
                 </p>
@@ -114,7 +114,7 @@ export function Overview({
                 className={cn(
                   "mt-auto inline-flex h-11 w-fit items-center rounded-xl px-5 text-sm font-bold transition",
                   card.soon
-                    ? "bg-slate-100 text-slate-500"
+                    ? "bg-muted text-muted-foreground"
                     : "bg-primary text-white group-hover:bg-primary/90",
                 )}
               >
@@ -168,7 +168,7 @@ function WidgetPreviewStrip({ tone }: { tone: WidgetOverviewCard["tone"] }) {
           {[Video, MessageCircle, MessageCircle, Zap, ExternalLink].map(
             (Icon, index) => (
               <div key={index} className="text-center">
-                <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-white/35 backdrop-blur">
+                <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-card/35 backdrop-blur">
                   <Icon className="h-7 w-7 fill-white/60" />
                 </div>
                 <span className="text-sm font-bold">
@@ -184,8 +184,8 @@ function WidgetPreviewStrip({ tone }: { tone: WidgetOverviewCard["tone"] }) {
 
   if (tone === "feed") {
     return (
-      <div className="relative h-40 overflow-hidden rounded-2xl bg-white">
-        <div className="absolute left-0 right-0 top-3 text-center text-[10px] font-bold tracking-wide text-slate-800">
+      <div className="relative h-40 overflow-hidden rounded-2xl bg-card">
+        <div className="absolute left-0 right-0 top-3 text-center text-3xs font-bold tracking-wide text-foreground/90">
           DESCUBRA CADA DETALHE EM VÍDEO
         </div>
         <div className="absolute inset-x-[-22px] bottom-3 flex items-end justify-center gap-4">
@@ -201,9 +201,9 @@ function WidgetPreviewStrip({ tone }: { tone: WidgetOverviewCard["tone"] }) {
                   background: `linear-gradient(180deg, ${color}, #5f5148)`,
                 }}
               >
-                <div className="absolute bottom-2 left-2 right-2 flex items-center gap-1 rounded-md bg-white/80 p-1">
-                  <span className="h-5 w-5 rounded bg-slate-200" />
-                  <span className="h-2 flex-1 rounded bg-slate-500/40" />
+                <div className="absolute bottom-2 left-2 right-2 flex items-center gap-1 rounded-md bg-card/80 p-1">
+                  <span className="h-5 w-5 rounded bg-muted" />
+                  <span className="h-2 flex-1 rounded bg-muted-foreground/40" />
                 </div>
               </div>
             ),
@@ -216,7 +216,7 @@ function WidgetPreviewStrip({ tone }: { tone: WidgetOverviewCard["tone"] }) {
   return (
     <div className="relative h-40 overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#c7b6a0,#5f5148)]">
       <div className="absolute inset-0 bg-black/30" />
-      <div className="absolute left-1/2 top-5 flex h-24 w-24 -translate-x-1/2 items-center justify-center rounded-full bg-white text-xs font-bold text-slate-300">
+      <div className="absolute left-1/2 top-5 flex h-24 w-24 -translate-x-1/2 items-center justify-center rounded-full bg-card text-xs font-bold text-muted-foreground/50">
         LOGO
       </div>
       <div className="absolute bottom-7 left-0 right-0 text-center text-xl font-bold text-white">

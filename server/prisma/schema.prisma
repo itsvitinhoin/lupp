@@ -137,7 +137,7 @@ model User {
 
   stores      Store[]
   memberships StoreMember[]
-  audit_logs  MasterConsoleAuditLog[]
+  audit_logs  AdminConsoleAuditLog[]
   auth_tokens AuthToken[]
 
   @@map("users")
@@ -244,7 +244,7 @@ model Store {
   integrations     Integration[]
   subscriptions    Subscription[]
   feed_settings    FeedSetting?
-  audit_logs       MasterConsoleAuditLog[]
+  audit_logs       AdminConsoleAuditLog[]
   store_domains    StoreDomain[]
 
   @@map("stores")
@@ -642,7 +642,7 @@ model FeedSetting {
 // Master console audit trail (service-role only in Supabase)
 // ---------------------------------------------------------------------------
 
-model MasterConsoleAuditLog {
+model AdminConsoleAuditLog {
   id              String   @id @default(uuid(7))
   admin_user_id   String?
   admin_email     String?
@@ -657,5 +657,5 @@ model MasterConsoleAuditLog {
 
   @@index([created_at(sort: Desc)])
   @@index([target_store_id])
-  @@map("master_console_audit_logs")
+  @@map("admin_console_audit_logs")
 }

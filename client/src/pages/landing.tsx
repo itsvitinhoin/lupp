@@ -29,10 +29,10 @@ import { VideoPlayerMock } from "@/components/shared/VideoPlayerMock";
 import { PLAN_LIMITS } from "@/lib/constants";
 
 const feedSectionClass =
-  "h-[100svh] snap-start snap-always overflow-hidden px-4 pb-6 pt-20 sm:px-6 lg:px-8";
+  "h-svh snap-start snap-always overflow-hidden px-4 pb-6 pt-20 sm:px-6 lg:px-8";
 
 const immersiveSectionClass =
-  "h-[100svh] snap-start snap-always overflow-hidden px-4 pb-6 pt-20 sm:px-6 lg:px-8";
+  "h-svh snap-start snap-always overflow-hidden px-4 pb-6 pt-20 sm:px-6 lg:px-8";
 
 const sectionInnerClass =
   "mx-auto flex h-full max-w-7xl flex-col justify-center py-4";
@@ -281,7 +281,7 @@ function HeroCommerceScene() {
                   <p className="truncate text-xs font-bold text-slate-800">
                     {product}
                   </p>
-                  <p className="mt-1 text-[11px] font-semibold text-blue-600">
+                  <p className="mt-1 text-2xs font-semibold text-blue-600">
                     vídeo vinculado
                   </p>
                 </div>
@@ -309,7 +309,7 @@ function HeroCommerceScene() {
         <PhonePreview className="max-w-[250px] border-[7px] shadow-2xl shadow-blue-100">
           <div className="relative h-full bg-black">
             <VideoPlayerMock gradient="from-blue-800 via-slate-900 to-black" />
-            <div className="absolute left-3 top-10 rounded-full bg-white/90 px-3 py-1 text-[11px] font-black text-slate-950">
+            <div className="absolute left-3 top-10 rounded-full bg-white/90 px-3 py-1 text-2xs font-black text-slate-950">
               Luup Feed
             </div>
             <div className="absolute right-3 top-24 flex flex-col gap-3 text-white">
@@ -346,7 +346,7 @@ export default function Landing() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href="/">
             <a aria-label="Luup Home">
-              <LuppLogo />
+              <LuppLogo variant="brand" />
             </a>
           </Link>
           <div className="hidden items-center gap-8 md:flex">
@@ -393,7 +393,7 @@ export default function Landing() {
         className="h-screen snap-y snap-mandatory overflow-y-scroll overflow-x-hidden overscroll-contain scroll-smooth touch-pan-y"
         onScroll={() => setShowSwipeHint(false)}
       >
-        <section className="relative isolate h-[100svh] snap-start snap-always overflow-hidden px-4 pb-6 pt-20 sm:px-6 lg:px-8">
+        <section className="relative isolate h-svh snap-start snap-always overflow-hidden px-4 pb-6 pt-20 sm:px-6 lg:px-8">
           <HeroCommerceScene />
           <div className="mx-auto flex h-full max-w-7xl items-center py-4">
             <div className="w-full max-w-[calc(100vw-2rem)] sm:max-w-2xl">
@@ -456,7 +456,7 @@ export default function Landing() {
                 <PhonePreview className="max-w-[245px] border-[7px] shadow-2xl shadow-blue-100">
                   <div className="relative h-full bg-black">
                     <VideoPlayerMock gradient="from-blue-800 via-slate-900 to-black" />
-                    <div className="absolute left-3 top-10 rounded-full bg-white/90 px-3 py-1 text-[11px] font-black text-slate-950">
+                    <div className="absolute left-3 top-10 rounded-full bg-white/90 px-3 py-1 text-2xs font-black text-slate-950">
                       Luup Feed
                     </div>
                     <div className="absolute right-3 top-24 flex flex-col gap-3 text-white">
@@ -639,15 +639,15 @@ export default function Landing() {
                   <div className="absolute right-4 top-24 flex flex-col items-center gap-5 text-white">
                     <button className="flex flex-col items-center gap-1">
                       <Star className="h-6 w-6 fill-white" />
-                      <span className="text-[11px] font-bold">1.2k</span>
+                      <span className="text-2xs font-bold">1.2k</span>
                     </button>
                     <button className="flex flex-col items-center gap-1">
                       <MessageCircle className="h-6 w-6" />
-                      <span className="text-[11px] font-bold">84</span>
+                      <span className="text-2xs font-bold">84</span>
                     </button>
                     <button className="flex flex-col items-center gap-1">
                       <Send className="h-6 w-6" />
-                      <span className="text-[11px] font-bold">Share</span>
+                      <span className="text-2xs font-bold">Share</span>
                     </button>
                   </div>
                   <div className="absolute bottom-5 left-3 right-3">
@@ -853,7 +853,7 @@ export default function Landing() {
           </div>
         </section>
 
-        <section className="h-[100svh] snap-start snap-always overflow-hidden px-4 pb-6 pt-20 sm:px-6 lg:px-8">
+        <section className="h-svh snap-start snap-always overflow-hidden px-4 pb-6 pt-20 sm:px-6 lg:px-8">
           <div className="mx-auto flex h-full max-w-7xl flex-col justify-between py-4">
             <div className="overflow-hidden rounded-[2rem] bg-blue-600 px-6 py-14 text-white shadow-2xl shadow-blue-600/20 sm:px-10 lg:px-14">
               <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
@@ -885,7 +885,7 @@ export default function Landing() {
             </div>
             <footer className="mt-8 border-t border-slate-200 pt-6">
               <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                <LuppLogo />
+                <LuppLogo variant="brand" />
                 <p className="text-sm font-medium text-slate-500">
                   © 2026 Luup. Video Commerce para e-commerces que vendem com
                   conteúdo.

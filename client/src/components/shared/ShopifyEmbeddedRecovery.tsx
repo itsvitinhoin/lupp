@@ -41,26 +41,26 @@ export function ShopifyEmbeddedRecovery({ connecting = false, error }: ShopifyEm
   }`;
 
   return (
-    <div className="min-h-screen bg-[#f4f6f8] text-slate-950 flex items-center justify-center p-6">
-      <Card className="w-full max-w-xl border-slate-200 bg-white shadow-sm">
+    <div className="min-h-screen bg-[#f4f6f8] text-foreground flex items-center justify-center p-6">
+      <Card className="w-full max-w-xl border-border bg-card shadow-sm">
         <CardHeader className="space-y-5">
           <div className="flex items-center justify-between gap-4">
             <LuppLogo />
-            <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+            <span className="inline-flex items-center gap-2 rounded-full border border-info-surface-border bg-info-surface px-3 py-1 text-xs font-semibold text-info-surface-foreground">
               <ShieldCheck className="h-3.5 w-3.5" />
               Shopify
             </span>
           </div>
           <div className="space-y-2">
             <CardTitle className="text-2xl">Conectar Luup na Shopify</CardTitle>
-            <p className="text-sm leading-6 text-slate-600">
-              Loja: <span className="font-medium text-slate-900">{shop}</span>. {supportMessage(details?.code, connecting)}
+            <p className="text-sm leading-6 text-muted-foreground">
+              Loja: <span className="font-medium text-foreground">{shop}</span>. {supportMessage(details?.code, connecting)}
             </p>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {connecting ? (
-            <div className="flex gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+            <div className="flex gap-3 rounded-xl border border-info-surface-border bg-info-surface p-4 text-sm text-info-surface-foreground">
               <ShieldCheck className="mt-0.5 h-4 w-4 flex-none" />
               <div>
                 <p className="font-semibold">Conexao em andamento</p>
@@ -68,7 +68,7 @@ export function ShopifyEmbeddedRecovery({ connecting = false, error }: ShopifyEm
               </div>
             </div>
           ) : details?.message ? (
-            <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <div className="flex gap-3 rounded-xl border border-warning-surface-border bg-warning-surface p-4 text-sm text-warning-surface-foreground">
               <AlertCircle className="mt-0.5 h-4 w-4 flex-none" />
               <div>
                 <p className="font-semibold">Status da conexao</p>
@@ -79,11 +79,11 @@ export function ShopifyEmbeddedRecovery({ connecting = false, error }: ShopifyEm
 
           <div className="grid gap-3 sm:grid-cols-2">
             {hasAuthorizeUrl ? (
-              <Button className="h-12 bg-blue-600 text-white hover:bg-blue-700" onClick={() => openShopifyUrl(details!.authorizeUrl!)}>
+              <Button className="h-12 bg-primary text-white hover:bg-primary/90" onClick={() => openShopifyUrl(details!.authorizeUrl!)}>
                 Autorizar Shopify
               </Button>
             ) : (
-              <Button className="h-12 bg-blue-600 text-white hover:bg-blue-700" onClick={() => window.location.reload()}>
+              <Button className="h-12 bg-primary text-white hover:bg-primary/90" onClick={() => window.location.reload()}>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Tentar novamente
               </Button>
@@ -109,8 +109,8 @@ export function ShopifyEmbeddedRecovery({ connecting = false, error }: ShopifyEm
             Abrir Luup fora da Shopify
           </Button>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            <p className="font-medium text-slate-900">O que fazer agora?</p>
+          <div className="rounded-xl border border-border bg-muted/50 p-4 text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">O que fazer agora?</p>
             <p className="mt-1">
               Se o embedded da Shopify nao liberar a sessao, use a Luup fora
               da Shopify. A integracao e os videos continuam funcionando na

@@ -60,8 +60,6 @@ const envSchema = z
     SHOPIFY_API_VERSION: z.string().default("2026-04"),
     // UPZERO
     UPZERO_API_BASE_URL: z.url().default("https://api.upzero.com.br"),
-    // MASTER CONSOLE (comma-separated admin email allowlist)
-    MASTER_ADMIN_EMAILS: z.string().default("playluup@gmail.com"),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== "production") return;

@@ -14,7 +14,7 @@ import { NuvemshopRoutes } from "./http/nuvemshop/routes";
 import { ShopifyRoutes } from "./http/shopify/routes";
 import { UpzeroRoutes } from "./http/upzero/routes";
 import { WidgetRoutes } from "./http/widget/routes";
-import { MasterConsoleRoutes } from "./http/master-console/routes";
+import { AdminConsoleRoutes } from "./http/admin-console/routes";
 
 export function registerRoutes(app: FastifyTypedInstance) {
   app.register(AuthRoutes);
@@ -32,5 +32,5 @@ export function registerRoutes(app: FastifyTypedInstance) {
   app.register(ShopifyRoutes);
   app.register(UpzeroRoutes);
   app.register(WidgetRoutes);
-  app.register(MasterConsoleRoutes);
+  app.register(AdminConsoleRoutes);
 }
