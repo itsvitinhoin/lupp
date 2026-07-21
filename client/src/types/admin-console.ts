@@ -306,3 +306,124 @@ export interface AdminStoreDetail {
   webhook_events: AdminWebhookEvent[];
   widgets: AdminWidget[];
 }
+
+// ---------------------------------------------------------------------------
+// Live Asaas account reads (admin console, /api/billing/asaas/*)
+// ---------------------------------------------------------------------------
+
+export interface AsaasListPage<TItem> {
+  data: TItem[];
+  hasMore?: boolean;
+  limit?: number;
+  offset?: number;
+  totalCount?: number;
+}
+
+export interface AsaasPayment {
+  billingType?: string;
+  customer?: string;
+  dateCreated?: string;
+  description?: string | null;
+  dueDate?: string;
+  id: string;
+  invoiceUrl?: string | null;
+  netValue?: number;
+  paymentDate?: string | null;
+  status?: string;
+  subscription?: string | null;
+  value?: number;
+}
+
+export interface AsaasCustomer {
+  cpfCnpj?: string | null;
+  dateCreated?: string;
+  email?: string | null;
+  externalReference?: string | null;
+  id: string;
+  mobilePhone?: string | null;
+  name?: string;
+}
+
+export interface AsaasAccountSubscription {
+  billingType?: string;
+  customer?: string;
+  cycle?: string;
+  dateCreated?: string;
+  description?: string | null;
+  externalReference?: string | null;
+  id: string;
+  nextDueDate?: string;
+  status?: string;
+  value?: number;
+}
+
+export interface AsaasWebhookConfig {
+  enabled?: boolean;
+  events?: string[];
+  id?: string;
+  name?: string;
+  sendType?: string;
+  url?: string;
+}
+
+export interface AsaasAccountOverview {
+  balance: number | null;
+  environment: string;
+  webhooks: AsaasWebhookConfig[] | null;
+}
+
+export interface AsaasInvoice {
+  customer?: string | null;
+  effectiveDate?: string | null;
+  externalReference?: string | null;
+  id: string;
+  municipalServiceName?: string | null;
+  number?: string | null;
+  payment?: string | null;
+  pdfUrl?: string | null;
+  rpsNumber?: string | null;
+  serviceDescription?: string | null;
+  status?: string;
+  value?: number;
+  xmlUrl?: string | null;
+}
+
+export interface AsaasStatistic {
+  netValue: number | null;
+  quantity: number | null;
+  value: number | null;
+}
+
+export interface AsaasSummary {
+  days: number;
+  overdue: AsaasStatistic | null;
+  pending: AsaasStatistic | null;
+  received: AsaasStatistic | null;
+}
+
+export interface AsaasDailyPoint {
+  count: number;
+  date: string;
+  paid_value: number;
+  value: number;
+}
+
+export interface AsaasDailySeries {
+  days: number;
+  series: AsaasDailyPoint[];
+}
+
+export interface AsaasPaymentFilters {
+  billingType?: string;
+  dateCreatedGe?: string;
+  dueDateGe?: string;
+  dueDateLe?: string;
+  offset?: number;
+  status?: string;
+}
+
+export interface AsaasInvoiceFilters {
+  effectiveDateGe?: string;
+  offset?: number;
+  status?: string;
+}

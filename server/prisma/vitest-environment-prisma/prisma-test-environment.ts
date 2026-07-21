@@ -42,6 +42,10 @@ export default <Environment>{
     process.env.DOTENV_CONFIG_QUIET = "true"
     // Silence Fastify's request logging during tests (consumed by app.ts).
     process.env.LOG_LEVEL = 'silent'
+    // Billing specs stub fetch and assert sandbox hosts; pin the environment
+    // so a developer .env pointed at production Asaas can't leak into tests
+    // (nor could a missed stub ever reach a production host).
+    process.env.ASAAS_ENVIRONMENT = 'sandbox'
 
     // `prisma db push --force-reset` is blocked by Prisma's AI-safety guard
     // unless PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION is set. The reset only

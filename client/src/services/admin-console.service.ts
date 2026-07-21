@@ -3,6 +3,16 @@ import type {
   AdminConsoleAction,
   AdminConsoleSnapshot,
   AdminCursorPage,
+  AsaasAccountOverview,
+  AsaasAccountSubscription,
+  AsaasCustomer,
+  AsaasDailySeries,
+  AsaasInvoice,
+  AsaasInvoiceFilters,
+  AsaasListPage,
+  AsaasPayment,
+  AsaasPaymentFilters,
+  AsaasSummary,
   AdminStoreComment,
   AdminStoreDetail,
   AdminStoreEventsPage,
@@ -12,6 +22,21 @@ import type {
 } from "@/types/admin-console";
 
 type CursorListOptions = { cursor?: string | null; search?: string };
+
+async function fetchAsaasList<TItem>(
+  resource: "payments" | "customers" | "subscriptions" | "invoices",
+  options: Record<string, string | number | undefined>,
+) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(options)) {
+    if (value !== undefined && value !== "") params.set(key, String(value));
+  }
+  const data = await apiGet<AsaasListPage<TItem>>(
+    `/api/billing/asaas/${resource}?${params}`,
+  );
+  if (!data) throw new Error("Asaas não retornou dados.");
+  return data;
+}
 
 async function fetchStoreList<TItem>(
   storeId: string,
@@ -93,6 +118,46 @@ export const adminConsoleService = {
 
   async getStoreComments(storeId: string, options: CursorListOptions = {}) {
     return fetchStoreList<AdminStoreComment>(storeId, "comments", options);
+  },
+
+  async getAsaasAccount() {
+    const data = await apiGet<AsaasAccountOverview>("/api/billing/asaas/account");
+    if (!data) throw new Error("Asaas não retornou dados.");
+    return data;
+  },
+
+  async getAsaasPayments(options: AsaasPaymentFilters = {}) {
+    return fetchAsaasList<AsaasPayment>("payments", { ...options });
+  },
+
+  async getAsaasCustomers(options: { name?: string; offset?: number } = {}) {
+    return fetchAsaasList<AsaasCustomer>("customers", options);
+  },
+
+  async getAsaasSubscriptions(
+    options: { billingType?: string; offset?: number; status?: string } = {},
+  ) {
+    return fetchAsaasList<AsaasAccountSubscription>("subscriptions", { ...options });
+  },
+
+  async getAsaasInvoices(options: AsaasInvoiceFilters = {}) {
+    return fetchAsaasList<AsaasInvoice>("invoices", { ...options });
+  },
+
+  async getAsaasSummary(days = 30) {
+    const data = await apiGet<AsaasSummary>(
+      `/api/billing/asaas/summary?days=${days}`,
+    );
+    if (!data) throw new Error("Asaas não retornou dados.");
+    return data;
+  },
+
+  async getAsaasDailyPayments(days = 30) {
+    const data = await apiGet<AsaasDailySeries>(
+      `/api/billing/asaas/payments/daily?days=${days}`,
+    );
+    if (!data) throw new Error("Asaas não retornou dados.");
+    return data;
   },
 
   async runAction(action: AdminConsoleAction, payload: AdminConsoleActionPayload) {

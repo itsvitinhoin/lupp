@@ -1,4 +1,5 @@
 import React from "react";
+import { Link, useLocation } from "wouter";
 import { LuppLogo } from "@/components/shared/LuppLogo";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,36 @@ export function statusTone(status?: string | null) {
   return "bg-muted/50 text-muted-foreground border-border";
 }
 
+const ADMIN_NAV_ITEMS = [
+  { href: "/admin", label: "Home" },
+  { href: "/admin/asaas", label: "Asaas" },
+] as const;
+
+function AdminNav() {
+  const [location] = useLocation();
+
+  return (
+    <nav className="flex items-center gap-1 rounded-xl border border-border bg-muted/50 p-1">
+      {ADMIN_NAV_ITEMS.map((item) => {
+        const isActive = location === item.href;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`rounded-lg px-3 py-1.5 text-sm font-bold transition-colors ${
+              isActive
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {item.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
 export function AdminShell({
   adminEmail,
   children,
@@ -38,11 +69,11 @@ export function AdminShell({
   return (
     <div className="min-h-dvh bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur">
-        <div className="mx-auto flex h-20 max-w-full items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex h-20 max-w-full items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-3">
             <LuppLogo className="h-9 w-auto" />
             <div className="hidden h-8 w-px bg-muted sm:block" />
-            <div className="hidden sm:block">
+            <div className="hidden lg:block">
               <p className="text-sm font-black text-foreground">
                 Admin Console
               </p>
@@ -50,6 +81,7 @@ export function AdminShell({
                 Operação interna
               </p>
             </div>
+            <AdminNav />
           </div>
           <div className="flex items-center gap-3">
             {adminEmail && onSignOut ? (

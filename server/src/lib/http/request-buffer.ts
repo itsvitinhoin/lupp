@@ -30,9 +30,10 @@ export function pushCapped<T>(arr: T[], v: T) {
   if (arr.length > MAX_BUFFERED) arr.shift();
 }
 
-const SECRET_HEADERS = new Set(["authorization", "authentication"]);
+// access_token is Asaas' API-key header; the others are standard bearer spots.
+const SECRET_HEADERS = new Set(["authorization", "authentication", "access_token"]);
 
-/** Buffered copies must never retain bearer tokens. */
+/** Buffered copies must never retain bearer tokens or API keys. */
 export function redactHeaderSecrets(
   headers: Record<string, string>,
 ): Record<string, string> {
