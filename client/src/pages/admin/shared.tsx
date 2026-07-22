@@ -27,6 +27,7 @@ export function statusTone(status?: string | null) {
 
 const ADMIN_NAV_ITEMS = [
   { href: "/admin", label: "Home" },
+  { href: "/admin/users", label: "Usuários" },
   { href: "/admin/asaas", label: "Asaas" },
 ] as const;
 

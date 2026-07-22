@@ -13,6 +13,13 @@ import {
   getAdminConsoleSnapshot,
   AdminConsoleSnapshotResponseSchema,
 } from "./snapshot";
+import {
+  runAddUserToStore,
+  runRemoveUserFromStore,
+  runResetUserPassword,
+  runSetUserEmailConfirmed,
+  runSetUserRole,
+} from "./user-actions";
 
 // Ported from supabase/functions/admin-console (POST). action defaults to
 // "snapshot"; the body stays loose because the whole payload is persisted
@@ -25,9 +32,14 @@ const BodySchema = z
       .describe(
         "snapshot (default) | pause_store | activate_store | extend_trial | set_plan | " +
           "update_store | update_widget | update_feed | add_member | set_member_role | " +
-          "remove_member | confirm_user_email | send_password_reset.",
+          "remove_member | confirm_user_email | send_password_reset | set_user_role | " +
+          "set_user_email_confirmed | reset_user_password | add_user_to_store | " +
+          "remove_user_from_store.",
       ),
-    store_id: z.string().optional().describe("Target store (required for every action)."),
+    store_id: z
+      .string()
+      .optional()
+      .describe("Target store (required for every store-scoped action)."),
     plan_id: z.string().optional().describe("set_plan: target plan id."),
     widget_id: z.string().optional().describe("update_widget: target widget id."),
     member_id: z
@@ -37,9 +49,30 @@ const BodySchema = z
     user_id: z
       .string()
       .optional()
-      .describe("confirm_user_email / send_password_reset: target user id (must belong to the store)."),
+      .describe(
+        "confirm_user_email / send_password_reset (must belong to store_id) / " +
+          "set_user_role / set_user_email_confirmed / reset_user_password / " +
+          "add_user_to_store / remove_user_from_store: target user id (platform-wide).",
+      ),
     email: z.string().optional().describe("add_member: account email to add to the store."),
-    role: z.string().optional().describe("add_member / set_member_role: member role."),
+    role: z
+      .string()
+      .optional()
+      .describe(
+        "add_member / set_member_role: store member role. set_user_role / " +
+          "add_user_to_store: platform role / store member role.",
+      ),
+    confirmed: z
+      .boolean()
+      .optional()
+      .describe(
+        "set_user_email_confirmed: true sets email_confirmed_at to now, false clears it " +
+          "(default true).",
+      ),
+    target_store_id: z
+      .string()
+      .optional()
+      .describe("add_user_to_store / remove_user_from_store: the store to add/remove from."),
     days: z
       .union([z.number(), z.string()])
       .optional()
@@ -94,10 +127,10 @@ function buildStorePatch(patch: Record<string, unknown>) {
   return { data };
 }
 
-const MEMBER_ROLES = ["owner", "admin", "marketing", "editor", "analyst"] as const;
-type MemberRole = (typeof MEMBER_ROLES)[number];
+export const MEMBER_ROLES = ["owner", "admin", "marketing", "editor", "analyst"] as const;
+export type MemberRole = (typeof MEMBER_ROLES)[number];
 
-type ActionOutcome =
+export type ActionOutcome =
   | { result: Record<string, unknown> }
   | { error: string; status: 400 | 404 | 409 };
 
@@ -306,7 +339,8 @@ export const AdminConsoleActionSchema = {
     description:
       "Runs a admin-console action (pause_store, activate_store, extend_trial, set_plan, " +
       "update_store, update_widget, update_feed, add_member, set_member_role, remove_member, " +
-      "confirm_user_email, send_password_reset) " +
+      "confirm_user_email, send_password_reset, set_user_role, set_user_email_confirmed, " +
+      "reset_user_password, add_user_to_store, remove_user_from_store) " +
       "and writes a admin_console_audit_logs row, or returns the snapshot when action is " +
       "omitted/'snapshot'. Caller's account must hold the admin role.",
     tags: ["admin-console"],
@@ -323,7 +357,20 @@ export const AdminConsoleActionSchema = {
   },
 };
 
-type ActionBody = z.infer<typeof BodySchema>;
+export type ActionBody = z.infer<typeof BodySchema>;
+
+// Platform-wide actions target a user directly (user_id) instead of a
+// store, so they run before the store_id requirement below applies.
+const platformUserActions: Record<
+  string,
+  (adminId: string, body: ActionBody) => Promise<ActionOutcome>
+> = {
+  add_user_to_store: runAddUserToStore,
+  remove_user_from_store: runRemoveUserFromStore,
+  reset_user_password: runResetUserPassword,
+  set_user_email_confirmed: runSetUserEmailConfirmed,
+  set_user_role: runSetUserRole,
+};
 
 async function runAction(
   action: string,
@@ -331,6 +378,27 @@ async function runAction(
   body: ActionBody,
   reply: FastifyReply,
 ) {
+  const platformAction = platformUserActions[action];
+  if (platformAction) {
+    const outcome = await platformAction(admin.id, body);
+    if ("error" in outcome) return reply.status(outcome.status).send({ error: outcome.error });
+
+    // The generated password is only ever returned to the caller once — the
+    // audit log keeps a record that a reset happened, not the plaintext.
+    const { password: _password, ...auditableResult } = outcome.result;
+    await prisma.adminConsoleAuditLog.create({
+      data: {
+        action,
+        admin_email: admin.email,
+        admin_user_id: admin.id,
+        payload: body as Prisma.InputJsonObject,
+        result: auditableResult as Prisma.InputJsonObject,
+        target_store_id: clean(body.target_store_id) || null,
+      },
+    });
+    return reply.status(200).send({ ok: true, result: outcome.result });
+  }
+
   const storeId = clean(body.store_id);
   if (!storeId) return reply.status(400).send({ error: "missing_store_id" });
 

@@ -27,6 +27,7 @@ const Settings = React.lazy(() => import("@/pages/settings"));
 const AdminConsole = React.lazy(() => import("@/pages/admin"));
 const AdminStore = React.lazy(() => import("@/pages/admin/store"));
 const AdminAsaas = React.lazy(() => import("@/pages/admin/asaas"));
+const AdminUsers = React.lazy(() => import("@/pages/admin/users"));
 const PreviewFeed = React.lazy(() => import("@/pages/preview/feed"));
 const PreviewProduct = React.lazy(() => import("@/pages/preview/product"));
 const TestStore = React.lazy(() => import("@/pages/test-store"));
@@ -156,6 +157,9 @@ export function AppRoutes() {
         {/* Must precede /admin/:storeId — the param route would swallow it. */}
         <Route path="/admin/asaas">
           <AdminAsaas />
+        </Route>
+        <Route path="/admin/users">
+          <AdminUsers />
         </Route>
         <Route path="/admin/:storeId">
           <AdminStore />

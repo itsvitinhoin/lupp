@@ -70,13 +70,18 @@ export interface AdminConsoleSnapshot {
 export type AdminConsoleAction =
   | "activate_store"
   | "add_member"
+  | "add_user_to_store"
   | "confirm_user_email"
   | "extend_trial"
   | "pause_store"
   | "remove_member"
+  | "remove_user_from_store"
+  | "reset_user_password"
   | "send_password_reset"
   | "set_member_role"
   | "set_plan"
+  | "set_user_email_confirmed"
+  | "set_user_role"
   | "update_feed"
   | "update_store"
   | "update_widget";
@@ -195,6 +200,31 @@ export interface AdminStoreEventsPage {
 export interface AdminCursorPage<TItem> {
   items: TItem[];
   next_cursor: string | null;
+}
+
+export interface AdminPlatformUserStoreRef {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface AdminPlatformUserMembership {
+  id: string;
+  role: string;
+  store: AdminPlatformUserStoreRef;
+}
+
+export interface AdminPlatformUser {
+  avatar_url: string | null;
+  created_at: string;
+  email: string;
+  email_confirmed_at: string | null;
+  id: string;
+  memberships: AdminPlatformUserMembership[];
+  name: string;
+  role: string;
+  stores: (AdminPlatformUserStoreRef & { status: string })[];
+  updated_at: string;
 }
 
 export interface AdminStoreProduct {

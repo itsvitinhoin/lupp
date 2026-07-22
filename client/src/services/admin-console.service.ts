@@ -3,6 +3,7 @@ import type {
   AdminConsoleAction,
   AdminConsoleSnapshot,
   AdminCursorPage,
+  AdminPlatformUser,
   AsaasAccountOverview,
   AsaasAccountSubscription,
   AsaasCustomer,
@@ -54,6 +55,7 @@ async function fetchStoreList<TItem>(
 }
 
 type AdminConsoleActionPayload = {
+  confirmed?: boolean;
   current_trial_ends_at?: string | null;
   days?: number;
   email?: string;
@@ -61,7 +63,8 @@ type AdminConsoleActionPayload = {
   patch?: AdminStorePatch | Record<string, unknown>;
   plan_id?: string;
   role?: string;
-  store_id: string;
+  store_id?: string;
+  target_store_id?: string;
   user_id?: string;
   widget_id?: string;
 };
@@ -118,6 +121,26 @@ export const adminConsoleService = {
 
   async getStoreComments(storeId: string, options: CursorListOptions = {}) {
     return fetchStoreList<AdminStoreComment>(storeId, "comments", options);
+  },
+
+  async getUsers(
+    options: CursorListOptions & {
+      emailConfirmed?: "true" | "false";
+      role?: string;
+      storeId?: string;
+    } = {},
+  ) {
+    const params = new URLSearchParams();
+    if (options.cursor) params.set("cursor", options.cursor);
+    if (options.search?.trim()) params.set("search", options.search.trim());
+    if (options.role) params.set("role", options.role);
+    if (options.emailConfirmed) params.set("email_confirmed", options.emailConfirmed);
+    if (options.storeId) params.set("store_id", options.storeId);
+    const data = await apiGet<AdminCursorPage<AdminPlatformUser>>(
+      `/api/admin-console/users?${params}`,
+    );
+    if (!data) throw new Error("Admin Console não retornou dados.");
+    return data;
   },
 
   async getAsaasAccount() {

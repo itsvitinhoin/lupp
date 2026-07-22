@@ -19,6 +19,7 @@ import {
   adminConsoleStoreVideosHandler,
   AdminConsoleStoreVideosSchema,
 } from "./store-lists";
+import { adminConsoleUsersHandler, AdminConsoleUsersSchema } from "./user-lists";
 
 // verifyUserRole("admin") rejects non-admin JWT claims at the route level;
 // the handlers still re-read the role from the DB (requireAdmin) so a
@@ -55,6 +56,11 @@ export async function AdminConsoleRoutes(app: FastifyTypedInstance) {
     "/api/admin-console/stores/:storeId/comments",
     { schema: AdminConsoleStoreCommentsSchema.schema, preHandler },
     adminConsoleStoreCommentsHandler,
+  );
+  app.get(
+    "/api/admin-console/users",
+    { schema: AdminConsoleUsersSchema.schema, preHandler },
+    adminConsoleUsersHandler,
   );
   app.post(
     "/api/admin-console",
