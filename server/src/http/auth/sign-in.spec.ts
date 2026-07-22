@@ -80,7 +80,7 @@ describe("POST /api/auth/sessions (e2e)", () => {
     expect(wrongPassword.body.message).toBe(unknownEmail.body.message);
   });
 
-  it("rejects an unconfirmed account with a 403 the SPA can detect", async () => {
+  it("signs in an unconfirmed account (email confirmation disabled)", async () => {
     const user = await createUser({
       password: "secret-123",
       email_confirmed_at: null,
@@ -90,9 +90,8 @@ describe("POST /api/auth/sessions (e2e)", () => {
       .post("/api/auth/sessions")
       .send({ email: user.email, password: "secret-123" });
 
-    expect(response.status).toBe(403);
-    // login.tsx matches /not.*confirmed/i to offer resending the confirmation.
-    expect(response.body.message).toMatch(/not.*confirmed/i);
+    expect(response.status).toBe(200);
+    expect(response.body.user.id).toBe(user.id);
   });
 
   it("rejects an OAuth-provisioned account (placeholder hash) with 401", async () => {

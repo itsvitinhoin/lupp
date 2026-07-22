@@ -4,6 +4,7 @@ import { app } from "@/app";
 import { env } from "@/env";
 import { prisma } from "@/lib/prisma";
 import { mailer, type MailMessage } from "@/lib/mailer";
+import { createUser } from "../../../test/utils/create-user";
 
 function tokenFromMail(mail: MailMessage): string {
   const match = mail.text.match(/token=([A-Za-z0-9_-]+)/);
@@ -27,10 +28,12 @@ describe("GET /api/auth/confirm-email (e2e)", () => {
     mailSpy = vi.spyOn(mailer, "send");
   });
 
+  // Sign-up no longer issues a confirmation token itself (email confirmation
+  // is disabled — see sign-up.ts), so bootstrap a token through
+  // resend-confirmation against a manually created unconfirmed user instead.
   async function signUp(email: string) {
-    await request(app.server)
-      .post("/api/auth/sign-up")
-      .send({ name: "To Confirm", email, password: "secret-123" });
+    await createUser({ email, email_confirmed_at: null });
+    await request(app.server).post("/api/auth/resend-confirmation").send({ email });
     return tokenFromMail(mailSpy.mock.calls.at(-1)![0]);
   }
 

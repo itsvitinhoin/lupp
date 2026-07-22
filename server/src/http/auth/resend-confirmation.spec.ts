@@ -51,9 +51,11 @@ describe("POST /api/auth/resend-confirmation (e2e)", () => {
 
   it("invalidates previously issued confirmation tokens", async () => {
     const email = "resend-invalidates@example.com";
-    await request(app.server)
-      .post("/api/auth/sign-up")
-      .send({ name: "Resend", email, password: "secret-123" });
+    // Sign-up no longer issues a confirmation token itself (email confirmation
+    // is disabled — see sign-up.ts), so bootstrap the first token directly
+    // through resend-confirmation instead.
+    await createUser({ email, email_confirmed_at: null });
+    await request(app.server).post("/api/auth/resend-confirmation").send({ email });
     const firstToken = tokenFromMail(mailSpy.mock.calls.at(-1)![0]);
 
     await request(app.server).post("/api/auth/resend-confirmation").send({ email });

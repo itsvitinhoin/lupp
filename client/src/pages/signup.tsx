@@ -18,8 +18,9 @@ export default function Signup() {
   const [storeName, setStoreName] = React.useState('');
   const [platform, setPlatform] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [pendingConfirmationEmail, setPendingConfirmationEmail] = React.useState('');
-  const [isResending, setIsResending] = React.useState(false);
+  // Email confirmation disabled for now — see auth.service.ts / server sign-up.ts.
+  // const [pendingConfirmationEmail, setPendingConfirmationEmail] = React.useState('');
+  // const [isResending, setIsResending] = React.useState(false);
 
   const persistOnboardingPrefill = () => {
     sessionStorage.setItem(
@@ -40,21 +41,15 @@ export default function Signup() {
 
     try {
       setIsSubmitting(true);
-      const data = await authService.signUp({ name, email, password });
+      await authService.signUp({ name, email, password });
 
-      if (!data.session) {
-        const confirmationEmail = email.trim();
-        setPendingConfirmationEmail(confirmationEmail);
-        toast({
-          title: 'Cadastro criado',
-          description: 'Confirme seu e-mail para entrar e concluir o onboarding.',
-        });
-        setLocation(`/login?confirm_email=${encodeURIComponent(confirmationEmail)}`);
-        return;
-      }
-
-      toast({ title: 'Cadastro criado com sucesso.' });
-      setLocation('/onboarding');
+      // Email confirmation disabled for now — sign-up never returns a
+      // session (see auth.service.ts), so send the user straight to login.
+      toast({
+        title: 'Cadastro criado',
+        description: 'Faça login para continuar.',
+      });
+      setLocation('/login');
     } catch (error) {
       toast({
         title: 'Não foi possível criar a conta',
@@ -65,26 +60,27 @@ export default function Signup() {
     }
   };
 
-  const handleResendConfirmation = async () => {
-    const targetEmail = pendingConfirmationEmail || email.trim();
-    if (!targetEmail) {
-      toast({ title: 'Informe o e-mail cadastrado.' });
-      return;
-    }
-
-    try {
-      setIsResending(true);
-      await authService.resendConfirmation(targetEmail);
-      toast({ title: 'Confirmação reenviada', description: 'Confira sua caixa de entrada e spam.' });
-    } catch (error) {
-      toast({
-        title: 'Não foi possível reenviar',
-        description: error instanceof Error ? error.message : 'Tente novamente em instantes.',
-      });
-    } finally {
-      setIsResending(false);
-    }
-  };
+  // Email confirmation disabled for now — see auth.service.ts / server sign-up.ts.
+  // const handleResendConfirmation = async () => {
+  //   const targetEmail = pendingConfirmationEmail || email.trim();
+  //   if (!targetEmail) {
+  //     toast({ title: 'Informe o e-mail cadastrado.' });
+  //     return;
+  //   }
+  //
+  //   try {
+  //     setIsResending(true);
+  //     await authService.resendConfirmation(targetEmail);
+  //     toast({ title: 'Confirmação reenviada', description: 'Confira sua caixa de entrada e spam.' });
+  //   } catch (error) {
+  //     toast({
+  //       title: 'Não foi possível reenviar',
+  //       description: error instanceof Error ? error.message : 'Tente novamente em instantes.',
+  //     });
+  //   } finally {
+  //     setIsResending(false);
+  //   }
+  // };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-background selection:bg-primary/30">
@@ -175,6 +171,7 @@ export default function Signup() {
           </Button>
           </form>
 
+          {/* Email confirmation disabled for now — see auth.service.ts / server sign-up.ts.
           {pendingConfirmationEmail && (
             <div className="rounded-md border border-primary/20 bg-primary/10 p-3 text-sm text-muted-foreground">
               <p>Cadastro criado para {pendingConfirmationEmail}. Confirme seu e-mail para liberar o login.</p>
@@ -189,7 +186,8 @@ export default function Signup() {
               </Button>
             </div>
           )}
-          
+          */}
+
           <p className="text-center text-sm text-muted-foreground mt-6">
             Já tem uma conta?{' '}
             <Link href="/login" className="font-semibold text-primary hover:underline">

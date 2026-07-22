@@ -2,11 +2,12 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "@/lib/prisma";
-import { env } from "@/env";
 import { ResourceAlreadyExistError } from "@/errors";
 import { errorSchemas, rateLimitErrorSchema } from "@/schemas/http-errors";
-import { issueAuthToken } from "@/lib/auth-tokens";
-import { sendEmailConfirmation } from "@/lib/mailer";
+// Email confirmation disabled for now — see signUpHandler below.
+// import { env } from "@/env";
+// import { issueAuthToken } from "@/lib/auth-tokens";
+// import { sendEmailConfirmation } from "@/lib/mailer";
 import { PublicUserSchema, publicUserSelect, toPublicUser } from "./public-user";
 
 const BodySchema = z.object({
@@ -19,8 +20,10 @@ export const SignUpSchema = {
   schema: {
     summary: "Sign up",
     description:
-      "Creates an account and emails a confirmation link. No session is issued: the email " +
-      "must be confirmed before the first sign-in. A duplicate email returns 409.",
+      "Creates an account. Email confirmation is disabled for now: no confirmation email is " +
+      "sent and sign-in does not require it, even though the account is created with " +
+      "email_confirmed_at unset. No session is issued here — call sign-in next. A duplicate " +
+      "email returns 409.",
     tags: ["auth"],
     operationId: "signUp",
     body: BodySchema,
@@ -48,12 +51,13 @@ export async function signUpHandler(request: FastifyRequest, reply: FastifyReply
     select: publicUserSelect,
   });
 
-  const token = await issueAuthToken(user.id, "email_confirmation");
-  await sendEmailConfirmation({
-    to: email,
-    name: user.name,
-    confirmUrl: `${env.LUPP_API_URL}/api/auth/confirm-email?token=${token}`,
-  });
+  // Email confirmation disabled for now — no token issued, no email sent.
+  // const token = await issueAuthToken(user.id, "email_confirmation");
+  // await sendEmailConfirmation({
+  //   to: email,
+  //   name: user.name,
+  //   confirmUrl: `${env.LUPP_API_URL}/api/auth/confirm-email?token=${token}`,
+  // });
 
   return reply.status(201).send({ user: toPublicUser(user) });
 }

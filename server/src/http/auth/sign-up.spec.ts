@@ -21,7 +21,7 @@ describe("POST /api/auth/sign-up (e2e)", () => {
     mailSpy = vi.spyOn(mailer, "send");
   });
 
-  it("creates an unconfirmed account and emails a confirmation link", async () => {
+  it("creates an account without sending a confirmation email", async () => {
     const email = "new-user@example.com";
 
     const response = await request(app.server)
@@ -40,10 +40,8 @@ describe("POST /api/auth/sign-up (e2e)", () => {
     expect(dbUser.email_confirmed_at).toBeNull();
     expect(bcrypt.compareSync("secret-123", dbUser.password_hash)).toBe(true);
 
-    expect(mailSpy).toHaveBeenCalledTimes(1);
-    const mail = mailSpy.mock.calls[0][0];
-    expect(mail.to).toBe(email);
-    expect(mail.text).toMatch(/\/api\/auth\/confirm-email\?token=[A-Za-z0-9_-]+/);
+    // Email confirmation disabled for now — see sign-up.ts.
+    expect(mailSpy).not.toHaveBeenCalled();
   });
 
   it("stores the email lowercased", async () => {

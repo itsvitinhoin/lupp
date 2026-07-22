@@ -3,7 +3,9 @@ import bcrypt from "bcryptjs";
 import { FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "@/lib/prisma";
 import { env } from "@/env";
-import { UnauthorizedUserError, UserForbiddenError } from "@/errors";
+import { UnauthorizedUserError } from "@/errors";
+// Email confirmation disabled for now — see signInHandler below.
+// import { UserForbiddenError } from "@/errors";
 import { errorSchemas, rateLimitErrorSchema } from "@/schemas/http-errors";
 import type { Role } from "@/schemas/roles";
 import { PublicUserSchema, toPublicUser } from "./public-user";
@@ -19,8 +21,8 @@ export const SignInSchema = {
     description:
       "Validates email/password and issues a short-lived access JWT in the body plus a 7-day " +
       "refresh JWT in an httpOnly `refreshToken` cookie. Unknown email and wrong password " +
-      "return the same 401. An unconfirmed email returns 403 (the SPA offers to resend the " +
-      "confirmation based on that message).",
+      "return the same 401. Email confirmation is disabled for now, so an unconfirmed email " +
+      "no longer blocks sign-in.",
     tags: ["auth"],
     operationId: "signIn",
     body: BodySchema,
@@ -49,11 +51,10 @@ export async function signInHandler(request: FastifyRequest, reply: FastifyReply
     throw new UnauthorizedUserError("Invalid credentials.");
   }
 
-  // Message is load-bearing: the SPA login page matches /not.*confirmed/i to
-  // surface its resend-confirmation UI.
-  if (!user.email_confirmed_at) {
-    throw new UserForbiddenError("Email not confirmed.");
-  }
+  // Email confirmation disabled for now.
+  // if (!user.email_confirmed_at) {
+  //   throw new UserForbiddenError("Email not confirmed.");
+  // }
 
   const role = user.role as Role;
   const token = await reply.jwtSign({ role }, { sign: { sub: user.id } });
