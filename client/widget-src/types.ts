@@ -136,6 +136,10 @@ export type BootstrapPayload = {
   upzero_config?: UpzeroConfig | null;
   display?: ContextDisplay;
   config?: ContextConfig;
+  feed_options?: {
+    reload_storefront_on_cart_update?: boolean;
+    show_feedback_form_on_close?: boolean;
+  };
   videos?: SlimVideo[];
   widget?: unknown;
 }
@@ -273,6 +277,8 @@ export type BridgeState = {
   pendingStorefrontCartDetail: CartUpdateDetail | null;
   upzeroCustomerStatusCache: CustomerStatus | null;
   upzeroCustomerStatusLastRefreshAt: number;
+  reloadStorefrontOnCartUpdate: boolean;
+  showFeedbackFormOnClose: boolean;
 }
 
 export interface BridgeUtils {

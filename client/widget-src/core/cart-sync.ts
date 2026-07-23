@@ -115,6 +115,7 @@ export function flushPendingStorefrontCartRefresh(): void {
   ) {
     return;
   }
+  if (!sharedState.reloadStorefrontOnCartUpdate) return;
 
   window.setTimeout(() => {
     try {

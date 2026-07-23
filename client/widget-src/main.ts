@@ -161,6 +161,8 @@ import type { BridgeState, LauncherConfig, StorePayload, UpzeroConfig, WidgetBri
     pendingStorefrontCartDetail: null,
     upzeroCustomerStatusCache: null,
     upzeroCustomerStatusLastRefreshAt: 0,
+    reloadStorefrontOnCartUpdate: true,
+    showFeedbackFormOnClose: true,
   };
 
   const widgetBridge: WidgetBridge = {
@@ -289,6 +291,14 @@ import type { BridgeState, LauncherConfig, StorePayload, UpzeroConfig, WidgetBri
           store.upzero_config = payload.upzero_config;
           if (payload.upzero_config.storefront_url && !store.url) {
             store.url = String(payload.upzero_config.storefront_url);
+          }
+        }
+        if (payload.feed_options && typeof payload.feed_options === "object") {
+          if (typeof payload.feed_options.reload_storefront_on_cart_update === "boolean") {
+            sharedState.reloadStorefrontOnCartUpdate = payload.feed_options.reload_storefront_on_cart_update;
+          }
+          if (typeof payload.feed_options.show_feedback_form_on_close === "boolean") {
+            sharedState.showFeedbackFormOnClose = payload.feed_options.show_feedback_form_on_close;
           }
         }
         applyContextConfig(payload.config);

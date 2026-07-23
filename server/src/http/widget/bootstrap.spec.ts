@@ -265,6 +265,71 @@ describe("GET /api/widget/bootstrap (e2e)", () => {
     expect(response.body.widget.type).toBe("floating_video");
   });
 
+  it("defaults feed_options to both toggles on when nothing is configured", async () => {
+    const { store } = await createStore();
+    await seedWidget(store.id);
+
+    const response = await request(app.server).get(
+      `/api/widget/bootstrap?store_id=${store.id}`,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.feed_options).toEqual({
+      reload_storefront_on_cart_update: true,
+      show_feedback_form_on_close: true,
+    });
+  });
+
+  it("threads explicit feed_options through the bootstrap response", async () => {
+    const { store } = await createStore();
+    await seedWidget(store.id, {
+      settings: {
+        feed_options: {
+          reload_storefront_on_cart_update: false,
+          show_feedback_form_on_close: false,
+        },
+      },
+    });
+
+    const response = await request(app.server).get(
+      `/api/widget/bootstrap?store_id=${store.id}`,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.feed_options).toEqual({
+      reload_storefront_on_cart_update: false,
+      show_feedback_form_on_close: false,
+    });
+  });
+
+  it("still finds feed_options on the floating_video row when a different widget type is requested", async () => {
+    const { store } = await createStore({ plan_id: "growth" });
+    await seedWidget(store.id, {
+      type: "floating_video",
+      settings: { feed_options: { reload_storefront_on_cart_update: false } },
+    });
+    await prisma.widget.create({
+      data: {
+        store_id: store.id,
+        name: "Product video widget",
+        type: "product_video",
+        status: "active",
+        settings: {},
+      },
+    });
+
+    const response = await request(app.server).get(
+      `/api/widget/bootstrap?store_id=${store.id}&widget=product_video`,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.widget.type).toBe("product_video");
+    expect(response.body.feed_options).toEqual({
+      reload_storefront_on_cart_update: false,
+      show_feedback_form_on_close: true,
+    });
+  });
+
   it("answers active:false + no_active_widget when the store has no widget", async () => {
     const { store } = await createStore();
 

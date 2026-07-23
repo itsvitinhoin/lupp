@@ -22,9 +22,11 @@ type FeedOptions = {
   loopVideo: boolean;
   pauseWhenHidden: boolean;
   preloadNext: boolean;
+  reloadStorefrontOnCartUpdate: boolean;
   showBuyButton: boolean;
   showComments: boolean;
   showDescription: boolean;
+  showFeedbackFormOnClose: boolean;
   showLikes: boolean;
   showLogo: boolean;
   showPrice: boolean;
@@ -39,9 +41,11 @@ const defaultFeedOptions: FeedOptions = {
   loopVideo: true,
   pauseWhenHidden: true,
   preloadNext: true,
+  reloadStorefrontOnCartUpdate: true,
   showBuyButton: true,
   showComments: true,
   showDescription: false,
+  showFeedbackFormOnClose: true,
   showLikes: true,
   showLogo: true,
   showPrice: true,
@@ -122,6 +126,10 @@ export default function FeedConfig() {
         defaultFeedOptions.pauseWhenHidden,
       ),
       preloadNext: asBoolean(feed.preload_next, defaultFeedOptions.preloadNext),
+      reloadStorefrontOnCartUpdate: asBoolean(
+        feed.reload_storefront_on_cart_update,
+        defaultFeedOptions.reloadStorefrontOnCartUpdate,
+      ),
       showBuyButton: asBoolean(
         feed.show_buy_button,
         defaultFeedOptions.showBuyButton,
@@ -133,6 +141,10 @@ export default function FeedConfig() {
       showDescription: asBoolean(
         feed.show_description,
         defaultFeedOptions.showDescription,
+      ),
+      showFeedbackFormOnClose: asBoolean(
+        feed.show_feedback_form_on_close,
+        defaultFeedOptions.showFeedbackFormOnClose,
       ),
       showLikes: asBoolean(feed.show_likes, defaultFeedOptions.showLikes),
       showLogo: asBoolean(feed.show_logo, defaultFeedOptions.showLogo),
@@ -175,9 +187,11 @@ export default function FeedConfig() {
             loop_video: options.loopVideo,
             pause_when_hidden: options.pauseWhenHidden,
             preload_next: options.preloadNext,
+            reload_storefront_on_cart_update: options.reloadStorefrontOnCartUpdate,
             show_buy_button: options.showBuyButton,
             show_comments: options.showComments,
             show_description: options.showDescription,
+            show_feedback_form_on_close: options.showFeedbackFormOnClose,
             show_likes: options.showLikes,
             show_logo: options.showLogo,
             show_price: options.showPrice,
@@ -323,6 +337,18 @@ export default function FeedConfig() {
                 checked={options.addToCartInline}
                 label="Add to cart sem sair do feed"
                 onChange={(value) => setOption("addToCartInline", value)}
+              />
+              <ToggleRow
+                checked={options.reloadStorefrontOnCartUpdate}
+                label="Recarregar a página da loja após adicionar ao carrinho"
+                onChange={(value) =>
+                  setOption("reloadStorefrontOnCartUpdate", value)
+                }
+              />
+              <ToggleRow
+                checked={options.showFeedbackFormOnClose}
+                label="Pedir avaliação ao fechar o feed"
+                onChange={(value) => setOption("showFeedbackFormOnClose", value)}
               />
             </CardContent>
           </Card>

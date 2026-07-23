@@ -344,8 +344,8 @@ export function openFeedOverlay(
   }
 
   function showFeedbackForm() {
-    if (feedbackShown) {
-      destroyOverlay("feedback_already_open");
+    if (feedbackShown || !ctx.sharedState.showFeedbackFormOnClose) {
+      destroyOverlay(feedbackShown ? "feedback_already_open" : "close");
       return;
     }
 

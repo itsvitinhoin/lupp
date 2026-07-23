@@ -186,6 +186,12 @@ const BootstrapResponseSchema = z
       })
       .optional(),
     config: ResolvedConfigSchema.optional(),
+    feed_options: z
+      .object({
+        reload_storefront_on_cart_update: z.boolean(),
+        show_feedback_form_on_close: z.boolean(),
+      })
+      .optional(),
     videos: z.array(z.union([WidgetSlimVideoSchema, WidgetVideoSchema])),
     widget: WidgetConfigSchema.nullable(),
   })
@@ -427,7 +433,7 @@ export async function widgetBootstrapHandler(request: FastifyRequest, reply: Fas
   // independent lookups — run them concurrently. Widget types outside the
   // enum can never exist, so skip that query (the original's text column
   // simply returned no row for them).
-  const [widget, videos, upzeroConfig] = await Promise.all([
+  const [widget, videos, upzeroConfig, feedOptionsWidget] = await Promise.all([
     isWidgetType(widgetType)
       ? prisma.widget.findFirst({
           where: { store_id: store.id, type: widgetType, status: "active" },
@@ -438,8 +444,31 @@ export async function widgetBootstrapHandler(request: FastifyRequest, reply: Fas
     // never needs more, and the slim cards only use preview fields.
     mode === "meta" ? [] : loadVideos(store.id, context ? "preview" : mode),
     clean(store.platform).toLowerCase() === "upzero" ? buildUpzeroConfig(store) : null,
+    // feed_options lives on the "floating_video" widget row regardless of
+    // which type embedded the launcher (e.g. floating_launcher opens the
+    // same feed overlay) — only a second lookup when that's not already the
+    // row just fetched above.
+    widgetType === "floating_video"
+      ? null
+      : prisma.widget.findFirst({
+          where: { store_id: store.id, type: "floating_video", status: "active" },
+          select: { settings: true },
+        }),
   ]);
   const effectiveWidget = enforceWidgetPlanLimits(widget, store);
+  const feedOptionsRecord = asRecord(
+    asRecord((widgetType === "floating_video" ? widget : feedOptionsWidget)?.settings).feed_options,
+  );
+  const feedOptions = {
+    reload_storefront_on_cart_update:
+      typeof feedOptionsRecord.reload_storefront_on_cart_update === "boolean"
+        ? feedOptionsRecord.reload_storefront_on_cart_update
+        : true,
+    show_feedback_form_on_close:
+      typeof feedOptionsRecord.show_feedback_form_on_close === "boolean"
+        ? feedOptionsRecord.show_feedback_form_on_close
+        : true,
+  };
 
   if (context) {
     const config = resolveWidgetConfig(widget, store);
@@ -455,6 +484,7 @@ export async function widgetBootstrapHandler(request: FastifyRequest, reply: Fas
       upzero_config: upzeroConfig,
       display,
       config,
+      feed_options: feedOptions,
       videos: display.show ? slimVideos(filtered) : [],
       widget: effectiveWidget,
     };
@@ -478,6 +508,7 @@ export async function widgetBootstrapHandler(request: FastifyRequest, reply: Fas
     resolved_by: resolution.resolvedBy,
     store,
     upzero_config: upzeroConfig,
+    feed_options: feedOptions,
     videos,
     widget: effectiveWidget,
   });
