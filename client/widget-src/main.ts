@@ -163,6 +163,9 @@ import type { BridgeState, LauncherConfig, StorePayload, UpzeroConfig, WidgetBri
     upzeroCustomerStatusLastRefreshAt: 0,
     reloadStorefrontOnCartUpdate: true,
     showFeedbackFormOnClose: true,
+    feedOverlayBackdropColor: "#000000",
+    feedOverlayBackdropOpacity: 76,
+    feedCloseButtonColor: "#ffffff",
   };
 
   const widgetBridge: WidgetBridge = {
@@ -299,6 +302,15 @@ import type { BridgeState, LauncherConfig, StorePayload, UpzeroConfig, WidgetBri
           }
           if (typeof payload.feed_options.show_feedback_form_on_close === "boolean") {
             sharedState.showFeedbackFormOnClose = payload.feed_options.show_feedback_form_on_close;
+          }
+          if (typeof payload.feed_options.overlay_backdrop_color === "string") {
+            sharedState.feedOverlayBackdropColor = payload.feed_options.overlay_backdrop_color;
+          }
+          if (typeof payload.feed_options.overlay_backdrop_opacity === "number") {
+            sharedState.feedOverlayBackdropOpacity = payload.feed_options.overlay_backdrop_opacity;
+          }
+          if (typeof payload.feed_options.close_button_color === "string") {
+            sharedState.feedCloseButtonColor = payload.feed_options.close_button_color;
           }
         }
         applyContextConfig(payload.config);

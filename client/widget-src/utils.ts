@@ -163,3 +163,22 @@ export function normalizeText(value: unknown): string {
     .trim()
     .toLowerCase();
 }
+
+/** "#rrggbb" (or shorthand "#rgb") -> "rgba(r,g,b,alpha)"; falls back to white
+ * at the given alpha for anything that doesn't parse as a hex color. */
+export function hexToRgba(hex: string, alpha: number): string {
+  var normalized = String(hex || "").trim().replace(/^#/, "");
+  if (normalized.length === 3) {
+    normalized = normalized
+      .split("")
+      .map(function (char) {
+        return char + char;
+      })
+      .join("");
+  }
+  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return "rgba(255,255,255," + alpha + ")";
+  var r = parseInt(normalized.slice(0, 2), 16);
+  var g = parseInt(normalized.slice(2, 4), 16);
+  var b = parseInt(normalized.slice(4, 6), 16);
+  return "rgba(" + r + "," + g + "," + b + "," + alpha + ")";
+}

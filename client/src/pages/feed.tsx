@@ -3,8 +3,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { ColorPickerField } from "@/components/shared/ColorPickerField";
 import { PhonePreview } from "@/components/shared/PhonePreview";
 import { Copy, ExternalLink, Heart, MessageCircle, Send, ShoppingBag } from "lucide-react";
 import { mockVideos } from "@/data/mock";
@@ -13,13 +15,17 @@ import { useCurrentStore } from "@/hooks/useStore";
 import { useVideos } from "@/hooks/useVideos";
 import { widgetsService } from "@/services/widgets.service";
 import { isApiConfigured } from "@/lib/env";
-import { cn } from "@/lib/utils";
+import { cn, formatBRL } from "@/lib/utils";
+import { primaryProductOfVideo } from "@/lib/video-products";
 
 type FeedOptions = {
   addToCartInline: boolean;
   autoplayMuted: boolean;
+  closeButtonColor: string;
   enabled: boolean;
   loopVideo: boolean;
+  overlayBackdropColor: string;
+  overlayBackdropOpacity: number;
   pauseWhenHidden: boolean;
   preloadNext: boolean;
   reloadStorefrontOnCartUpdate: boolean;
@@ -37,8 +43,11 @@ type FeedOptions = {
 const defaultFeedOptions: FeedOptions = {
   addToCartInline: true,
   autoplayMuted: true,
+  closeButtonColor: "#ffffff",
   enabled: true,
   loopVideo: true,
+  overlayBackdropColor: "#000000",
+  overlayBackdropOpacity: 76,
   pauseWhenHidden: true,
   preloadNext: true,
   reloadStorefrontOnCartUpdate: true,
@@ -62,22 +71,19 @@ function asBoolean(value: unknown, fallback: boolean) {
   return typeof value === "boolean" ? value : fallback;
 }
 
-function productFromVideo(video: any) {
-  return (
-    video?.video_products?.find((item: any) => item.is_primary)?.products ??
-    video?.video_products?.[0]?.products ??
-    null
-  );
+function asNumber(value: unknown, fallback: number) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function asString(value: unknown, fallback: string) {
+  return typeof value === "string" && value ? value : fallback;
 }
 
 function money(value?: number | string | null) {
   if (value === null || value === undefined || value === "") return "";
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return "";
-  return new Intl.NumberFormat("pt-BR", {
-    currency: "BRL",
-    style: "currency",
-  }).format(numeric);
+  return formatBRL(numeric);
 }
 
 export default function FeedConfig() {
@@ -96,7 +102,7 @@ export default function FeedConfig() {
     ? videosQuery.data
     : mockVideos.slice(0, 4);
   const previewVideo = videos[0] ?? null;
-  const previewProduct = productFromVideo(previewVideo);
+  const previewProduct = primaryProductOfVideo(previewVideo);
   const floatingWidget =
     widgetsQuery.data?.find((widget) => widget.type === "floating_video") ??
     null;
@@ -119,8 +125,20 @@ export default function FeedConfig() {
         feed.autoplay_muted,
         defaultFeedOptions.autoplayMuted,
       ),
+      closeButtonColor: asString(
+        feed.close_button_color,
+        defaultFeedOptions.closeButtonColor,
+      ),
       enabled: asBoolean(display.feed_enabled, defaultFeedOptions.enabled),
       loopVideo: asBoolean(feed.loop_video, defaultFeedOptions.loopVideo),
+      overlayBackdropColor: asString(
+        feed.overlay_backdrop_color,
+        defaultFeedOptions.overlayBackdropColor,
+      ),
+      overlayBackdropOpacity: asNumber(
+        feed.overlay_backdrop_opacity,
+        defaultFeedOptions.overlayBackdropOpacity,
+      ),
       pauseWhenHidden: asBoolean(
         feed.pause_when_hidden,
         defaultFeedOptions.pauseWhenHidden,
@@ -157,7 +175,7 @@ export default function FeedConfig() {
     });
   }, [floatingWidget?.id, floatingWidget?.updated_at]);
 
-  const setOption = (key: keyof FeedOptions, value: boolean) => {
+  const setOption = <K extends keyof FeedOptions>(key: K, value: FeedOptions[K]) => {
     setOptions((current) => ({ ...current, [key]: value }));
   };
 
@@ -184,7 +202,10 @@ export default function FeedConfig() {
           feed_options: {
             add_to_cart_inline: options.addToCartInline,
             autoplay_muted: options.autoplayMuted,
+            close_button_color: options.closeButtonColor,
             loop_video: options.loopVideo,
+            overlay_backdrop_color: options.overlayBackdropColor,
+            overlay_backdrop_opacity: options.overlayBackdropOpacity,
             pause_when_hidden: options.pauseWhenHidden,
             preload_next: options.preloadNext,
             reload_storefront_on_cart_update: options.reloadStorefrontOnCartUpdate,
@@ -349,6 +370,46 @@ export default function FeedConfig() {
                 checked={options.showFeedbackFormOnClose}
                 label="Pedir avaliação ao fechar o feed"
                 onChange={(value) => setOption("showFeedbackFormOnClose", value)}
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="border-border bg-card text-foreground shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-foreground">
+                Aparência do overlay
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <ColorPickerField
+                id="feed-overlay-backdrop-color"
+                label="Cor de fundo"
+                value={options.overlayBackdropColor}
+                onChange={(value) => setOption("overlayBackdropColor", value)}
+              />
+              <div className="space-y-2">
+                <Label htmlFor="feed-overlay-backdrop-opacity">
+                  Opacidade do fundo (%)
+                </Label>
+                <Input
+                  id="feed-overlay-backdrop-opacity"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={options.overlayBackdropOpacity}
+                  onChange={(event) =>
+                    setOption(
+                      "overlayBackdropOpacity",
+                      Math.max(0, Math.min(100, Number(event.target.value) || 0)),
+                    )
+                  }
+                />
+              </div>
+              <ColorPickerField
+                id="feed-close-button-color"
+                label="Cor do botão de fechar"
+                value={options.closeButtonColor}
+                onChange={(value) => setOption("closeButtonColor", value)}
               />
             </CardContent>
           </Card>

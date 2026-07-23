@@ -3,6 +3,7 @@
 import {
   getUrlHostname,
   getUrlOrigin,
+  hexToRgba,
   resolveUrl,
   sameStorefrontHostname,
 } from "./utils";
@@ -179,8 +180,14 @@ export function openFeedOverlay(
   overlay.setAttribute("role", "dialog");
   overlay.setAttribute("aria-modal", "true");
   overlay.setAttribute("aria-label", "Feed Luup");
+  var backdropOpacity =
+    Math.max(0, Math.min(100, ctx.sharedState.feedOverlayBackdropOpacity)) / 100;
+  var closeButtonColor = ctx.sharedState.feedCloseButtonColor || "#ffffff";
+
   overlay.style.cssText =
-    "position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.76);display:flex;align-items:center;justify-content:center;font-family:" +
+    "position:fixed;inset:0;z-index:2147483647;background:" +
+    hexToRgba(ctx.sharedState.feedOverlayBackdropColor, backdropOpacity) +
+    ";display:flex;align-items:center;justify-content:center;font-family:" +
     ctx.launcherConfig.fontFamily +
     ";opacity:" +
     (reduceMotion ? "1" : "0") +
@@ -191,7 +198,11 @@ export function openFeedOverlay(
   close.type = "button";
   close.setAttribute("aria-label", "Fechar feed Luup");
   close.style.cssText =
-    "position:absolute;right:16px;top:16px;width:42px;height:42px;border:0;border-radius:999px;background:rgba(255,255,255,.14);color:#fff;font-size:28px;line-height:1;cursor:pointer;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);";
+    "position:absolute;right:16px;top:16px;width:42px;height:42px;border:0;border-radius:999px;background:" +
+    hexToRgba(closeButtonColor, 0.14) +
+    ";color:" +
+    closeButtonColor +
+    ";font-size:28px;line-height:1;cursor:pointer;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);";
   close.innerHTML = "&times;";
 
   var frame = document.createElement("iframe");

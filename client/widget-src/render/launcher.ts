@@ -1,6 +1,6 @@
 // Lupp widget – floating launcher: DOM, drag persistence and impression
 // tracking.
-import { escapeHtml, normalizedHostname } from "../utils";
+import { escapeHtml, hexToRgba, normalizedHostname } from "../utils";
 import { primeInlineVideos } from "../hls";
 import { ctx, videoMediaUrl } from "../context";
 import { openFeedOverlay } from "../feed";
@@ -303,15 +303,26 @@ export function renderLauncher(
   videos: SlimVideo[],
 ): void {
   var video = videos[0] || {};
-  var size = Math.max(56, ctx.launcherConfig.bubbleSize);
+  // Floor mirrors BUBBLE_SIZE_RANGE.min in lib/widget-config — was 56 here,
+  // silently overriding the dashboard's own documented 48px minimum for any
+  // store that actually saved a size between 48 and 55.
+  var size = Math.max(48, ctx.launcherConfig.bubbleSize);
   var model = ctx.launcherConfig.model || "circular";
   var isRectangular = model === "rectangular";
   var isSquare = model === "square";
   var isInsta = model.indexOf("insta") > -1 || model === "highlight";
   var width = isRectangular ? Math.round(size * 1.35) : size;
   var height = isRectangular ? Math.round(size * 0.78) : size;
-  var radius = isRectangular || isSquare ? "18px" : "999px";
+  var autoRadius = isRectangular || isSquare ? 18 : 999;
+  var radius = (ctx.launcherConfig.borderRadius >= 0 ? ctx.launcherConfig.borderRadius : autoRadius) + "px";
   var mediaRadius = radius;
+  var shadowStyle = ctx.launcherConfig.shadowEnabled
+    ? "filter:drop-shadow(0 14px " +
+      ctx.launcherConfig.shadowBlur +
+      "px " +
+      hexToRgba(ctx.launcherConfig.shadowColor, Math.max(0, Math.min(100, ctx.launcherConfig.shadowOpacity)) / 100) +
+      ");"
+    : "";
   var ring = isInsta
     ? "linear-gradient(135deg,#ffb13b,#f33f86,#7b4dff)"
     : ctx.launcherConfig.backgroundColor;
@@ -345,7 +356,8 @@ export function renderLauncher(
     '" style="' +
     "display:flex;align-items:center;gap:10px;border:0;background:transparent;padding:0;cursor:grab;touch-action:none;font-family:" +
     ctx.launcherConfig.fontFamily +
-    ";filter:drop-shadow(0 14px 28px rgba(0,0,0,.28));" +
+    ";" +
+    shadowStyle +
     launcherEntranceStyle(root) +
     '">' +
     '<span style="position:relative;display:block;width:' +

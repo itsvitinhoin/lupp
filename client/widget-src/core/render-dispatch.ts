@@ -6,7 +6,7 @@ import { ctx } from "../context";
 import { openFeedOverlay } from "../feed";
 import { renderLauncher } from "../render/launcher";
 import { removeHomeCarouselRoot, renderCarousel, renderEmbeddedHomeCarousel } from "../render/carousel";
-import { isCarouselWidgetType } from "./widget-type";
+import { isCarouselWidgetType, isFloatingWidgetType } from "./widget-type";
 import type { SlimVideo, StorePayload } from "../types";
 
 export function createRoot(): HTMLElement {
@@ -68,7 +68,7 @@ function renderStoriesBar(root: HTMLElement, store: StorePayload, videos: SlimVi
 }
 
 function render(root: HTMLElement, store: StorePayload, videos: SlimVideo[]): void {
-  if (!videos.length && (ctx.widgetType === "floating_launcher" || ctx.widgetType === "floating_video")) {
+  if (!videos.length && isFloatingWidgetType(ctx.widgetType)) {
     renderLauncher(root, store, []);
     emitWidgetRendered({ videoCount: 0, widgetType: ctx.widgetType });
     return;
@@ -85,7 +85,7 @@ function render(root: HTMLElement, store: StorePayload, videos: SlimVideo[]): vo
     return;
   }
 
-  if (ctx.widgetType === "floating_launcher" || ctx.widgetType === "floating_video") {
+  if (isFloatingWidgetType(ctx.widgetType)) {
     renderLauncher(root, store, videos);
     emitWidgetRendered({ videoCount: videos.length, widgetType: ctx.widgetType });
     return;

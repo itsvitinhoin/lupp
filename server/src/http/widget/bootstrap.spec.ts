@@ -277,6 +277,9 @@ describe("GET /api/widget/bootstrap (e2e)", () => {
     expect(response.body.feed_options).toEqual({
       reload_storefront_on_cart_update: true,
       show_feedback_form_on_close: true,
+      overlay_backdrop_color: "#000000",
+      overlay_backdrop_opacity: 76,
+      close_button_color: "#ffffff",
     });
   });
 
@@ -287,6 +290,9 @@ describe("GET /api/widget/bootstrap (e2e)", () => {
         feed_options: {
           reload_storefront_on_cart_update: false,
           show_feedback_form_on_close: false,
+          overlay_backdrop_color: "#1a1a2e",
+          overlay_backdrop_opacity: 90,
+          close_button_color: "#f5f5f5",
         },
       },
     });
@@ -299,6 +305,9 @@ describe("GET /api/widget/bootstrap (e2e)", () => {
     expect(response.body.feed_options).toEqual({
       reload_storefront_on_cart_update: false,
       show_feedback_form_on_close: false,
+      overlay_backdrop_color: "#1a1a2e",
+      overlay_backdrop_opacity: 90,
+      close_button_color: "#f5f5f5",
     });
   });
 
@@ -327,6 +336,9 @@ describe("GET /api/widget/bootstrap (e2e)", () => {
     expect(response.body.feed_options).toEqual({
       reload_storefront_on_cart_update: false,
       show_feedback_form_on_close: true,
+      overlay_backdrop_color: "#000000",
+      overlay_backdrop_opacity: 76,
+      close_button_color: "#ffffff",
     });
   });
 

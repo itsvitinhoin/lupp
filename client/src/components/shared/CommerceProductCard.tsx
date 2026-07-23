@@ -11,6 +11,10 @@ export type CommerceProductCardView = {
 };
 
 type CommerceProductCardProps = {
+  /** Store's brand color for the primary buy button — falls back to the
+   * neutral card-token styling when omitted (e.g. the video-upload preview,
+   * which has no store context to draw a brand color from). */
+  accentColor?: string;
   actionLabel?: string;
   buyLabel?: string;
   className?: string;
@@ -27,6 +31,7 @@ type CommerceProductCardProps = {
 };
 
 export function CommerceProductCard({
+  accentColor,
   actionLabel,
   buyLabel = "Comprar agora",
   className,
@@ -100,7 +105,13 @@ export function CommerceProductCard({
             </Button>
           )}
           <Button
-            className="h-9 bg-card/92 text-xs font-bold text-foreground hover:bg-card"
+            className={cn(
+              "h-9 text-xs font-bold",
+              accentColor
+                ? "text-white transition-[filter] hover:brightness-90"
+                : "bg-card/92 text-foreground hover:bg-card",
+            )}
+            style={accentColor ? { backgroundColor: accentColor } : undefined}
             disabled={disabled}
             onClick={singleAction ? handlePrimaryAction : onBuy}
             type="button"

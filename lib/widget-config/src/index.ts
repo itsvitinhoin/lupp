@@ -65,6 +65,8 @@ export type CarouselFontSource = (typeof CAROUSEL_FONT_SOURCES)[number];
 
 export const BUBBLE_SIZE_RANGE = { min: 48, max: 120 } as const;
 export const OFFSET_RANGE = { min: 0, max: 120 } as const;
+/** -1 (kept as the floor) means "auto" — see WidgetAppearanceSettings.border_radius. */
+export const LAUNCHER_BORDER_RADIUS_RANGE = { min: -1, max: 60 } as const;
 export const CAROUSEL_ITEMS_RANGE = { min: 1, max: 24 } as const;
 /** section_padding_x/y and section_margin_x/y, in px. */
 export const CAROUSEL_SPACING_RANGE = { min: 0, max: 120 } as const;
@@ -73,8 +75,8 @@ export const CAROUSEL_CARD_GAP_RANGE = { min: 0, max: 80 } as const;
 /** card_min_width/card_max_width, in px. */
 export const CAROUSEL_CARD_WIDTH_RANGE = { min: 120, max: 360 } as const;
 export const CAROUSEL_CARD_RADIUS_RANGE = { min: 0, max: 40 } as const;
-export const CAROUSEL_CARD_SHADOW_OPACITY_RANGE = { min: 0, max: 100 } as const;
-export const CAROUSEL_CARD_SHADOW_BLUR_RANGE = { min: 0, max: 80 } as const;
+export const SHADOW_OPACITY_RANGE = { min: 0, max: 100 } as const;
+export const SHADOW_BLUR_RANGE = { min: 0, max: 80 } as const;
 export const CAROUSEL_CARD_SHADOW_OFFSET_RANGE = { min: -40, max: 40 } as const;
 /** Time between auto-advances, in ms. */
 export const CAROUSEL_AUTOPLAY_INTERVAL_RANGE = { min: 1500, max: 15000 } as const;
@@ -90,6 +92,13 @@ export type WidgetAppearanceSettings = {
   model: LauncherModel;
   offset_x: number;
   offset_y: number;
+  /** px; -1 means "auto" (999 for circular-family models, 18 otherwise). */
+  border_radius: number;
+  shadow_enabled: boolean;
+  shadow_color: string;
+  /** 0-100, percent opacity. */
+  shadow_opacity: number;
+  shadow_blur: number;
 };
 
 export type WidgetDisplaySettings = {
@@ -147,6 +156,14 @@ export type WidgetCarouselSettings = {
   card_shadow_blur: number;
   card_shadow_offset_x: number;
   card_shadow_offset_y: number;
+  // The per-card product-info pill (name/price/CTA) and the navigation
+  // arrows — both were previously fixed regardless of card_background_color
+  // or the store's own accent, always a dark-glass pill and a light arrow
+  // button no matter how the rest of the card was themed.
+  pill_background_color: string;
+  pill_text_color: string;
+  nav_arrow_background_color: string;
+  nav_arrow_icon_color: string;
   // Auto-scroll. Disabled by default — existing stores must not suddenly
   // start auto-scrolling. The widget additionally never auto-scrolls for a
   // visitor with prefers-reduced-motion, regardless of this setting.
@@ -176,6 +193,11 @@ export const WIDGET_SETTINGS_DEFAULTS: WidgetSettings = {
     model: "circular",
     offset_x: 18,
     offset_y: 18,
+    border_radius: -1,
+    shadow_enabled: true,
+    shadow_color: "#000000",
+    shadow_opacity: 28,
+    shadow_blur: 28,
   },
   display: {
     mode: "all",
@@ -232,6 +254,10 @@ export const WIDGET_SETTINGS_DEFAULTS: WidgetSettings = {
     card_shadow_blur: 28,
     card_shadow_offset_x: 0,
     card_shadow_offset_y: 14,
+    pill_background_color: "#485248",
+    pill_text_color: "#ffffff",
+    nav_arrow_background_color: "#ffffff",
+    nav_arrow_icon_color: "#16171a",
     autoplay_enabled: false,
     autoplay_interval_ms: 3500,
     autoplay_direction: "forward",
@@ -338,6 +364,23 @@ export function normalizeWidgetSettings(
       model: oneOf(appearance.model, LAUNCHER_MODELS, base.appearance.model),
       offset_x: clampedNumber(appearance.offset_x, OFFSET_RANGE, base.appearance.offset_x),
       offset_y: clampedNumber(appearance.offset_y, OFFSET_RANGE, base.appearance.offset_y),
+      border_radius: clampedNumber(
+        appearance.border_radius,
+        LAUNCHER_BORDER_RADIUS_RANGE,
+        base.appearance.border_radius,
+      ),
+      shadow_enabled: bool(appearance.shadow_enabled, base.appearance.shadow_enabled),
+      shadow_color: color(appearance.shadow_color, base.appearance.shadow_color),
+      shadow_opacity: clampedNumber(
+        appearance.shadow_opacity,
+        SHADOW_OPACITY_RANGE,
+        base.appearance.shadow_opacity,
+      ),
+      shadow_blur: clampedNumber(
+        appearance.shadow_blur,
+        SHADOW_BLUR_RANGE,
+        base.appearance.shadow_blur,
+      ),
     },
     display: {
       ...display,
@@ -464,12 +507,12 @@ export function normalizeWidgetSettings(
       card_shadow_color: color(carousel.card_shadow_color, base.carousel.card_shadow_color),
       card_shadow_opacity: clampedNumber(
         carousel.card_shadow_opacity,
-        CAROUSEL_CARD_SHADOW_OPACITY_RANGE,
+        SHADOW_OPACITY_RANGE,
         base.carousel.card_shadow_opacity,
       ),
       card_shadow_blur: clampedNumber(
         carousel.card_shadow_blur,
-        CAROUSEL_CARD_SHADOW_BLUR_RANGE,
+        SHADOW_BLUR_RANGE,
         base.carousel.card_shadow_blur,
       ),
       card_shadow_offset_x: clampedNumber(
@@ -481,6 +524,19 @@ export function normalizeWidgetSettings(
         carousel.card_shadow_offset_y,
         CAROUSEL_CARD_SHADOW_OFFSET_RANGE,
         base.carousel.card_shadow_offset_y,
+      ),
+      pill_background_color: color(
+        carousel.pill_background_color,
+        base.carousel.pill_background_color,
+      ),
+      pill_text_color: color(carousel.pill_text_color, base.carousel.pill_text_color),
+      nav_arrow_background_color: color(
+        carousel.nav_arrow_background_color,
+        base.carousel.nav_arrow_background_color,
+      ),
+      nav_arrow_icon_color: color(
+        carousel.nav_arrow_icon_color,
+        base.carousel.nav_arrow_icon_color,
       ),
       autoplay_enabled: bool(carousel.autoplay_enabled, base.carousel.autoplay_enabled),
       autoplay_interval_ms: clampedNumber(

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { CodeBlock } from "@/components/shared/CodeBlock";
+import { ColorPickerField } from "@/components/shared/ColorPickerField";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
@@ -317,6 +318,83 @@ export function FloatingEditor(props: {
                   </button>
                 ))}
               </div>
+            </section>
+
+            <SectionDivider />
+
+            <section>
+              <div className="mb-5 flex items-center gap-3">
+                <LayoutGrid className="h-5 w-5 text-foreground/80" />
+                <h4 className="text-base font-bold text-foreground">
+                  Borda e sombra
+                </h4>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-muted-foreground">
+                  Raio da borda (px) — em branco usa o padrão do modelo
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={60}
+                  placeholder="Automático"
+                  value={form.launcherBorderRadius}
+                  onChange={(event) =>
+                    setField("launcherBorderRadius", event.target.value)
+                  }
+                  className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground"
+                />
+              </div>
+              <div className="mt-4">
+                <AdvancedSwitch
+                  checked={form.launcherShadowEnabled}
+                  description="Sombra suave projetada pela miniatura flutuante."
+                  label="Sombra na miniatura"
+                  onChange={(value) => setField("launcherShadowEnabled", value)}
+                />
+              </div>
+              {form.launcherShadowEnabled ? (
+                <div className="mt-4 space-y-4">
+                  <ColorPickerField
+                    id="launcher-shadow-color"
+                    label="Cor da sombra"
+                    value={form.launcherShadowColor}
+                    onChange={(value) => setField("launcherShadowColor", value)}
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-muted-foreground">
+                        Opacidade (%)
+                      </Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={form.launcherShadowOpacity}
+                        onChange={(event) =>
+                          setField("launcherShadowOpacity", event.target.value)
+                        }
+                        className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-muted-foreground">
+                        Desfoque (px)
+                      </Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={80}
+                        value={form.launcherShadowBlur}
+                        onChange={(event) =>
+                          setField("launcherShadowBlur", event.target.value)
+                        }
+                        className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </section>
 
             <SectionDivider />

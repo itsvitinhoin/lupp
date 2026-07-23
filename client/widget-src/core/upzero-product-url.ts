@@ -99,7 +99,10 @@ function upzeroReferenceSlugFromProduct(
     if (compactRefMatch && compactRefMatch[1]) {
       return "ref" + compactRefMatch[1].replace(/[^a-z0-9-]/gi, "").toLowerCase();
     }
-    const numeric = decoded.match(/^\s*(\d+[a-z0-9-]*)\s*$/i);
+    // 3+ digits, matching the identical rule in server/sync-products.ts and
+    // client/pages/preview/feed.tsx — a shorter numeric string is too likely
+    // to be something else entirely (a size, a quantity) to trust as an id.
+    const numeric = decoded.match(/^\s*(\d{3,}[a-z0-9]*)\s*$/i);
     if (numeric && numeric[1] && !numericFallback) {
       // No "ref" prefix invented here — a bare numeric id (this store's
       // real, verified-live URL scheme: e.g. "27082-vt-linho-gerlane", no

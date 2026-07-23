@@ -12,6 +12,12 @@ export type WidgetSettingsForm = {
   launcherModel: string;
   launcherOffsetX: string;
   launcherOffsetY: string;
+  /** Empty string means "auto" (999 for circular-family models, 18 otherwise). */
+  launcherBorderRadius: string;
+  launcherShadowEnabled: boolean;
+  launcherShadowColor: string;
+  launcherShadowOpacity: string;
+  launcherShadowBlur: string;
   displayMode: string;
   productMode: string;
   includePaths: string;
@@ -65,6 +71,10 @@ export type WidgetSettingsForm = {
   carouselCardShadowBlur: string;
   carouselCardShadowOffsetX: string;
   carouselCardShadowOffsetY: string;
+  carouselPillBackgroundColor: string;
+  carouselPillTextColor: string;
+  carouselNavArrowBackgroundColor: string;
+  carouselNavArrowIconColor: string;
   carouselAutoplayEnabled: boolean;
   carouselAutoplayIntervalMs: string;
   carouselAutoplayDirection: string;
@@ -90,6 +100,11 @@ const defaultForm: WidgetSettingsForm = {
   launcherModel: DEFAULTS.appearance.model,
   launcherOffsetX: String(DEFAULTS.appearance.offset_x),
   launcherOffsetY: String(DEFAULTS.appearance.offset_y),
+  launcherBorderRadius: "",
+  launcherShadowEnabled: DEFAULTS.appearance.shadow_enabled,
+  launcherShadowColor: DEFAULTS.appearance.shadow_color,
+  launcherShadowOpacity: String(DEFAULTS.appearance.shadow_opacity),
+  launcherShadowBlur: String(DEFAULTS.appearance.shadow_blur),
   displayMode: DEFAULTS.display.mode,
   productMode: DEFAULTS.display.product_mode,
   includePaths: DEFAULTS.display.include_paths.join("\n"),
@@ -143,6 +158,10 @@ const defaultForm: WidgetSettingsForm = {
   carouselCardShadowBlur: String(DEFAULTS.carousel.card_shadow_blur),
   carouselCardShadowOffsetX: String(DEFAULTS.carousel.card_shadow_offset_x),
   carouselCardShadowOffsetY: String(DEFAULTS.carousel.card_shadow_offset_y),
+  carouselPillBackgroundColor: DEFAULTS.carousel.pill_background_color,
+  carouselPillTextColor: DEFAULTS.carousel.pill_text_color,
+  carouselNavArrowBackgroundColor: DEFAULTS.carousel.nav_arrow_background_color,
+  carouselNavArrowIconColor: DEFAULTS.carousel.nav_arrow_icon_color,
   carouselAutoplayEnabled: DEFAULTS.carousel.autoplay_enabled,
   carouselAutoplayIntervalMs: String(DEFAULTS.carousel.autoplay_interval_ms),
   carouselAutoplayDirection: DEFAULTS.carousel.autoplay_direction,
@@ -208,6 +227,23 @@ export function useWidgetSettingsForm({
       launcherModel: String(appearance.model || DEFAULTS.appearance.model),
       launcherOffsetX: String(appearance.offset_x ?? DEFAULTS.appearance.offset_x),
       launcherOffsetY: String(appearance.offset_y ?? DEFAULTS.appearance.offset_y),
+      launcherBorderRadius:
+        typeof appearance.border_radius === "number" && appearance.border_radius >= 0
+          ? String(appearance.border_radius)
+          : "",
+      launcherShadowEnabled:
+        "shadow_enabled" in appearance
+          ? appearance.shadow_enabled !== false
+          : DEFAULTS.appearance.shadow_enabled,
+      launcherShadowColor: String(
+        appearance.shadow_color || DEFAULTS.appearance.shadow_color,
+      ),
+      launcherShadowOpacity: String(
+        appearance.shadow_opacity ?? DEFAULTS.appearance.shadow_opacity,
+      ),
+      launcherShadowBlur: String(
+        appearance.shadow_blur ?? DEFAULTS.appearance.shadow_blur,
+      ),
       fixedVideo: Boolean(appearance.fixed_video),
       allowClose: appearance.allow_close !== false,
       randomizeThumbnail: Boolean(appearance.randomize_thumbnail),
@@ -299,6 +335,18 @@ export function useWidgetSettingsForm({
       carouselCardShadowOffsetY: String(
         carousel.card_shadow_offset_y ?? DEFAULTS.carousel.card_shadow_offset_y,
       ),
+      carouselPillBackgroundColor: String(
+        carousel.pill_background_color || DEFAULTS.carousel.pill_background_color,
+      ),
+      carouselPillTextColor: String(
+        carousel.pill_text_color || DEFAULTS.carousel.pill_text_color,
+      ),
+      carouselNavArrowBackgroundColor: String(
+        carousel.nav_arrow_background_color || DEFAULTS.carousel.nav_arrow_background_color,
+      ),
+      carouselNavArrowIconColor: String(
+        carousel.nav_arrow_icon_color || DEFAULTS.carousel.nav_arrow_icon_color,
+      ),
       carouselAutoplayEnabled: Boolean(carousel.autoplay_enabled),
       carouselAutoplayIntervalMs: String(
         carousel.autoplay_interval_ms || DEFAULTS.carousel.autoplay_interval_ms,
@@ -330,6 +378,14 @@ export function useWidgetSettingsForm({
       model: form.launcherModel,
       offset_x: Number(form.launcherOffsetX ?? DEFAULTS.appearance.offset_x) || 0,
       offset_y: Number(form.launcherOffsetY ?? DEFAULTS.appearance.offset_y) || 0,
+      border_radius: form.launcherBorderRadius.trim() === ""
+        ? -1
+        : Number(form.launcherBorderRadius),
+      shadow_enabled: form.launcherShadowEnabled,
+      shadow_color: form.launcherShadowColor,
+      shadow_opacity:
+        Number(form.launcherShadowOpacity) || DEFAULTS.appearance.shadow_opacity,
+      shadow_blur: Number(form.launcherShadowBlur) || DEFAULTS.appearance.shadow_blur,
       position: form.launcherPosition,
       randomize_thumbnail: form.randomizeThumbnail,
       text_color: form.launcherTextColor,
@@ -394,6 +450,10 @@ export function useWidgetSettingsForm({
       card_shadow_offset_x: Number(form.carouselCardShadowOffsetX) || 0,
       card_shadow_offset_y:
         Number(form.carouselCardShadowOffsetY) || DEFAULTS.carousel.card_shadow_offset_y,
+      pill_background_color: form.carouselPillBackgroundColor,
+      pill_text_color: form.carouselPillTextColor,
+      nav_arrow_background_color: form.carouselNavArrowBackgroundColor,
+      nav_arrow_icon_color: form.carouselNavArrowIconColor,
       autoplay_enabled: form.carouselAutoplayEnabled,
       autoplay_interval_ms:
         Number(form.carouselAutoplayIntervalMs) || DEFAULTS.carousel.autoplay_interval_ms,

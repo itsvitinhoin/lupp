@@ -1183,6 +1183,94 @@ async function pruneStaleUpzeroProducts(storeId: string, freshExternalIds: Set<s
   return { relinked, removed };
 }
 
+// Shared by storefrontVariantRows and externalVariantRows: both sources feed
+// the same fallback chain (a recognized "color"/"size" attribute, then a
+// handful of direct field-name guesses, then the combination-key split,
+// then — for size only — a guess off the SKU) to the same output shape.
+function resolveVariantColorSize(params: {
+  attributes: Array<Record<string, unknown>>;
+  combinationParts: string[];
+  directRecords: Array<Record<string, unknown>>;
+  imageKey: string;
+  sku: unknown;
+}): {
+  colorCode: string | null;
+  colorHex: string | null;
+  colorName: string | null;
+  sizeCode: string | null;
+  sizeName: string | null;
+} {
+  const { attributes, combinationParts, directRecords, imageKey, sku } = params;
+  const color = findVariantAttribute(attributes, "color");
+  const size = findVariantAttribute(attributes, "size");
+  const directColorName = directVariantValue(directRecords, [
+    "color_name",
+    "colorName",
+    "color",
+    "cor",
+    "colour",
+    "variant_color",
+    "variantColor",
+    "option1",
+    "option_1",
+  ]);
+  const directColorCode = directVariantCode(directRecords, [
+    "color_code",
+    "colorCode",
+    "color_slug",
+    "colorSlug",
+    "cor_codigo",
+    "corCode",
+  ]);
+  const directSizeName = directVariantValue(directRecords, [
+    "size_name",
+    "sizeName",
+    "size",
+    "tamanho",
+    "tam",
+    "variant_size",
+    "variantSize",
+    "option2",
+    "option_2",
+  ]);
+  const directSizeCode = directVariantCode(directRecords, [
+    "size_code",
+    "sizeCode",
+    "size_slug",
+    "sizeSlug",
+    "tamanho_codigo",
+    "tamanhoCode",
+  ]);
+  const fallbackColorName =
+    (color ? attributeValueName(color) : "") ||
+    directColorName ||
+    combinationParts[0] ||
+    humanizeAttributeFallback(imageKey);
+  const fallbackColorCode =
+    (color ? attributeValueCode(color) : "") ||
+    directColorCode ||
+    slugify(fallbackColorName) ||
+    null;
+  const fallbackSizeName =
+    (size ? attributeValueName(size) : "") ||
+    directSizeName ||
+    combinationParts[1] ||
+    sizeFromSku(sku);
+  const fallbackSizeCode =
+    (size ? attributeValueCode(size) : "") ||
+    directSizeCode ||
+    slugify(fallbackSizeName) ||
+    null;
+
+  return {
+    colorCode: fallbackColorCode,
+    colorHex: (color ? attributeHex(color) : null) || directVariantHex(directRecords),
+    colorName: fallbackColorName || null,
+    sizeCode: fallbackSizeCode,
+    sizeName: fallbackSizeName || null,
+  };
+}
+
 function storefrontRows(
   items: StorefrontProductItem[],
   storeId: string,
@@ -1298,8 +1386,6 @@ function storefrontVariantRows(
           ...normalizeAttributeItems(variant.values),
           ...normalizeAttributeItems(variant.properties),
         ];
-        const color = findVariantAttribute(attributes, "color");
-        const size = findVariantAttribute(attributes, "size");
         const directRecords = [variantItemRecord, variant];
         const combinationParts = variantCombinationParts(
           {
@@ -1316,64 +1402,13 @@ function storefrontVariantRows(
             skuGroup?.image_key ||
             "",
         );
-        const directColorName = directVariantValue(directRecords, [
-          "color_name",
-          "colorName",
-          "color",
-          "cor",
-          "colour",
-          "variant_color",
-          "variantColor",
-          "option1",
-          "option_1",
-        ]);
-        const directColorCode = directVariantCode(directRecords, [
-          "color_code",
-          "colorCode",
-          "color_slug",
-          "colorSlug",
-          "cor_codigo",
-          "corCode",
-        ]);
-        const directSizeName = directVariantValue(directRecords, [
-          "size_name",
-          "sizeName",
-          "size",
-          "tamanho",
-          "tam",
-          "variant_size",
-          "variantSize",
-          "option2",
-          "option_2",
-        ]);
-        const directSizeCode = directVariantCode(directRecords, [
-          "size_code",
-          "sizeCode",
-          "size_slug",
-          "sizeSlug",
-          "tamanho_codigo",
-          "tamanhoCode",
-        ]);
-        const fallbackColorName =
-          (color ? attributeValueName(color) : "") ||
-          directColorName ||
-          combinationParts[0] ||
-          humanizeAttributeFallback(imageKey);
-        const fallbackColorCode =
-          (color ? attributeValueCode(color) : "") ||
-          directColorCode ||
-          slugify(fallbackColorName) ||
-          null;
-        const fallbackSizeName =
-          (size ? attributeValueName(size) : "") ||
-          directSizeName ||
-          combinationParts[1] ||
-          sizeFromSku(variant.sku);
-        const fallbackSizeCode =
-          (size ? attributeValueCode(size) : "") ||
-          directSizeCode ||
-          slugify(fallbackSizeName) ||
-          null;
+        const colorSize = resolveVariantColorSize({
+          attributes,
+          combinationParts,
+          directRecords,
+          imageKey,
+          sku: variant.sku,
+        });
         const promoPrice = centsToPrice(variant.promo_cents);
         const basePrice = centsToPrice(variant.price_cents);
 
@@ -1382,10 +1417,9 @@ function storefrontVariantRows(
             variant.asset_id === undefined || variant.asset_id === null
               ? null
               : String(variant.asset_id),
-          color_code: fallbackColorCode,
-          color_hex:
-            (color ? attributeHex(color) : null) || directVariantHex(directRecords),
-          color_name: fallbackColorName || null,
+          color_code: colorSize.colorCode,
+          color_hex: colorSize.colorHex,
+          color_name: colorSize.colorName,
           compare_at_price:
             promoPrice && basePrice && promoPrice < basePrice ? basePrice : null,
           external_id: externalId,
@@ -1407,8 +1441,8 @@ function storefrontVariantRows(
           platform: "upzero",
           price: promoPrice ?? basePrice,
           product_external_id: productExternalId,
-          size_code: fallbackSizeCode,
-          size_name: fallbackSizeName || null,
+          size_code: colorSize.sizeCode,
+          size_name: colorSize.sizeName,
           sku:
             typeof variant.sku === "string" && variant.sku.trim()
               ? variant.sku
@@ -1514,71 +1548,18 @@ function externalVariantRows(
           ...normalizeAttributeItems(variantRecord.values),
           ...normalizeAttributeItems(variantRecord.properties),
         ];
-        const color = findVariantAttribute(attributes, "color");
-        const size = findVariantAttribute(attributes, "size");
         const directRecords = [variantRecord];
         const combinationParts = variantCombinationParts(variantRecord, variantRecord);
         const imageKey = String(
           variantRecord.image_key || variantRecord.variant_image_key || "",
         );
-        const directColorName = directVariantValue(directRecords, [
-          "color_name",
-          "colorName",
-          "color",
-          "cor",
-          "colour",
-          "variant_color",
-          "variantColor",
-          "option1",
-          "option_1",
-        ]);
-        const directColorCode = directVariantCode(directRecords, [
-          "color_code",
-          "colorCode",
-          "color_slug",
-          "colorSlug",
-          "cor_codigo",
-          "corCode",
-        ]);
-        const directSizeName = directVariantValue(directRecords, [
-          "size_name",
-          "sizeName",
-          "size",
-          "tamanho",
-          "tam",
-          "variant_size",
-          "variantSize",
-          "option2",
-          "option_2",
-        ]);
-        const directSizeCode = directVariantCode(directRecords, [
-          "size_code",
-          "sizeCode",
-          "size_slug",
-          "sizeSlug",
-          "tamanho_codigo",
-          "tamanhoCode",
-        ]);
-        const fallbackColorName =
-          (color ? attributeValueName(color) : "") ||
-          directColorName ||
-          combinationParts[0] ||
-          humanizeAttributeFallback(imageKey);
-        const fallbackColorCode =
-          (color ? attributeValueCode(color) : "") ||
-          directColorCode ||
-          slugify(fallbackColorName) ||
-          null;
-        const fallbackSizeName =
-          (size ? attributeValueName(size) : "") ||
-          directSizeName ||
-          combinationParts[1] ||
-          sizeFromSku(variant.sku);
-        const fallbackSizeCode =
-          (size ? attributeValueCode(size) : "") ||
-          directSizeCode ||
-          slugify(fallbackSizeName) ||
-          null;
+        const colorSize = resolveVariantColorSize({
+          attributes,
+          combinationParts,
+          directRecords,
+          imageKey,
+          sku: variant.sku,
+        });
         const promoPrice = numericPrice(variant.promotional_price);
         const basePrice = numericPrice(variant.price);
 
@@ -1587,10 +1568,9 @@ function externalVariantRows(
             variantRecord.asset_id === undefined || variantRecord.asset_id === null
               ? null
               : String(variantRecord.asset_id),
-          color_code: fallbackColorCode,
-          color_hex:
-            (color ? attributeHex(color) : null) || directVariantHex(directRecords),
-          color_name: fallbackColorName || null,
+          color_code: colorSize.colorCode,
+          color_hex: colorSize.colorHex,
+          color_name: colorSize.colorName,
           compare_at_price:
             promoPrice && basePrice && promoPrice < basePrice ? basePrice : null,
           external_id: externalId,
@@ -1601,8 +1581,8 @@ function externalVariantRows(
           platform: "upzero",
           price: promoPrice ?? basePrice,
           product_external_id: String(productExternalId),
-          size_code: fallbackSizeCode,
-          size_name: fallbackSizeName || null,
+          size_code: colorSize.sizeCode,
+          size_name: colorSize.sizeName,
           sku: variant.sku || null,
           status: (product.status === "archived"
             ? "archived"

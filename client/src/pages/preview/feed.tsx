@@ -19,7 +19,8 @@ import {
   resolveVideoFitMode,
   shouldShowBufferingSpinner,
 } from "@/lib/feed-playback";
-import { cn, prefersReducedMotion } from "@/lib/utils";
+import { cn, formatBRL, prefersReducedMotion } from "@/lib/utils";
+import { primaryProductOfVideo } from "@/lib/video-products";
 import {
   Heart,
   MessageCircle,
@@ -87,14 +88,6 @@ async function refreshBunnyStatusForPublicFeed(storeSlug: string) {
   ).catch(() => null);
 }
 
-function getPrimaryProduct(video: any) {
-  return (
-    video.video_products?.find((item: any) => item.is_primary)?.products ??
-    video.video_products?.[0]?.products ??
-    null
-  );
-}
-
 function getLinkedProducts(video: any) {
   const links = Array.isArray(video.video_products) ? video.video_products : [];
   const seen = new Set<string>();
@@ -114,11 +107,7 @@ function getLinkedProducts(video: any) {
 }
 
 function formatPrice(value?: number | null) {
-  if (!value) return null;
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(value);
+  return value ? formatBRL(value) : null;
 }
 
 function formatVariantPrice(value?: number | null) {
@@ -524,7 +513,7 @@ function getProductView(
   storeUrl?: string | null,
 ) {
   return productToView(
-    getPrimaryProduct(video),
+    primaryProductOfVideo(video),
     fallbackUrl,
     contextualProductUrl,
     storeUrl,
@@ -593,11 +582,6 @@ type QuickOrderItem = {
   asset_id?: string | null;
   product_variant_id: number;
   quantity: number;
-};
-
-type QuickOrderPayload = {
-  items: QuickOrderItem[];
-  productUrl?: string | null;
 };
 
 type NuvemshopQuickOrderItem = {
@@ -727,10 +711,7 @@ function hasRealVariantSize(variant: any) {
 
 function hasUsableQuickOrderGrid(product: any) {
   const variants = Array.isArray(product?.variants) ? product.variants : [];
-  const purchasableVariants = variants.filter(isAvailableCommerceVariant);
-  if (!purchasableVariants.length) return false;
-  if (purchasableVariants.length > 1) return true;
-  return true;
+  return variants.some(isAvailableCommerceVariant);
 }
 
 function shouldHydrateShopifyVariants(product: any) {
@@ -858,6 +839,13 @@ export default function PreviewFeed() {
 
   const store = feedQuery.data?.store;
   const feedOptions = asRecord((feedQuery.data as any)?.feed_options);
+  // The feed's own accent, falling back to the store's dashboard-wide brand
+  // color (same fallback chain the carousel/launcher already use) — every
+  // CTA/highlight in this file used to be a fixed hex regardless of either.
+  const accentColor =
+    (typeof feedOptions.accent_color === "string" && feedOptions.accent_color) ||
+    store?.button_color ||
+    "#fe2c55";
   const showLogo = feedOption(feedOptions, "show_logo", true);
   const showProductName = feedOption(feedOptions, "show_product_name", true);
   const showPrice = feedOption(feedOptions, "show_price", true);
@@ -896,7 +884,7 @@ export default function PreviewFeed() {
   const productRelatedVideoCount = React.useMemo(() => {
     if (!sourceProductUrl) return 0;
     return orderedVideos.filter((video: any) =>
-      sameProductUrl(getPrimaryProduct(video)?.product_url, sourceProductUrl),
+      sameProductUrl(primaryProductOfVideo(video)?.product_url, sourceProductUrl),
     ).length;
   }, [orderedVideos, sourceProductUrl]);
   const isProductSwipeHint = productRelatedVideoCount > 1;
@@ -1203,7 +1191,7 @@ export default function PreviewFeed() {
     track(
       "like_click",
       video,
-      getPrimaryProduct(video)?.id ?? video.productId ?? null,
+      primaryProductOfVideo(video)?.id ?? video.productId ?? null,
     );
   };
 
@@ -1217,7 +1205,7 @@ export default function PreviewFeed() {
       track(
         "like_click",
         video,
-        getPrimaryProduct(video)?.id ?? video.productId ?? null,
+        primaryProductOfVideo(video)?.id ?? video.productId ?? null,
       );
       return { ...current, [video.id]: true };
     });
@@ -1232,7 +1220,7 @@ export default function PreviewFeed() {
     track(
       "share_click",
       video,
-      getPrimaryProduct(video)?.id ?? video.productId ?? null,
+      primaryProductOfVideo(video)?.id ?? video.productId ?? null,
     );
     try {
       if (navigator.share) {
@@ -1284,7 +1272,7 @@ export default function PreviewFeed() {
       track(
         "comment_create",
         selectedCommentVideo,
-        getPrimaryProduct(selectedCommentVideo)?.id ??
+        primaryProductOfVideo(selectedCommentVideo)?.id ??
           selectedCommentVideo.productId ??
           null,
       );
@@ -1428,7 +1416,18 @@ export default function PreviewFeed() {
     });
   };
 
-  const sendUpzeroQuickOrder = ({ items, productUrl }: QuickOrderPayload) => {
+  // The three platform adapters all speak the same request/response
+  // envelope over postMessage — only the message `type` and item shape
+  // differ, so one parameterized sender replaces what used to be three
+  // near-identical copies.
+  const sendCartAddRequest = (
+    messageType:
+      | "LUPP_UPZERO_ADD_TO_CART_REQUEST"
+      | "LUPP_NUVEMSHOP_ADD_TO_CART_REQUEST"
+      | "LUPP_SHOPIFY_ADD_TO_CART_REQUEST",
+    items: QuickOrderItem[] | NuvemshopQuickOrderItem[] | ShopifyQuickOrderItem[],
+    productUrl?: string | null,
+  ) => {
     if (!isEmbedded || window.parent === window) {
       return Promise.reject(
         new Error("Abra o vídeo dentro da loja para adicionar ao carrinho."),
@@ -1452,94 +1451,7 @@ export default function PreviewFeed() {
         timeout,
       });
       window.parent.postMessage(
-        {
-          type: "LUPP_UPZERO_ADD_TO_CART_REQUEST",
-          requestId,
-          items,
-          productUrl,
-        },
-        "*",
-      );
-    });
-  };
-
-  const sendNuvemshopQuickOrder = ({
-    items,
-    productUrl,
-  }: {
-    items: NuvemshopQuickOrderItem[];
-    productUrl?: string | null;
-  }) => {
-    if (!isEmbedded || window.parent === window) {
-      return Promise.reject(
-        new Error("Abra o vídeo dentro da loja para adicionar ao carrinho."),
-      );
-    }
-
-    const requestId =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-    return new Promise<void>((resolve, reject) => {
-      const timeout = window.setTimeout(() => {
-        quickOrderRequestsRef.current.delete(requestId);
-        reject(new Error("A loja não respondeu ao pedido de carrinho."));
-      }, 12000);
-
-      quickOrderRequestsRef.current.set(requestId, {
-        reject,
-        resolve,
-        timeout,
-      });
-      window.parent.postMessage(
-        {
-          type: "LUPP_NUVEMSHOP_ADD_TO_CART_REQUEST",
-          requestId,
-          items,
-          productUrl,
-        },
-        "*",
-      );
-    });
-  };
-
-  const sendShopifyQuickOrder = ({
-    items,
-    productUrl,
-  }: {
-    items: ShopifyQuickOrderItem[];
-    productUrl?: string | null;
-  }) => {
-    if (!isEmbedded || window.parent === window) {
-      return Promise.reject(
-        new Error("Abra o vídeo dentro da loja para adicionar ao carrinho."),
-      );
-    }
-
-    const requestId =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-    return new Promise<void>((resolve, reject) => {
-      const timeout = window.setTimeout(() => {
-        quickOrderRequestsRef.current.delete(requestId);
-        reject(new Error("A loja não respondeu ao pedido de carrinho."));
-      }, 12000);
-
-      quickOrderRequestsRef.current.set(requestId, {
-        reject,
-        resolve,
-        timeout,
-      });
-      window.parent.postMessage(
-        {
-          type: "LUPP_SHOPIFY_ADD_TO_CART_REQUEST",
-          requestId,
-          items,
-          productUrl,
-        },
+        { type: messageType, requestId, items, productUrl },
         "*",
       );
     });
@@ -1610,20 +1522,23 @@ export default function PreviewFeed() {
     setQuickOrderStatus("submitting");
     try {
       if (isNuvemshopOrder) {
-        await sendNuvemshopQuickOrder({
-          items: items as NuvemshopQuickOrderItem[],
-          productUrl: selectedQuickOrder.product.productUrl,
-        });
+        await sendCartAddRequest(
+          "LUPP_NUVEMSHOP_ADD_TO_CART_REQUEST",
+          items as NuvemshopQuickOrderItem[],
+          selectedQuickOrder.product.productUrl,
+        );
       } else if (isShopifyOrder) {
-        await sendShopifyQuickOrder({
-          items: items as ShopifyQuickOrderItem[],
-          productUrl: selectedQuickOrder.product.productUrl,
-        });
+        await sendCartAddRequest(
+          "LUPP_SHOPIFY_ADD_TO_CART_REQUEST",
+          items as ShopifyQuickOrderItem[],
+          selectedQuickOrder.product.productUrl,
+        );
       } else {
-        await sendUpzeroQuickOrder({
-          items: items as QuickOrderItem[],
-          productUrl: selectedQuickOrder.product.productUrl,
-        });
+        await sendCartAddRequest(
+          "LUPP_UPZERO_ADD_TO_CART_REQUEST",
+          items as QuickOrderItem[],
+          selectedQuickOrder.product.productUrl,
+        );
       }
       track(
         "add_to_cart_click",
@@ -2121,6 +2036,7 @@ export default function PreviewFeed() {
             return (
               <FeedItem
                 key={video.id}
+                accentColor={accentColor}
                 actions={feedItemActions}
                 addToCartInline={addToCartInline}
                 commerceActionLabel={commerceActionLabel}
@@ -2216,11 +2132,11 @@ export default function PreviewFeed() {
                         {selectedProductView?.name}
                       </h2>
                       {selectedProductView?.price ? (
-                        <p className="mt-2 text-2xl font-black text-[#fe2c55]">
+                        <p className="mt-2 text-2xl font-black" style={{ color: accentColor }}>
                           {selectedProductView.price}
                         </p>
                       ) : (
-                        <p className="mt-2 text-sm font-bold text-[#fe2c55]">
+                        <p className="mt-2 text-sm font-bold" style={{ color: accentColor }}>
                           {customerAccessLabel}
                         </p>
                       )}
@@ -2238,11 +2154,11 @@ export default function PreviewFeed() {
 
                   <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
                     <div className="rounded-sm bg-slate-50 p-3">
-                      <Truck className="mb-1 h-4 w-4 text-[#fe2c55]" />
+                      <Truck className="mb-1 h-4 w-4" style={{ color: accentColor }} />
                       Entrega e checkout pela plataforma conectada.
                     </div>
                     <div className="rounded-sm bg-slate-50 p-3">
-                      <ShieldCheck className="mb-1 h-4 w-4 text-[#fe2c55]" />
+                      <ShieldCheck className="mb-1 h-4 w-4" style={{ color: accentColor }} />
                       Eventos rastreados pela Lupp.
                     </div>
                   </div>
@@ -2258,7 +2174,8 @@ export default function PreviewFeed() {
                 </div>
                 <DrawerFooter className="border-t border-slate-100 bg-white">
                   <Button
-                    className="h-12 bg-[#fe2c55] text-base font-black text-white hover:bg-[#e6294e]"
+                    className="h-12 text-base font-black text-white transition-[filter] hover:brightness-90"
+                    style={{ backgroundColor: accentColor }}
                     onClick={() => {
                       if (selectedProductRestricted) {
                         openProductPage(
@@ -2548,7 +2465,8 @@ export default function PreviewFeed() {
 
                       <DrawerFooter className="border-t border-slate-100 bg-white px-5">
                         <Button
-                          className="h-12 rounded-none bg-[#37a928] text-xs font-semibold uppercase tracking-[0.32em] text-black hover:bg-[#2f9822]"
+                          className="h-12 rounded-none text-xs font-semibold uppercase tracking-[0.32em] text-white transition-[filter] hover:brightness-90"
+                          style={{ backgroundColor: accentColor }}
                           disabled={
                             quickOrderStatus === "submitting" ||
                             isLoadingShopifyVariants ||
@@ -2819,6 +2737,7 @@ export default function PreviewFeed() {
         )}
 
         <CommentDrawer
+          accentColor={accentColor}
           open={Boolean(selectedCommentVideo)}
           isSubmitting={isSubmittingComment}
           onClose={() => setSelectedCommentVideo(null)}
@@ -2882,6 +2801,7 @@ const FeedItemPlaceholder = React.memo(function FeedItemPlaceholder({
 });
 
 type FeedItemProps = {
+  accentColor: string;
   actions: FeedItemActions;
   addToCartInline: boolean;
   commerceActionLabel: (product: any) => string;
@@ -2913,6 +2833,7 @@ type FeedItemProps = {
 };
 
 const FeedItem = React.memo(function FeedItem({
+  accentColor,
   actions,
   addToCartInline,
   commerceActionLabel,
@@ -3229,6 +3150,7 @@ const FeedItem = React.memo(function FeedItem({
                 return (
                   <div key={item.product.id} className="w-[78%] shrink-0">
                     <CommerceProductCard
+                      accentColor={accentColor}
                       product={item.view}
                       singleAction
                       disabled={itemUnavailable}
@@ -3272,6 +3194,7 @@ const FeedItem = React.memo(function FeedItem({
                 !hasUsableQuickOrderGrid(visibleProducts[0].product);
               return (
                 <CommerceProductCard
+                  accentColor={accentColor}
                   product={visibleProducts[0].view}
                   singleAction
                   disabled={singleUnavailable}
@@ -3327,8 +3250,8 @@ const FeedItem = React.memo(function FeedItem({
           >
             <Heart
               className="h-8 w-8 drop-shadow-[0_2px_7px_rgba(0,0,0,.45)] transition-all"
-              fill={liked ? "#fe2c55" : "white"}
-              stroke={liked ? "#fe2c55" : "white"}
+              fill={liked ? accentColor : "white"}
+              stroke={liked ? accentColor : "white"}
               strokeWidth={2.3}
             />
             <span className="text-2xs font-black leading-none text-white [text-shadow:0_1px_4px_rgba(0,0,0,.8)]">
@@ -3381,11 +3304,13 @@ const FeedItem = React.memo(function FeedItem({
 // feed. Fields persist across open/close and clear only after a successful
 // submit, matching the previous page-level state behavior.
 function CommentDrawer({
+  accentColor,
   isSubmitting,
   onClose,
   onSubmit,
   open,
 }: {
+  accentColor: string;
   isSubmitting: boolean;
   onClose: () => void;
   onSubmit: (authorName: string, body: string) => Promise<boolean>;
@@ -3441,7 +3366,8 @@ function CommentDrawer({
         </div>
         <DrawerFooter className="border-t border-slate-100 bg-white">
           <Button
-            className="h-12 bg-[#fe2c55] text-base font-black text-white hover:bg-[#e6294e]"
+            className="h-12 text-base font-black text-white transition-[filter] hover:brightness-90"
+            style={{ backgroundColor: accentColor }}
             disabled={isSubmitting}
             onClick={() => void submit()}
           >

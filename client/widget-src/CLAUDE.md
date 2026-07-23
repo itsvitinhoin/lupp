@@ -53,7 +53,12 @@ concern per file: config parsing, adapter loading, cart-sync, etc.).
   it — never import from `core/*` there, only from `ctx` and their own
   sibling modules. `core/*` modules may write specific `ctx` fields they own
   after that point (e.g. `core/spa-navigation.ts` owns
-  `ctx.lastRenderedUrl`/`ctx.lastRequestedContextUrl`).
+  `ctx.lastRenderedUrl`/`ctx.lastRequestedContextUrl`). Narrow exception:
+  `render/*.ts` MAY import from `core/constants.ts` and `core/widget-type.ts`
+  specifically — both are pure, side-effect-free constants/predicates with no
+  state of their own, so importing them carries none of the risk the rule
+  guards against (accidentally reading/writing another module's mutable
+  state). Don't stretch this exception to any other `core/*` module.
 - **Every inbound `postMessage` handler must check
   `isTrustedLuppFrameOrigin(event.origin)`** before doing anything (cart
   adds, product lookups, customer-status requests). This is the widget's

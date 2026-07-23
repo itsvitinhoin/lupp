@@ -43,6 +43,11 @@ export type LauncherServerConfig = {
   model?: string;
   offset_x?: number;
   offset_y?: number;
+  border_radius?: number;
+  shadow_enabled?: boolean;
+  shadow_color?: string;
+  shadow_opacity?: number;
+  shadow_blur?: number;
 }
 
 export type DisplayServerConfig = {
@@ -92,6 +97,10 @@ export type CarouselServerConfig = {
   card_shadow_blur?: number;
   card_shadow_offset_x?: number;
   card_shadow_offset_y?: number;
+  pill_background_color?: string;
+  pill_text_color?: string;
+  nav_arrow_background_color?: string;
+  nav_arrow_icon_color?: string;
   autoplay_enabled?: boolean;
   autoplay_interval_ms?: number;
   autoplay_direction?: string;
@@ -139,6 +148,9 @@ export type BootstrapPayload = {
   feed_options?: {
     reload_storefront_on_cart_update?: boolean;
     show_feedback_form_on_close?: boolean;
+    overlay_backdrop_color?: string;
+    overlay_backdrop_opacity?: number;
+    close_button_color?: string;
   };
   videos?: SlimVideo[];
   widget?: unknown;
@@ -159,6 +171,12 @@ export type LauncherConfig = {
   model: string;
   offsetX: number;
   offsetY: number;
+  /** px; -1 means "auto" (999 for circular-family models, 18 otherwise). */
+  borderRadius: number;
+  shadowEnabled: boolean;
+  shadowColor: string;
+  shadowOpacity: number;
+  shadowBlur: number;
 }
 
 export type DisplayConfig = {
@@ -207,6 +225,10 @@ export type CarouselConfig = {
   cardShadowBlur: number;
   cardShadowOffsetX: number;
   cardShadowOffsetY: number;
+  pillBackgroundColor: string;
+  pillTextColor: string;
+  navArrowBackgroundColor: string;
+  navArrowIconColor: string;
   autoplayEnabled: boolean;
   autoplayIntervalMs: number;
   autoplayDirection: string;
@@ -279,6 +301,9 @@ export type BridgeState = {
   upzeroCustomerStatusLastRefreshAt: number;
   reloadStorefrontOnCartUpdate: boolean;
   showFeedbackFormOnClose: boolean;
+  feedOverlayBackdropColor: string;
+  feedOverlayBackdropOpacity: number;
+  feedCloseButtonColor: string;
 }
 
 export interface BridgeUtils {

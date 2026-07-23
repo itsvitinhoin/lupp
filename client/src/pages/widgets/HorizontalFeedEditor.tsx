@@ -571,6 +571,37 @@ export function HorizontalFeedEditor(props: {
               </div>
             ) : null}
 
+            <div className="grid grid-cols-2 gap-4">
+              <ColorPickerField
+                id="carousel-pill-background-color"
+                label="Cor de fundo do rótulo de produto"
+                value={form.carouselPillBackgroundColor}
+                onChange={(value) => setField("carouselPillBackgroundColor", value)}
+              />
+              <ColorPickerField
+                id="carousel-pill-text-color"
+                label="Cor do texto do rótulo de produto"
+                value={form.carouselPillTextColor}
+                onChange={(value) => setField("carouselPillTextColor", value)}
+              />
+            </div>
+            {form.carouselShowNavigationArrows ? (
+              <div className="grid grid-cols-2 gap-4">
+                <ColorPickerField
+                  id="carousel-nav-arrow-background-color"
+                  label="Cor de fundo das setas"
+                  value={form.carouselNavArrowBackgroundColor}
+                  onChange={(value) => setField("carouselNavArrowBackgroundColor", value)}
+                />
+                <ColorPickerField
+                  id="carousel-nav-arrow-icon-color"
+                  label="Cor do ícone das setas"
+                  value={form.carouselNavArrowIconColor}
+                  onChange={(value) => setField("carouselNavArrowIconColor", value)}
+                />
+              </div>
+            ) : null}
+
             <SectionDivider />
 
             <div className="flex items-center gap-3">

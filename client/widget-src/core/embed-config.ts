@@ -115,6 +115,14 @@ export function buildLauncherConfig(raw: RawEmbedValues): LauncherConfig {
     model: raw.model,
     offsetX: Number(raw.offsetX),
     offsetY: Number(raw.offsetY),
+    // Dashboard-only, no data-*/query override (same precedent as the
+    // carousel's own shadow/layout fields below) — bootstrap always
+    // supplies the resolved value once it answers.
+    borderRadius: -1,
+    shadowEnabled: true,
+    shadowColor: "#000000",
+    shadowOpacity: 28,
+    shadowBlur: 28,
   };
 }
 
@@ -172,6 +180,10 @@ export function buildCarouselConfig(raw: RawEmbedValues): CarouselConfig {
     cardShadowBlur: 28,
     cardShadowOffsetX: 0,
     cardShadowOffsetY: 14,
+    pillBackgroundColor: "#485248",
+    pillTextColor: "#ffffff",
+    navArrowBackgroundColor: "#ffffff",
+    navArrowIconColor: "#16171a",
     autoplayEnabled: false,
     autoplayIntervalMs: 3500,
     autoplayDirection: "forward",
@@ -220,6 +232,21 @@ export function applyContextConfig(config: ContextConfig | undefined): void {
   }
   if (launcher.offset_y && !hasExplicitScriptValue(script, SCRIPT_VALUE_SPECS.offsetY)) {
     ctx.launcherConfig.offsetY = Number(launcher.offset_y) || ctx.launcherConfig.offsetY;
+  }
+  if (Number.isFinite(Number(launcher.border_radius))) {
+    ctx.launcherConfig.borderRadius = Number(launcher.border_radius);
+  }
+  if ("shadow_enabled" in launcher) {
+    ctx.launcherConfig.shadowEnabled = launcher.shadow_enabled !== false;
+  }
+  if (launcher.shadow_color) {
+    ctx.launcherConfig.shadowColor = launcher.shadow_color;
+  }
+  if (Number.isFinite(Number(launcher.shadow_opacity))) {
+    ctx.launcherConfig.shadowOpacity = Number(launcher.shadow_opacity);
+  }
+  if (Number.isFinite(Number(launcher.shadow_blur))) {
+    ctx.launcherConfig.shadowBlur = Number(launcher.shadow_blur);
   }
 
   if ("hide_without_videos" in display && !hasExplicitScriptValue(script, SCRIPT_VALUE_SPECS.hideWithoutVideos)) {
@@ -363,6 +390,18 @@ export function applyContextConfig(config: ContextConfig | undefined): void {
   }
   if (Number.isFinite(Number(carousel.card_shadow_offset_y))) {
     ctx.carouselConfig.cardShadowOffsetY = Number(carousel.card_shadow_offset_y);
+  }
+  if (carousel.pill_background_color) {
+    ctx.carouselConfig.pillBackgroundColor = carousel.pill_background_color;
+  }
+  if (carousel.pill_text_color) {
+    ctx.carouselConfig.pillTextColor = carousel.pill_text_color;
+  }
+  if (carousel.nav_arrow_background_color) {
+    ctx.carouselConfig.navArrowBackgroundColor = carousel.nav_arrow_background_color;
+  }
+  if (carousel.nav_arrow_icon_color) {
+    ctx.carouselConfig.navArrowIconColor = carousel.nav_arrow_icon_color;
   }
   if ("autoplay_enabled" in carousel) {
     ctx.carouselConfig.autoplayEnabled = carousel.autoplay_enabled === true;

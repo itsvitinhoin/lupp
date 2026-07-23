@@ -1,10 +1,11 @@
 // Lupp widget – embedded home carousel: card rendering plus the anchor
 // discovery/watching that decides where the carousel attaches on the page.
-import { debugLog, escapeHtml, normalizeText } from "../utils";
+import { debugLog, escapeHtml, hexToRgba, normalizeText } from "../utils";
 import { primeInlineVideos } from "../hls";
 import { ctx, isUpzeroStore, videoMediaUrl } from "../context";
 import { openFeedOverlay } from "../feed";
 import { CAROUSEL_MOBILE_BREAKPOINT } from "../core/constants";
+import { isFloatingWidgetType } from "../core/widget-type";
 import type { SlimVideo, StorePayload } from "../types";
 
 var homeCarouselRoot: HTMLElement | null = null;
@@ -43,10 +44,6 @@ export function resolveCarouselItemLimit(
 ): number {
   const configured = isMobileViewport ? config.mobileMaxItems : config.maxItems;
   return Math.max(1, Number(configured) || 1);
-}
-
-function isFloatingWidget(): boolean {
-  return ctx.widgetType === "floating_launcher" || ctx.widgetType === "floating_video";
 }
 
 function closestSection(element: Element): Element {
@@ -498,7 +495,7 @@ function scheduleHomeCarouselAnchorRetry(root: HTMLElement): void {
 // on the storefront home with the home experience on and the carousel
 // plan-allowed, per the current context URL.
 function shouldRenderEmbeddedHomeCarousel(): boolean {
-  return isFloatingWidget() && ctx.contextDisplay.show_home_carousel === true;
+  return isFloatingWidgetType(ctx.widgetType) && ctx.contextDisplay.show_home_carousel === true;
 }
 
 export function renderEmbeddedHomeCarousel(videos: SlimVideo[], root: HTMLElement): void {
@@ -566,23 +563,6 @@ function triggerCarouselEntranceWhenVisible(root: HTMLElement): void {
 function aspectRatioToCss(value: string): string {
   var match = String(value || "").match(/^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/);
   return match ? match[1] + " / " + match[2] : "9 / 16";
-}
-
-function hexToRgba(hex: string, alpha: number): string {
-  var normalized = String(hex || "").trim().replace(/^#/, "");
-  if (normalized.length === 3) {
-    normalized = normalized
-      .split("")
-      .map(function (char) {
-        return char + char;
-      })
-      .join("");
-  }
-  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return "rgba(255,255,255," + alpha + ")";
-  var r = parseInt(normalized.slice(0, 2), 16);
-  var g = parseInt(normalized.slice(2, 4), 16);
-  var b = parseInt(normalized.slice(4, 6), 16);
-  return "rgba(" + r + "," + g + "," + b + "," + alpha + ")";
 }
 
 function carouselPrefersReducedMotion(): boolean {
@@ -982,8 +962,14 @@ export function renderCarousel(
     "px;z-index:2;display:flex;align-items:center;pointer-events:none}" +
     ".lupp-home-carousel-nav-zone--prev{left:8px}" +
     ".lupp-home-carousel-nav-zone--next{right:8px}" +
-    ".lupp-home-carousel-nav{pointer-events:auto;width:40px;height:40px;border:0;border-radius:999px;background:rgba(255,255,255,.92);color:#16171a;font-size:26px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 8px 20px rgba(15,23,42,.18);transition:opacity .2s ease}" +
-    ".lupp-home-carousel-nav:hover{background:#fff}" +
+    ".lupp-home-carousel-nav{pointer-events:auto;width:40px;height:40px;border:0;border-radius:999px;background:" +
+    hexToRgba(config.navArrowBackgroundColor, 0.92) +
+    ";color:" +
+    config.navArrowIconColor +
+    ";font-size:26px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 8px 20px rgba(15,23,42,.18);transition:opacity .2s ease}" +
+    ".lupp-home-carousel-nav:hover{background:" +
+    hexToRgba(config.navArrowBackgroundColor, 1) +
+    "}" +
     ".lupp-home-carousel-nav:focus-visible{outline:3px solid " +
     accent +
     ";outline-offset:2px}" +
@@ -1014,7 +1000,9 @@ export function renderCarousel(
     config.cardBackgroundColor +
     ";transition:transform .28s ease}" +
     ".lupp-home-carousel-card:hover .lupp-home-carousel-thumb{transform:scale(1.025)}" +
-    ".lupp-home-carousel-product{position:absolute;left:8px;right:8px;bottom:9px;display:flex;flex-direction:column;align-items:stretch;gap:0;min-height:78px;padding:0;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:rgba(72,82,72,.82);box-shadow:0 10px 24px rgba(15,23,42,.2);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);text-align:left;overflow:hidden}" +
+    ".lupp-home-carousel-product{position:absolute;left:8px;right:8px;bottom:9px;display:flex;flex-direction:column;align-items:stretch;gap:0;min-height:78px;padding:0;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:" +
+    hexToRgba(config.pillBackgroundColor, 0.82) +
+    ";box-shadow:0 10px 24px rgba(15,23,42,.2);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);text-align:left;overflow:hidden}" +
     ".lupp-home-carousel-product-main{display:flex;align-items:center;gap:7px;min-width:0;padding:7px 8px}" +
     ".lupp-home-carousel-product-image{display:block;flex:0 0 42px;width:42px;height:42px;border-radius:8px;object-fit:cover;background:" +
     config.cardBackgroundColor +
@@ -1022,10 +1010,18 @@ export function renderCarousel(
     ".lupp-home-carousel-product-placeholder{background:" +
     accent +
     "}" +
-    ".lupp-home-carousel-product-copy{min-width:0;display:block;flex:1;color:#fff}" +
-    ".lupp-home-carousel-product-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff;font-size:12px;font-weight:700;line-height:1.15;letter-spacing:0;text-transform:uppercase}" +
-    ".lupp-home-carousel-product-price{display:block;margin-top:4px;color:rgba(255,255,255,.84);font-size:11px;font-weight:600;line-height:1.2;letter-spacing:0}" +
-    ".lupp-home-carousel-product-divider{display:block;height:1px;background:rgba(255,255,255,.14)}" +
+    ".lupp-home-carousel-product-copy{min-width:0;display:block;flex:1;color:" +
+    config.pillTextColor +
+    "}" +
+    ".lupp-home-carousel-product-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:" +
+    config.pillTextColor +
+    ";font-size:12px;font-weight:700;line-height:1.15;letter-spacing:0;text-transform:uppercase}" +
+    ".lupp-home-carousel-product-price{display:block;margin-top:4px;color:" +
+    hexToRgba(config.pillTextColor, 0.84) +
+    ";font-size:11px;font-weight:600;line-height:1.2;letter-spacing:0}" +
+    ".lupp-home-carousel-product-divider{display:block;height:1px;background:" +
+    hexToRgba(config.pillTextColor, 0.14) +
+    "}" +
     ".lupp-home-carousel-product-cta{margin:7px 8px 8px;display:flex;align-items:center;justify-content:center;min-height:32px;border-radius:10px;background:#fff;color:#070d1d;border:2px solid " +
     accent +
     ";padding:7px 9px;text-align:center;font-size:11px;font-weight:800;line-height:1.1;letter-spacing:0}" +

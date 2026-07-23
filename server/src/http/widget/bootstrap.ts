@@ -190,6 +190,9 @@ const BootstrapResponseSchema = z
       .object({
         reload_storefront_on_cart_update: z.boolean(),
         show_feedback_form_on_close: z.boolean(),
+        overlay_backdrop_color: z.string(),
+        overlay_backdrop_opacity: z.number(),
+        close_button_color: z.string(),
       })
       .optional(),
     videos: z.array(z.union([WidgetSlimVideoSchema, WidgetVideoSchema])),
@@ -468,6 +471,18 @@ export async function widgetBootstrapHandler(request: FastifyRequest, reply: Fas
       typeof feedOptionsRecord.show_feedback_form_on_close === "boolean"
         ? feedOptionsRecord.show_feedback_form_on_close
         : true,
+    overlay_backdrop_color:
+      typeof feedOptionsRecord.overlay_backdrop_color === "string"
+        ? feedOptionsRecord.overlay_backdrop_color
+        : "#000000",
+    overlay_backdrop_opacity:
+      typeof feedOptionsRecord.overlay_backdrop_opacity === "number"
+        ? feedOptionsRecord.overlay_backdrop_opacity
+        : 76,
+    close_button_color:
+      typeof feedOptionsRecord.close_button_color === "string"
+        ? feedOptionsRecord.close_button_color
+        : "#ffffff",
   };
 
   if (context) {

@@ -43,6 +43,11 @@ export type ResolvedWidgetConfig = {
     model: string;
     offset_x: number;
     offset_y: number;
+    border_radius: number;
+    shadow_enabled: boolean;
+    shadow_color: string;
+    shadow_opacity: number;
+    shadow_blur: number;
   };
   display: {
     mode: string;
@@ -91,6 +96,10 @@ export type ResolvedWidgetConfig = {
     card_shadow_blur: number;
     card_shadow_offset_x: number;
     card_shadow_offset_y: number;
+    pill_background_color: string;
+    pill_text_color: string;
+    nav_arrow_background_color: string;
+    nav_arrow_icon_color: string;
     autoplay_enabled: boolean;
     autoplay_interval_ms: number;
     autoplay_direction: string;
@@ -277,6 +286,20 @@ export function resolveWidgetConfig(
       offset_y: Number.isFinite(Number(appearance.offset_y))
         ? Number(appearance.offset_y)
         : DEFAULTS.appearance.offset_y,
+      border_radius: Number.isFinite(Number(appearance.border_radius))
+        ? Number(appearance.border_radius)
+        : DEFAULTS.appearance.border_radius,
+      shadow_enabled:
+        "shadow_enabled" in appearance
+          ? appearance.shadow_enabled !== false
+          : DEFAULTS.appearance.shadow_enabled,
+      shadow_color: text(appearance.shadow_color) || DEFAULTS.appearance.shadow_color,
+      shadow_opacity: Number.isFinite(Number(appearance.shadow_opacity))
+        ? Number(appearance.shadow_opacity)
+        : DEFAULTS.appearance.shadow_opacity,
+      shadow_blur: Number.isFinite(Number(appearance.shadow_blur))
+        ? Number(appearance.shadow_blur)
+        : DEFAULTS.appearance.shadow_blur,
     },
     display: {
       mode: text(display.mode) || DEFAULTS.display.mode,
@@ -359,6 +382,14 @@ export function resolveWidgetConfig(
       card_shadow_offset_y: Number.isFinite(Number(carousel.card_shadow_offset_y))
         ? Number(carousel.card_shadow_offset_y)
         : DEFAULTS.carousel.card_shadow_offset_y,
+      pill_background_color:
+        text(carousel.pill_background_color) || DEFAULTS.carousel.pill_background_color,
+      pill_text_color: text(carousel.pill_text_color) || DEFAULTS.carousel.pill_text_color,
+      nav_arrow_background_color:
+        text(carousel.nav_arrow_background_color) ||
+        DEFAULTS.carousel.nav_arrow_background_color,
+      nav_arrow_icon_color:
+        text(carousel.nav_arrow_icon_color) || DEFAULTS.carousel.nav_arrow_icon_color,
       autoplay_enabled: Boolean(carousel.autoplay_enabled),
       autoplay_interval_ms:
         Number(carousel.autoplay_interval_ms) || DEFAULTS.carousel.autoplay_interval_ms,
@@ -381,7 +412,7 @@ export function resolveWidgetConfig(
 // Display rules (widget.js shouldDisplayOnCurrentUrl)
 // ---------------------------------------------------------------------------
 
-function isHomeCarouselWidget(rawWidgetType: string): boolean {
+function isHomeCarouselWidgetType(rawWidgetType: string): boolean {
   return (
     rawWidgetType === "home_carousel" ||
     rawWidgetType === "horizontal_feed" ||
@@ -398,7 +429,7 @@ function displayVerdict(
   if (matchesAnyPattern(ctx.path, config.display.exclude_paths)) {
     return { show: false, reason: "excluded_path" };
   }
-  if (isHomeCarouselWidget(ctx.rawWidgetType)) {
+  if (isHomeCarouselWidgetType(ctx.rawWidgetType)) {
     if (!home) return { show: false, reason: "carousel_outside_home" };
     if (!config.display.home_experience_enabled) {
       return { show: false, reason: "home_experience_disabled" };
@@ -406,7 +437,7 @@ function displayVerdict(
   } else if (home && !config.display.home_experience_enabled) {
     return { show: false, reason: "home_experience_disabled" };
   }
-  if (isHomeCarouselWidget(ctx.rawWidgetType) && !config.carousel.enabled) {
+  if (isHomeCarouselWidgetType(ctx.rawWidgetType) && !config.carousel.enabled) {
     return { show: false, reason: config.carousel.disabled_reason || "carousel_disabled" };
   }
   if (config.display.hide_without_videos && videoCount === 0) {
