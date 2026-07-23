@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "@/lib/prisma";
-import { findStoreMembership } from "@/lib/store-membership";
+import { canOperateStore } from "@/lib/store-membership";
 import { buildFloatingEnsureSettings } from "@/lib/widget-defaults";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
 import { WidgetRowSchema } from "@/schemas/rows";
@@ -31,8 +31,8 @@ export const EnsureFloatingSchema = {
 export async function ensureFloatingHandler(request: FastifyRequest, reply: FastifyReply) {
   const { store_id } = BodySchema.parse(request.body);
 
-  const member = await findStoreMembership(request.user.sub, store_id);
-  if (!member) return reply.status(403).send({ error: "store_access_denied" });
+  const allowed = await canOperateStore(request.user.sub, store_id);
+  if (!allowed) return reply.status(403).send({ error: "store_access_denied" });
 
   const existing = await prisma.widget.findFirst({
     where: { store_id, type: "floating_video" },

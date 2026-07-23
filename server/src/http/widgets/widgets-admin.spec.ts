@@ -58,6 +58,29 @@ describe("widgets admin (e2e)", () => {
     expect(denied.status).toBe(403);
   });
 
+  it("lets a platform admin list and update widgets for a store they don't belong to", async () => {
+    const { store } = await createStore();
+    const admin = await createUser({ role: "admin" });
+    const adminToken = app.jwt.sign({ sub: admin.id, role: "admin" });
+    const widget = await prisma.widget.create({
+      data: { store_id: store.id, name: "Config", type: "floating_video" },
+    });
+
+    const list = await request(app.server)
+      .get("/api/widgets")
+      .query({ store_id: store.id })
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(list.status).toBe(200);
+    expect(list.body.widgets).toHaveLength(1);
+
+    const update = await request(app.server)
+      .patch(`/api/widgets/${widget.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ status: "active" });
+    expect(update.status).toBe(200);
+    expect(update.body.widget.status).toBe("active");
+  });
+
   it("merges settings PATCHes instead of replacing, and normalizes garbage", async () => {
     const { owner, store } = await createStore();
     const token = app.jwt.sign({ sub: owner.id, role: "agent" });

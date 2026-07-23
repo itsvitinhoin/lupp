@@ -21,10 +21,22 @@ import {
 import { asSettings, useWidgetSettingsForm } from "./widgets/useWidgetSettingsForm";
 import { buildWidgetEmbedCode } from "@/lib/widget-embed";
 
-export default function Widgets() {
+type WidgetsManagerStore = {
+  id: string;
+  slug?: string | null;
+  plan_id?: string | null;
+};
+
+/**
+ * All of /app/widgets' actual editing logic, parameterized by store instead
+ * of always reading useCurrentStore() — reused as-is by the admin console's
+ * per-store "Widget & Feed" tab (client/src/pages/admin/store/widgets-tab.tsx)
+ * so an admin gets the identical rich editor for an arbitrary store, not a
+ * separate reimplementation that could drift from this one.
+ */
+export function WidgetsManager({ store }: { store: WidgetsManagerStore | null | undefined }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { store } = useCurrentStore();
   const [view, setView] = React.useState<WidgetView>("overview");
   const [isSavingSettings, setIsSavingSettings] = React.useState(false);
   const [isInstallingNuvemshop, setIsInstallingNuvemshop] =
@@ -208,57 +220,64 @@ export default function Widgets() {
   };
 
   return (
+    <div className="space-y-6 text-foreground">
+      {view === "overview" ? (
+        <Overview
+          cards={overviewCards}
+          canUseHorizontalFeed={canUseHorizontalFeed}
+          currentPlanName={currentPlan.name}
+          isConnected={Boolean(floatingWidget)}
+          onOpenCard={handleOpenCard}
+          storeSlug={store?.slug ?? undefined}
+        />
+      ) : view === "floating" ? (
+        <FloatingEditor
+          canPersist={Boolean(floatingWidget && store)}
+          embedCode={getEmbedCode()}
+          form={form}
+          isInstallingNuvemshop={isInstallingNuvemshop}
+          isSavingSettings={isSavingSettings}
+          storeSlug={store?.slug ?? undefined}
+          onBack={() => setView("overview")}
+          onCopyCode={() => void handleCopyCode()}
+          onInstallNuvemshop={() => void handleInstallNuvemshopScript()}
+          onSave={() => void handleSaveLauncherSettings()}
+          setField={setField}
+        />
+      ) : (
+        <HorizontalFeedEditor
+          activeWidgetCount={activeWidgetCount}
+          canPersist={Boolean(floatingWidget && store)}
+          currentPlanName={currentPlan.name}
+          embedCode={getHomeCarouselEmbedCode()}
+          form={form}
+          isLockedByPlan={!canUseHorizontalFeed}
+          isSavingSettings={isSavingSettings}
+          requiredPlanName={PLAN_LIMITS.growth.name}
+          widgetLimit={currentPlan.widgetLimit}
+          onBack={() => setView("overview")}
+          onCopyCode={async () => {
+            await navigator.clipboard.writeText(getHomeCarouselEmbedCode());
+            toast({
+              title: "Código do Feed Horizontal copiado",
+              description:
+                "Use esse código quando quiser instalar apenas o carrossel.",
+            });
+          }}
+          onSave={() => void handleSaveHorizontalSettings()}
+          setCarouselEnabled={handleCarouselEnabledChange}
+          setField={setField}
+        />
+      )}
+    </div>
+  );
+}
+
+export default function Widgets() {
+  const { store } = useCurrentStore();
+  return (
     <AppLayout title="Widgets">
-      <div className="space-y-6 text-foreground">
-        {view === "overview" ? (
-          <Overview
-            cards={overviewCards}
-            canUseHorizontalFeed={canUseHorizontalFeed}
-            currentPlanName={currentPlan.name}
-            isConnected={Boolean(floatingWidget)}
-            onOpenCard={handleOpenCard}
-            storeSlug={store?.slug}
-          />
-        ) : view === "floating" ? (
-          <FloatingEditor
-            canPersist={Boolean(floatingWidget && store)}
-            embedCode={getEmbedCode()}
-            form={form}
-            isInstallingNuvemshop={isInstallingNuvemshop}
-            isSavingSettings={isSavingSettings}
-            storeSlug={store?.slug}
-            onBack={() => setView("overview")}
-            onCopyCode={() => void handleCopyCode()}
-            onInstallNuvemshop={() => void handleInstallNuvemshopScript()}
-            onSave={() => void handleSaveLauncherSettings()}
-            setField={setField}
-          />
-        ) : (
-          <HorizontalFeedEditor
-            activeWidgetCount={activeWidgetCount}
-            canPersist={Boolean(floatingWidget && store)}
-            currentPlanName={currentPlan.name}
-            embedCode={getHomeCarouselEmbedCode()}
-            form={form}
-            isLockedByPlan={!canUseHorizontalFeed}
-            isSavingSettings={isSavingSettings}
-            requiredPlanName={PLAN_LIMITS.growth.name}
-            widgetLimit={currentPlan.widgetLimit}
-            onBack={() => setView("overview")}
-            onCopyCode={async () => {
-              await navigator.clipboard.writeText(getHomeCarouselEmbedCode());
-              toast({
-                title: "Código do Feed Horizontal copiado",
-                description:
-                  "Use esse código quando quiser instalar apenas o carrossel.",
-              });
-            }}
-            onSave={() => void handleSaveHorizontalSettings()}
-            setCarouselEnabled={handleCarouselEnabledChange}
-            setField={setField}
-          />
-        )}
-      </div>
+      <WidgetsManager store={store} />
     </AppLayout>
   );
 }

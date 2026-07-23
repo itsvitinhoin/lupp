@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "@/lib/prisma";
-import { findStoreMembership } from "@/lib/store-membership";
+import { canOperateStore } from "@/lib/store-membership";
 import { serializeVideo, VIDEO_PRODUCTS_INCLUDE, type VideoRow } from "@/lib/serialize";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
 import { VideoRowSchema } from "@/schemas/rows";
@@ -34,8 +34,8 @@ export const ListVideosSchema = {
 export async function listVideosHandler(request: FastifyRequest, reply: FastifyReply) {
   const query = QuerySchema.parse(request.query ?? {});
 
-  const member = await findStoreMembership(request.user.sub, query.store_id);
-  if (!member) return reply.status(403).send({ error: "store_access_denied" });
+  const allowed = await canOperateStore(request.user.sub, query.store_id);
+  if (!allowed) return reply.status(403).send({ error: "store_access_denied" });
 
   const where: Prisma.VideoWhereInput = {
     store_id: query.store_id,

@@ -86,10 +86,20 @@ function money(value?: number | string | null) {
   return formatBRL(numeric);
 }
 
-export default function FeedConfig() {
+type FeedManagerStore = {
+  id: string;
+  slug?: string | null;
+};
+
+/**
+ * All of /app/feed's actual editing logic, parameterized by store instead of
+ * always reading useCurrentStore() — reused as-is by the admin console's
+ * per-store "Widget & Feed" tab so an admin gets the identical editor for an
+ * arbitrary store, not a separate reimplementation that could drift.
+ */
+export function FeedManager({ store }: { store: FeedManagerStore | null | undefined }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { store } = useCurrentStore();
   const videosQuery = useVideos(store?.id, "", "active");
   const widgetsQuery = useQuery({
     queryKey: ["widgets", store?.id],
@@ -249,7 +259,6 @@ export default function FeedConfig() {
   };
 
   return (
-    <AppLayout title="Configuração do Feed Vertical">
       <div className="grid gap-8 lg:grid-cols-2">
         <div className="space-y-6">
           <Card className="border-border bg-card text-foreground shadow-sm">
@@ -452,6 +461,14 @@ export default function FeedConfig() {
           </div>
         </div>
       </div>
+  );
+}
+
+export default function FeedConfig() {
+  const { store } = useCurrentStore();
+  return (
+    <AppLayout title="Configuração do Feed Vertical">
+      <FeedManager store={store} />
     </AppLayout>
   );
 }

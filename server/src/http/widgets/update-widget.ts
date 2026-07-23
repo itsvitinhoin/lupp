@@ -2,7 +2,7 @@ import { z } from "zod";
 import { FastifyReply, FastifyRequest } from "fastify";
 import { mergeWidgetSettings } from "@workspace/widget-config";
 import { prisma } from "@/lib/prisma";
-import { findStoreMembership } from "@/lib/store-membership";
+import { canOperateStore } from "@/lib/store-membership";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
 import { WidgetRowSchema } from "@/schemas/rows";
 
@@ -41,8 +41,8 @@ export async function updateWidgetHandler(request: FastifyRequest, reply: Fastif
   });
   if (!existing) return reply.status(404).send({ error: "widget_not_found" });
 
-  const member = await findStoreMembership(request.user.sub, existing.store_id);
-  if (!member) return reply.status(403).send({ error: "store_access_denied" });
+  const allowed = await canOperateStore(request.user.sub, existing.store_id);
+  if (!allowed) return reply.status(403).send({ error: "store_access_denied" });
 
   // Settings PATCHes merge into the stored object (section-wise, normalized —
   // enums/colors/ranges coerced by the shared contract) instead of replacing
