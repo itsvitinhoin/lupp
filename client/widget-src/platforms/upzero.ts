@@ -871,6 +871,16 @@ type UpzeroActionResult = {
     storefrontStoreId: number | string,
     sessionId: string | null,
   ): Promise<Record<string, unknown>> {
+    // Body shape is pinned to Upzero's storefront OpenAPI spec
+    // (StorefrontCartAddItemsBatchRequest, POST /v1/cart/batch — verified
+    // against https://api.upzero.com.br/docs?spec=storefront): only
+    // {items, type}. The tenant is resolved from the X-API-Key header the
+    // proxy sends (never a body field), and cart continuity is the
+    // `sessionID` cookie the proxy relays from `sessionId` — a previous
+    // guess-based version tried 3 made-up shapes (snake/camel/`cart_items`
+    // keys plus stray session_id/store_id fields) and its last attempt
+    // structurally never had an `items` key, so it always failed with
+    // "missing field `items`" once the primary Next-Action flow gave up.
     var snakeItems = items.map(function (item) {
       var payload: Record<string, unknown> = {
         product_variant_id: item.productVariantId,
@@ -879,85 +889,35 @@ type UpzeroActionResult = {
       if (item.assetId) payload.asset_id = item.assetId;
       return payload;
     });
-    var camelItems = items.map(function (item) {
-      var payload: Record<string, unknown> = {
-        productVariantId: item.productVariantId,
-        quantity: item.quantity,
-      };
-      if (item.assetId) payload.assetId = item.assetId;
-      return payload;
+
+    return upzeroProxyRequest("cart_batch", {
+      payload: { items: snakeItems, type: "IN" },
+      session_id: sessionId || null,
+    }).then(function (response) {
+      return response
+        .text()
+        .catch(function () {
+          return "";
+        })
+        .then(function (text) {
+          var parsedPayload = null;
+          try {
+            parsedPayload = text ? JSON.parse(text) : null;
+          } catch (_) {}
+          if (!response.ok) {
+            var apiMessage =
+              (parsedPayload &&
+                (parsedPayload.message || parsedPayload.error)) ||
+              (text && text.length < 200 ? text : "upzero_cart_api_failed");
+            throw new Error(apiMessage);
+          }
+          // The 201 response body IS the cart (StorefrontCart: session_id,
+          // items, totals) — not wrapped in `.cart`/`.data`.
+          var cart = parsedPayload || null;
+          notifyUpzeroCartUpdated(cart, storefrontStoreId, items);
+          return parsedPayload || {};
+        });
     });
-    var payloads = [
-      {
-        items: snakeItems,
-        session_id: sessionId || null,
-        store_id: storefrontStoreId,
-        type: "IN",
-      },
-      {
-        items: camelItems,
-        sessionId: sessionId || null,
-        storeId: storefrontStoreId,
-        type: "IN",
-      },
-      {
-        cart_items: snakeItems,
-        session_id: sessionId || null,
-        store_id: storefrontStoreId,
-        type: "IN",
-      },
-    ];
-
-    function postPayload(
-      payload: Record<string, unknown>,
-    ): Promise<Record<string, unknown>> {
-      return upzeroProxyRequest("cart_batch", {
-        payloads: [payload],
-        session_id: sessionId || null,
-        storefront_store_id: storefrontStoreId,
-      }).then(function (response) {
-        return response
-          .text()
-          .catch(function () {
-            return "";
-          })
-          .then(function (text) {
-            var parsedPayload = null;
-            try {
-              parsedPayload = text ? JSON.parse(text) : null;
-            } catch (_) {}
-            if (!response.ok) {
-              var apiMessage =
-                (parsedPayload &&
-                  (parsedPayload.message || parsedPayload.error)) ||
-                (text && text.length < 200 ? text : "upzero_cart_api_failed");
-              throw new Error(apiMessage);
-            }
-            var cart =
-              (parsedPayload && parsedPayload.cart) ||
-              (parsedPayload && parsedPayload.data) ||
-              parsedPayload ||
-              null;
-            notifyUpzeroCartUpdated(cart, storefrontStoreId, items);
-            return parsedPayload || {};
-          });
-      });
-    }
-
-    function tryPayload(
-      index: number,
-      lastError: Error | null,
-    ): Promise<Record<string, unknown>> {
-      if (index >= payloads.length) {
-        throw lastError || new Error("upzero_cart_api_failed");
-      }
-
-      return postPayload(payloads[index]).catch(function (error) {
-        return tryPayload(index + 1, error);
-      });
-    }
-
-    return tryPayload(0, null);
   }
 
   function addUpzeroItemsToCart(

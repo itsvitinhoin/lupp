@@ -32,7 +32,7 @@ export function upzeroApiHeaders(apiKey: string): Record<string, string> {
  */
 export function upzeroProxyHeaders(
   apiKey: string,
-  options: { authorization?: string | null; hasBody?: boolean } = {},
+  options: { authorization?: string | null; cookie?: string | null; hasBody?: boolean } = {},
 ): Record<string, string> {
   const headers: Record<string, string> = {
     Accept: "application/json",
@@ -41,6 +41,12 @@ export function upzeroProxyHeaders(
   if (options.hasBody) headers["Content-Type"] = "application/json";
   const authorization = String(options.authorization || "");
   if (/^Bearer\s+\S+/i.test(authorization)) headers.Authorization = authorization;
+  // Cart continuity is a `sessionID` cookie per Upzero's storefront API docs
+  // (POST /v1/cart/batch), not a body field — the widget persists the value
+  // it gets back in the cart response's own `session_id` field and replays
+  // it here on the next add-to-cart call.
+  const cookie = String(options.cookie || "").trim();
+  if (cookie) headers.Cookie = `sessionID=${encodeURIComponent(cookie)}`;
   return headers;
 }
 

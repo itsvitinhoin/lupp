@@ -26,6 +26,15 @@ const BodySchema = z.object({
     .array(z.unknown())
     .optional()
     .describe("cart_batch payloads, tried in order until one succeeds."),
+  session_id: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "cart_batch: previously issued Upzero cart sessionID (from a prior response's " +
+        "`session_id` field), replayed as the `sessionID` cookie so the item is added to " +
+        "the same cart instead of starting a new one.",
+    ),
   product_path: z
     .string()
     .optional()
@@ -261,13 +270,19 @@ export async function upzeroStorefrontProxyHandler(
       return reply.status(400).send({ error: "missing_cart_payload" });
     }
 
+    const sessionCookie = clean(body.session_id);
+
     let lastError: JsonRecord | null = null;
     for (const payload of payloads) {
       const response = await upzeroFetch(
         `${baseUrl}/v1/cart/batch`,
         {
           body: JSON.stringify(payload),
-          headers: upzeroProxyHeaders(accessToken, { authorization, hasBody: true }),
+          headers: upzeroProxyHeaders(accessToken, {
+            authorization,
+            cookie: sessionCookie,
+            hasBody: true,
+          }),
           method: "POST",
         },
         null,

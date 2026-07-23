@@ -279,4 +279,34 @@ describe("POST /api/widget/upzero-proxy (e2e, public)", () => {
     expect(response.body).toEqual({ ok: true });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it("relays session_id as the sessionID cookie for cart_batch, and omits it when absent", async () => {
+    const { store } = await createStore();
+    await seedIntegration(store.id);
+    fetchMock.mockImplementation(async () => jsonResponse({ session_id: "cart-abc" }));
+
+    const withSession = await request(app.server)
+      .post("/api/widget/upzero-proxy")
+      .send({
+        action: "cart_batch",
+        store_id: store.id,
+        session_id: "cart-abc",
+        payload: { items: [{ product_variant_id: 101, quantity: 2 }], type: "IN" },
+      });
+    expect(withSession.status).toBe(200);
+    const [, initWithSession] = fetchMock.mock.calls[0];
+    expect(initWithSession.headers.Cookie).toBe("sessionID=cart-abc");
+
+    fetchMock.mockClear();
+    const withoutSession = await request(app.server)
+      .post("/api/widget/upzero-proxy")
+      .send({
+        action: "cart_batch",
+        store_id: store.id,
+        payload: { items: [{ product_variant_id: 101, quantity: 2 }], type: "IN" },
+      });
+    expect(withoutSession.status).toBe(200);
+    const [, initWithoutSession] = fetchMock.mock.calls[0];
+    expect(initWithoutSession.headers.Cookie).toBeUndefined();
+  });
 });
