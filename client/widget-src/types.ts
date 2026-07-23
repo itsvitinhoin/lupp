@@ -61,8 +61,11 @@ export type CarouselServerConfig = {
   before_heading?: string;
   anchor_selector?: string;
   anchor_placement?: string;
+  anchor_fallback?: string;
   max_items?: number;
   mobile_max_items?: number;
+  show_price?: boolean;
+  show_cart_actions?: boolean;
   disabled_reason?: string;
 }
 
@@ -135,8 +138,11 @@ export type CarouselConfig = {
   beforeHeading: string;
   anchorSelector: string;
   anchorPlacement: string;
+  anchorFallback: string;
   maxItems: number;
   mobileMaxItems: number;
+  showPrice: boolean;
+  showCartActions: boolean;
 }
 
 // ---------------------------------------------------------------------------

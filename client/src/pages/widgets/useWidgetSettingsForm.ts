@@ -34,8 +34,11 @@ export type WidgetSettingsForm = {
   carouselBeforeHeading: string;
   carouselAnchorSelector: string;
   carouselAnchorPlacement: string;
+  carouselAnchorFallback: string;
   carouselDesktopCount: string;
   carouselMobileCount: string;
+  carouselShowPrice: boolean;
+  carouselShowCartActions: boolean;
 };
 
 export type SetWidgetSettingsField = <K extends keyof WidgetSettingsForm>(
@@ -78,8 +81,11 @@ const defaultForm: WidgetSettingsForm = {
   carouselBeforeHeading: DEFAULTS.carousel.before_heading,
   carouselAnchorSelector: DEFAULTS.carousel.anchor_selector,
   carouselAnchorPlacement: DEFAULTS.carousel.anchor_placement,
+  carouselAnchorFallback: DEFAULTS.carousel.anchor_fallback,
   carouselDesktopCount: String(DEFAULTS.carousel.max_items),
   carouselMobileCount: String(DEFAULTS.carousel.mobile_max_items),
+  carouselShowPrice: DEFAULTS.carousel.show_price,
+  carouselShowCartActions: DEFAULTS.carousel.show_cart_actions,
 };
 
 export function asSettings(value: unknown): Record<string, any> {
@@ -168,10 +174,15 @@ export function useWidgetSettingsForm({
       carouselAnchorPlacement: String(
         carousel.anchor_placement || DEFAULTS.carousel.anchor_placement,
       ),
+      carouselAnchorFallback: String(
+        carousel.anchor_fallback || DEFAULTS.carousel.anchor_fallback,
+      ),
       carouselDesktopCount: String(carousel.max_items || DEFAULTS.carousel.max_items),
       carouselMobileCount: String(
         carousel.mobile_max_items || DEFAULTS.carousel.mobile_max_items,
       ),
+      carouselShowPrice: carousel.show_price !== false,
+      carouselShowCartActions: carousel.show_cart_actions !== false,
     });
   }, [floatingWidget?.id, floatingWidget?.updated_at]);
 
@@ -218,12 +229,15 @@ export function useWidgetSettingsForm({
     carousel: {
       anchor_placement: form.carouselAnchorPlacement,
       anchor_selector: form.carouselAnchorSelector.trim(),
+      anchor_fallback: form.carouselAnchorFallback,
       enabled: canUseHorizontalFeed && form.carouselEnabled,
       title: form.carouselTitle.trim() || DEFAULTS.carousel.title,
       description: form.carouselDescription.trim(),
       before_heading: form.carouselBeforeHeading.trim() || DEFAULTS.carousel.before_heading,
       max_items: Number(form.carouselDesktopCount) || DEFAULTS.carousel.max_items,
       mobile_max_items: Number(form.carouselMobileCount) || DEFAULTS.carousel.mobile_max_items,
+      show_price: form.carouselShowPrice,
+      show_cart_actions: form.carouselShowCartActions,
     },
   });
 

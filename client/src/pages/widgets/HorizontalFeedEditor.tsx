@@ -205,6 +205,43 @@ export function HorizontalFeedEditor(props: {
               </p>
             </div>
 
+            <div className="space-y-2">
+              <Label className="font-semibold text-muted-foreground">
+                Posição quando nenhuma âncora é encontrada
+              </Label>
+              <Select
+                value={form.carouselAnchorFallback}
+                onValueChange={(value) => setField("carouselAnchorFallback", value)}
+              >
+                <SelectTrigger className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bottom">Final da página</SelectItem>
+                  <SelectItem value="top">Início da página</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs font-semibold leading-5 text-muted-foreground">
+                Se o título acima e a âncora avançada não forem encontrados
+                nesse tema, o carrossel usa essa posição em vez de aparecer no
+                topo da página por padrão.
+              </p>
+            </div>
+
+            <AdvancedSwitch
+              checked={form.carouselShowPrice}
+              description="Quando desativado, o preço do produto fica oculto nos cartões do carrossel — em todas as visitas, independente de login."
+              label="Mostrar preço no carrossel"
+              onChange={(value) => setField("carouselShowPrice", value)}
+            />
+
+            <AdvancedSwitch
+              checked={form.carouselShowCartActions}
+              description="Quando desativado, o botão de compra (“Comprar”) some dos cartões do carrossel; os vídeos continuam abrindo normalmente ao clicar."
+              label="Mostrar botão de compra no carrossel"
+              onChange={(value) => setField("carouselShowCartActions", value)}
+            />
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="font-semibold text-muted-foreground">

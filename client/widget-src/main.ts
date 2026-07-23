@@ -125,8 +125,11 @@ type AnyAdapter = UpzeroAdapter | NuvemshopAdapter | ShopifyAdapter;
     carouselBeforeHeading: { attr: "data-carousel-before-heading", query: ["lupp_carousel_before_heading"], def: "Com Capa" },
     carouselAnchorSelector: { attr: "data-carousel-anchor-selector", query: ["lupp_carousel_anchor_selector"], def: "" },
     carouselAnchorPlacement: { attr: "data-carousel-anchor-placement", query: ["lupp_carousel_anchor_placement"], def: "before" },
+    carouselAnchorFallback: { attr: "data-carousel-anchor-fallback", query: ["lupp_carousel_anchor_fallback"], def: "bottom" },
     carouselMaxItems: { attr: "data-carousel-max-items", query: ["lupp_carousel_max_items"], def: "12" },
     carouselMobileMaxItems: { attr: "data-carousel-mobile-max-items", query: ["lupp_carousel_mobile_max_items"], def: "6" },
+    carouselShowPrice: { attr: "data-carousel-show-price", query: ["lupp_carousel_show_price"], def: "true" },
+    carouselShowCartActions: { attr: "data-carousel-show-cart-actions", query: ["lupp_carousel_show_cart_actions"], def: "true" },
     loadStrategy: { attr: "data-load-strategy", query: ["lupp_load_strategy"], def: "idle" },
     previewMode: { attr: "data-preview-mode", query: ["lupp_preview_mode"], def: "balanced" },
   } satisfies Record<string, ScriptValueSpec>;
@@ -291,8 +294,11 @@ type AnyAdapter = UpzeroAdapter | NuvemshopAdapter | ShopifyAdapter;
     beforeHeading: rawScript.carouselBeforeHeading,
     anchorSelector: rawScript.carouselAnchorSelector,
     anchorPlacement: rawScript.carouselAnchorPlacement,
+    anchorFallback: rawScript.carouselAnchorFallback,
     maxItems: Number(rawScript.carouselMaxItems) || 12,
     mobileMaxItems: Number(rawScript.carouselMobileMaxItems) || 6,
+    showPrice: rawScript.carouselShowPrice !== "false",
+    showCartActions: rawScript.carouselShowCartActions !== "false",
   };
   var loadStrategy = rawScript.loadStrategy;
   var previewMode = rawScript.previewMode;
@@ -1117,6 +1123,12 @@ type AnyAdapter = UpzeroAdapter | NuvemshopAdapter | ShopifyAdapter;
       carouselConfig.anchorPlacement = carousel.anchor_placement;
     }
     if (
+      carousel.anchor_fallback &&
+      !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.carouselAnchorFallback)
+    ) {
+      carouselConfig.anchorFallback = carousel.anchor_fallback;
+    }
+    if (
       "max_items" in carousel &&
       !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.carouselMaxItems)
     ) {
@@ -1129,6 +1141,18 @@ type AnyAdapter = UpzeroAdapter | NuvemshopAdapter | ShopifyAdapter;
     ) {
       carouselConfig.mobileMaxItems =
         Number(carousel.mobile_max_items) || carouselConfig.mobileMaxItems;
+    }
+    if (
+      "show_price" in carousel &&
+      !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.carouselShowPrice)
+    ) {
+      carouselConfig.showPrice = carousel.show_price !== false;
+    }
+    if (
+      "show_cart_actions" in carousel &&
+      !hasExplicitScriptValue(SCRIPT_VALUE_SPECS.carouselShowCartActions)
+    ) {
+      carouselConfig.showCartActions = carousel.show_cart_actions !== false;
     }
   }
 

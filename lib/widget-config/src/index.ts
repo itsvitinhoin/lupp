@@ -40,6 +40,10 @@ export type HomeOrdering = (typeof HOME_ORDERINGS)[number];
 export const ANCHOR_PLACEMENTS = ["before", "after"] as const;
 export type AnchorPlacement = (typeof ANCHOR_PLACEMENTS)[number];
 
+/** Where the carousel lands when no anchor_selector is set or none matches. */
+export const ANCHOR_FALLBACKS = ["top", "bottom"] as const;
+export type AnchorFallback = (typeof ANCHOR_FALLBACKS)[number];
+
 /** Plans allowed to render the home carousel (plan_widget_limit otherwise). */
 export const CAROUSEL_PLAN_IDS = ["growth", "pro", "scale"] as const;
 
@@ -77,8 +81,11 @@ export type WidgetCarouselSettings = {
   before_heading: string;
   anchor_selector: string;
   anchor_placement: AnchorPlacement;
+  anchor_fallback: AnchorFallback;
   max_items: number;
   mobile_max_items: number;
+  show_price: boolean;
+  show_cart_actions: boolean;
 };
 
 export type WidgetSettings = {
@@ -117,8 +124,16 @@ export const WIDGET_SETTINGS_DEFAULTS: WidgetSettings = {
     before_heading: "Com Capa",
     anchor_selector: "",
     anchor_placement: "before",
+    // Previously the widget silently landed at the very top of <main> when no
+    // anchor matched (reported as "the carousel stays on top" on Shopify
+    // themes whose DOM doesn't match any known heuristic) — bottom is the
+    // safer default; anchor_selector/anchor_placement still take priority
+    // whenever they resolve to a real element.
+    anchor_fallback: "bottom",
     max_items: 12,
     mobile_max_items: 6,
+    show_price: true,
+    show_cart_actions: true,
   },
 };
 
@@ -258,6 +273,11 @@ export function normalizeWidgetSettings(
         ANCHOR_PLACEMENTS,
         base.carousel.anchor_placement,
       ),
+      anchor_fallback: oneOf(
+        carousel.anchor_fallback,
+        ANCHOR_FALLBACKS,
+        base.carousel.anchor_fallback,
+      ),
       max_items: clampedNumber(
         carousel.max_items,
         CAROUSEL_ITEMS_RANGE,
@@ -268,6 +288,8 @@ export function normalizeWidgetSettings(
         CAROUSEL_ITEMS_RANGE,
         base.carousel.mobile_max_items,
       ),
+      show_price: bool(carousel.show_price, base.carousel.show_price),
+      show_cart_actions: bool(carousel.show_cart_actions, base.carousel.show_cart_actions),
     },
   };
 }

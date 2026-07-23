@@ -60,8 +60,11 @@ export type ResolvedWidgetConfig = {
     before_heading: string;
     anchor_selector: string;
     anchor_placement: string;
+    anchor_fallback: string;
     max_items: number;
     mobile_max_items: number;
+    show_price: boolean;
+    show_cart_actions: boolean;
     disabled_reason?: string;
   };
 };
@@ -268,9 +271,14 @@ export function resolveWidgetConfig(
       anchor_selector: text(carousel.anchor_selector),
       anchor_placement:
         text(carousel.anchor_placement) || DEFAULTS.carousel.anchor_placement,
+      anchor_fallback:
+        text(carousel.anchor_fallback) || DEFAULTS.carousel.anchor_fallback,
       max_items: Number(carousel.max_items) || DEFAULTS.carousel.max_items,
       mobile_max_items:
         Number(carousel.mobile_max_items) || DEFAULTS.carousel.mobile_max_items,
+      show_price: "show_price" in carousel ? carousel.show_price !== false : true,
+      show_cart_actions:
+        "show_cart_actions" in carousel ? carousel.show_cart_actions !== false : true,
     },
   };
 

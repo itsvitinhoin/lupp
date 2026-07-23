@@ -404,7 +404,16 @@ function ensureHomeCarouselRoot(): HTMLElement | null {
 
   var main = document.querySelector("main, #MainContent, [role='main']");
   if (main) {
-    main.insertBefore(homeCarouselRoot, main.firstChild || null);
+    // No anchor/heuristic matched this theme's DOM — land at the configured
+    // fallback edge of <main> instead of always the very top (previously
+    // hardcoded to firstChild, which read as "the carousel stays on top" on
+    // themes findShopifyProductShowcaseSection/findHomeBenefitsSection can't
+    // recognize).
+    if (ctx.carouselConfig.anchorFallback === "top") {
+      main.insertBefore(homeCarouselRoot, main.firstChild || null);
+    } else {
+      main.appendChild(homeCarouselRoot);
+    }
     return homeCarouselRoot;
   }
 
@@ -583,15 +592,27 @@ export function renderCarousel(
     var product = video.product || null;
     var imageUrl = (product && product.image_url) || "";
     var name = (product && product.name) || "";
-    var restricted =
+    // Two independent reasons a card can hide price/actions: the merchant's
+    // own show_price/show_cart_actions config (static, applies to every
+    // visitor) and Upzero's per-visitor customer-approval status. Config
+    // hiding wins outright; Upzero restriction only applies on top of it and
+    // gets the actionable "log in" copy since there's something the visitor
+    // can do about it.
+    var configHidesPrice = ctx.carouselConfig.showPrice === false;
+    var configHidesCartActions = ctx.carouselConfig.showCartActions === false;
+    var upzeroRestricted =
       isUpzeroStore(store) &&
       !(upzeroCustomerStatus && upzeroCustomerStatus.approved);
-    var price = restricted ? "" : (product && product.price_label) || "";
-    var subtitle = restricted
+    var priceVisible = !configHidesPrice && !upzeroRestricted;
+    var price = priceVisible ? (product && product.price_label) || "" : "";
+    var subtitle = upzeroRestricted
       ? "Entre ou cadastre-se para visualizar valores."
-      : price || "Disponível para compra.";
+      : priceVisible
+        ? price || "Disponível para compra."
+        : "";
+    var showCta = !configHidesCartActions;
     var actionLabel = isUpzeroStore(store)
-      ? restricted
+      ? upzeroRestricted
         ? upzeroCustomerStatus && upzeroCustomerStatus.loggedIn
           ? "Aguardando aprovação"
           : "Cadastre-se para ver o preço"
@@ -610,14 +631,19 @@ export function renderCarousel(
       '<span class="lupp-home-carousel-product-name">' +
       escapeHtml(name) +
       "</span>" +
-      '<span class="lupp-home-carousel-product-price">' +
-      escapeHtml(subtitle) +
-      "</span>" +
+      (subtitle
+        ? '<span class="lupp-home-carousel-product-price">' +
+          escapeHtml(subtitle) +
+          "</span>"
+        : "") +
       "</span></span>" +
-      '<span class="lupp-home-carousel-product-divider"></span>' +
-      '<span class="lupp-home-carousel-product-cta">' +
-      escapeHtml(actionLabel) +
-      "</span></span>"
+      (showCta
+        ? '<span class="lupp-home-carousel-product-divider"></span>' +
+          '<span class="lupp-home-carousel-product-cta">' +
+          escapeHtml(actionLabel) +
+          "</span>"
+        : "") +
+      "</span>"
     );
   }
 
