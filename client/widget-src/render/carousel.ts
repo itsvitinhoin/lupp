@@ -3,7 +3,8 @@
 import { debugLog, escapeHtml, normalizeText } from "../utils";
 import { primeInlineVideos } from "../hls";
 import { ctx, isUpzeroStore, videoMediaUrl } from "../context";
-import { openFeedOverlay } from "../overlay";
+import { openFeedOverlay } from "../feed";
+import { CAROUSEL_MOBILE_BREAKPOINT } from "../core/constants";
 import type { SlimVideo, StorePayload } from "../types";
 
 var homeCarouselRoot: HTMLElement | null = null;
@@ -421,6 +422,7 @@ function ensureHomeCarouselRoot(): HTMLElement | null {
 }
 
 export function removeHomeCarouselRoot(): void {
+  stopCarouselAutoplay();
   if (homeCarouselRoot && homeCarouselRoot.parentNode) {
     homeCarouselRoot.parentNode.removeChild(homeCarouselRoot);
   }
@@ -561,15 +563,261 @@ function triggerCarouselEntranceWhenVisible(root: HTMLElement): void {
   observer.observe(section);
 }
 
+function aspectRatioToCss(value: string): string {
+  var match = String(value || "").match(/^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/);
+  return match ? match[1] + " / " + match[2] : "9 / 16";
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  var normalized = String(hex || "").trim().replace(/^#/, "");
+  if (normalized.length === 3) {
+    normalized = normalized
+      .split("")
+      .map(function (char) {
+        return char + char;
+      })
+      .join("");
+  }
+  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return "rgba(255,255,255," + alpha + ")";
+  var r = parseInt(normalized.slice(0, 2), 16);
+  var g = parseInt(normalized.slice(2, 4), 16);
+  var b = parseInt(normalized.slice(4, 6), 16);
+  return "rgba(" + r + "," + g + "," + b + "," + alpha + ")";
+}
+
+function carouselPrefersReducedMotion(): boolean {
+  return (
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
+var carouselAutoplayIntervalId: number | null = null;
+var carouselAutoplayCleanupFns: Array<() => void> = [];
+
+function stopCarouselAutoplay(): void {
+  if (carouselAutoplayIntervalId !== null) {
+    window.clearInterval(carouselAutoplayIntervalId);
+    carouselAutoplayIntervalId = null;
+  }
+  carouselAutoplayCleanupFns.forEach(function (cleanup) {
+    cleanup();
+  });
+  carouselAutoplayCleanupFns = [];
+}
+
+// Shared by autoplay's step and the manual prev/next buttons so "one card"
+// means the same distance everywhere.
+function computeCardAdvance(track: HTMLElement, cardGap: number): number {
+  var firstCard = track.querySelector(".lupp-home-carousel-card") as HTMLElement | null;
+  return (firstCard ? firstCard.getBoundingClientRect().width : 200) + cardGap;
+}
+
+// Auto-advance by one card width at a fixed interval rather than a
+// continuous marquee scroll — matches the existing scroll-snap track
+// (native swipe, keyboard, click-drag, and this timer all just move
+// scrollLeft) with no extra animation-loop machinery. Never runs for
+// prefers-reduced-motion, regardless of the merchant's setting. Hover-pause
+// listens on `hoverBoundary` (the whole section, not just the track) so
+// hovering the nav arrows also pauses it, not just the track itself.
+function startCarouselAutoplay(hoverBoundary: HTMLElement, track: HTMLElement, itemCount: number): void {
+  stopCarouselAutoplay();
+  var config = ctx.carouselConfig;
+  if (!config.autoplayEnabled || itemCount <= 1 || carouselPrefersReducedMotion()) return;
+
+  var direction = config.autoplayDirection === "backward" ? -1 : 1;
+  var hoverPaused = false;
+  var hiddenPaused = document.hidden;
+
+  function step(): void {
+    if (hoverPaused || hiddenPaused || !track.isConnected) return;
+    var maxScrollLeft = track.scrollWidth - track.clientWidth;
+    if (maxScrollLeft <= 1) return;
+    var advance = computeCardAdvance(track, config.cardGap);
+    var next = track.scrollLeft + advance * direction;
+
+    if (direction > 0 && next >= maxScrollLeft - 2) {
+      if (!config.autoplayLoop) {
+        stopCarouselAutoplay();
+        return;
+      }
+      track.scrollTo({ left: 0, behavior: "smooth" });
+      return;
+    }
+    if (direction < 0 && next <= 2) {
+      if (!config.autoplayLoop) {
+        stopCarouselAutoplay();
+        return;
+      }
+      track.scrollTo({ left: maxScrollLeft, behavior: "smooth" });
+      return;
+    }
+    track.scrollTo({ left: Math.max(0, Math.min(maxScrollLeft, next)), behavior: "smooth" });
+  }
+
+  carouselAutoplayIntervalId = window.setInterval(step, Math.max(1500, config.autoplayIntervalMs));
+
+  if (config.autoplayPauseOnHover) {
+    var onEnter = function () {
+      hoverPaused = true;
+    };
+    var onLeave = function () {
+      hoverPaused = false;
+    };
+    hoverBoundary.addEventListener("mouseenter", onEnter);
+    hoverBoundary.addEventListener("mouseleave", onLeave);
+    carouselAutoplayCleanupFns.push(function () {
+      hoverBoundary.removeEventListener("mouseenter", onEnter);
+      hoverBoundary.removeEventListener("mouseleave", onLeave);
+    });
+  }
+
+  function onVisibilityChange() {
+    hiddenPaused = document.hidden;
+  }
+  document.addEventListener("visibilitychange", onVisibilityChange);
+  carouselAutoplayCleanupFns.push(function () {
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+  });
+}
+
+// Desktop prev/next chevrons: scroll by exactly one card, clamped at the
+// ends (no wraparound — that's an autoplay-only concept). Disabled/faded out
+// at the ends via a scroll listener rather than fixed at setup time, since
+// the user can also reach either end by dragging or via autoplay.
+function installCarouselNavigationArrows(
+  track: HTMLElement,
+  prevButton: HTMLButtonElement | null,
+  nextButton: HTMLButtonElement | null,
+  cardGap: number,
+): void {
+  if (!prevButton && !nextButton) return;
+
+  function updateDisabledState(): void {
+    var maxScrollLeft = track.scrollWidth - track.clientWidth;
+    if (prevButton) prevButton.disabled = track.scrollLeft <= 1;
+    if (nextButton) nextButton.disabled = track.scrollLeft >= maxScrollLeft - 1;
+  }
+
+  function scrollByOneCard(direction: number): void {
+    var advance = computeCardAdvance(track, cardGap);
+    var maxScrollLeft = track.scrollWidth - track.clientWidth;
+    var next = Math.max(0, Math.min(maxScrollLeft, track.scrollLeft + advance * direction));
+    track.scrollTo({ left: next, behavior: "smooth" });
+  }
+
+  if (prevButton) {
+    prevButton.addEventListener("click", function () {
+      scrollByOneCard(-1);
+    });
+  }
+  if (nextButton) {
+    nextButton.addEventListener("click", function () {
+      scrollByOneCard(1);
+    });
+  }
+
+  updateDisabledState();
+  var scrollUpdateFrame: number | null = null;
+  track.addEventListener("scroll", function () {
+    if (scrollUpdateFrame !== null) return;
+    scrollUpdateFrame = requestAnimationFrame(function () {
+      scrollUpdateFrame = null;
+      updateDisabledState();
+    });
+  });
+}
+
+// Desktop click-and-drag scrolling. Only ever attaches mouse listeners
+// (mousedown/mousemove/mouseup) — touch input already scrolls the track
+// natively via overflow-x + -webkit-overflow-scrolling, so there is nothing
+// to add there, and this must not fight that native behavior.
+function installCarouselDragToScroll(track: HTMLElement): void {
+  var isPointerDown = false;
+  var hasMoved = false;
+  var startX = 0;
+  var startScrollLeft = 0;
+  var previousUserSelect = "";
+  var DRAG_THRESHOLD_PX = 4;
+  var SUPPRESS_CLICK_MS = 200;
+
+  function onPointerMove(event: MouseEvent): void {
+    if (!isPointerDown) return;
+    var deltaX = event.clientX - startX;
+    if (!hasMoved) {
+      if (Math.abs(deltaX) < DRAG_THRESHOLD_PX) return;
+      hasMoved = true;
+      track.setAttribute("data-lupp-carousel-dragging", "true");
+      previousUserSelect = document.body.style.userSelect;
+      document.body.style.userSelect = "none";
+    }
+    event.preventDefault();
+    track.scrollLeft = startScrollLeft - deltaX;
+  }
+
+  function onPointerUp(): void {
+    if (!isPointerDown) return;
+    isPointerDown = false;
+    document.removeEventListener("mousemove", onPointerMove);
+    document.removeEventListener("mouseup", onPointerUp);
+    if (!hasMoved) return;
+    hasMoved = false;
+    track.removeAttribute("data-lupp-carousel-dragging");
+    document.body.style.userSelect = previousUserSelect;
+    // Swallow the click that would otherwise open the card under the
+    // cursor right after a drag — mirrors the same pattern the floating
+    // launcher's own drag handling uses (data-lupp-suppress-click).
+    track.setAttribute("data-lupp-suppress-click", "true");
+    window.setTimeout(function () {
+      track.removeAttribute("data-lupp-suppress-click");
+    }, SUPPRESS_CLICK_MS);
+  }
+
+  track.addEventListener("mousedown", function (event: MouseEvent) {
+    if (event.button !== 0) return;
+    isPointerDown = true;
+    hasMoved = false;
+    startX = event.clientX;
+    startScrollLeft = track.scrollLeft;
+    document.addEventListener("mousemove", onPointerMove, { passive: false });
+    document.addEventListener("mouseup", onPointerUp);
+  });
+}
+
 export function renderCarousel(
   root: HTMLElement,
   store: StorePayload,
   videos: SlimVideo[],
 ): void {
-  var accent = ctx.launcherConfig.accentColor || store.button_color || "#006BFF";
+  stopCarouselAutoplay();
+  var config = ctx.carouselConfig;
+  var accent = config.accentColor || ctx.launcherConfig.accentColor || store.button_color || "#006BFF";
+  // "store" inherits the storefront theme's own font via CSS `inherit` — the
+  // carousel is inserted directly into the page DOM (see
+  // ensureHomeCarouselRoot), so this cascades from whatever font the theme
+  // already sets on its own content, no detection needed.
+  var carouselFont =
+    config.fontSource === "custom"
+      ? config.fontFamily || ctx.launcherConfig.fontFamily
+      : config.fontSource === "launcher"
+        ? ctx.launcherConfig.fontFamily
+        : "inherit";
+  var cardMinWidth = Math.min(config.cardMinWidth, config.cardMaxWidth);
+  var cardMaxWidth = Math.max(config.cardMinWidth, config.cardMaxWidth);
+  var cardShadowCss = config.cardShadowEnabled
+    ? "box-shadow:" +
+      config.cardShadowOffsetX +
+      "px " +
+      config.cardShadowOffsetY +
+      "px " +
+      config.cardShadowBlur +
+      "px " +
+      hexToRgba(config.cardShadowColor, Math.max(0, Math.min(100, config.cardShadowOpacity)) / 100) +
+      ";"
+    : "";
   var isMobileViewport =
     typeof window.matchMedia === "function" &&
-    window.matchMedia("(max-width: 640px)").matches;
+    window.matchMedia(CAROUSEL_MOBILE_BREAKPOINT).matches;
   var items = videos.slice(
     0,
     resolveCarouselItemLimit(isMobileViewport, ctx.carouselConfig),
@@ -580,10 +828,24 @@ export function renderCarousel(
   var upzeroCustomerStatus = isUpzeroStore(store)
     ? ctx.sharedState.upzeroCustomerStatusCache
     : { approved: true, loggedIn: true };
-  var descriptionHtml = ctx.carouselConfig.description
-    ? '<p class="lupp-home-carousel-description">' +
-      escapeHtml(ctx.carouselConfig.description) +
-      "</p>"
+  var titleHtml = config.showTitle
+    ? '<h2 class="lupp-home-carousel-title">' + escapeHtml(config.title) + "</h2>"
+    : "";
+  var descriptionHtml =
+    config.showDescription && config.description
+      ? '<p class="lupp-home-carousel-description">' + escapeHtml(config.description) + "</p>"
+      : "";
+  var edgeFadeHtml = config.showScrollHint
+    ? '<div class="lupp-home-carousel-edge-fade lupp-home-carousel-edge-fade--left" aria-hidden="true"></div>' +
+      '<div class="lupp-home-carousel-edge-fade lupp-home-carousel-edge-fade--right" aria-hidden="true"></div>'
+    : "";
+  var navigationArrowsHtml = config.showNavigationArrows
+    ? '<div class="lupp-home-carousel-nav-zone lupp-home-carousel-nav-zone--prev">' +
+      '<button type="button" class="lupp-home-carousel-nav" data-lupp-carousel-nav="prev" aria-label="Ver vídeo anterior">&lsaquo;</button>' +
+      "</div>" +
+      '<div class="lupp-home-carousel-nav-zone lupp-home-carousel-nav-zone--next">' +
+      '<button type="button" class="lupp-home-carousel-nav" data-lupp-carousel-nav="next" aria-label="Ver próximo vídeo">&rsaquo;</button>' +
+      "</div>"
     : "";
 
   function productCardHtml(video: SlimVideo): string {
@@ -649,27 +911,98 @@ export function renderCarousel(
 
   root.innerHTML =
     '<section class="lupp-home-carousel" aria-label="' +
-    escapeHtml(ctx.carouselConfig.title) +
+    escapeHtml(config.title) +
     '">' +
     "<style>" +
     ".lupp-home-carousel{font-family:" +
-    ctx.launcherConfig.fontFamily +
-    ";box-sizing:border-box;position:relative;width:100%;max-width:100vw;padding:24px 0 30px;background:#fff;color:#16171a;overflow:hidden}" +
+    carouselFont +
+    ";box-sizing:border-box;position:relative;width:100%;max-width:100vw;padding:" +
+    config.sectionPaddingY +
+    "px 0;margin:" +
+    config.sectionMarginY +
+    "px " +
+    config.sectionMarginX +
+    "px;background:" +
+    config.backgroundColor +
+    ";color:#16171a;overflow:hidden}" +
     ".lupp-home-carousel *{box-sizing:border-box}" +
-    ".lupp-home-carousel-title{margin:0 16px 22px;text-align:center;font-size:clamp(18px,2vw,29px);font-weight:500;letter-spacing:0;line-height:1.2;color:#202124}" +
-    ".lupp-home-carousel-description{max-width:680px;margin:-12px auto 22px;padding:0 16px;text-align:center;color:#64748b;font-size:14px;font-weight:600;line-height:1.5;letter-spacing:0}" +
-    ".lupp-home-carousel-track{display:flex;gap:clamp(18px,2.5vw,48px);overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;padding:4px max(16px,calc((100vw - 1240px)/2)) 10px;-webkit-overflow-scrolling:touch;scrollbar-width:none}" +
+    ".lupp-home-carousel-title{margin:0 " +
+    config.sectionPaddingX +
+    "px 22px;text-align:center;font-size:clamp(18px,2vw,29px);font-weight:500;letter-spacing:0;line-height:1.2;color:" +
+    config.titleColor +
+    "}" +
+    ".lupp-home-carousel-description{max-width:680px;margin:-12px auto 22px;padding:0 " +
+    config.sectionPaddingX +
+    "px;text-align:center;color:" +
+    config.descriptionColor +
+    ";font-size:14px;font-weight:600;line-height:1.5;letter-spacing:0}" +
+    // Flat, section-relative padding (not a 100vw-based centering calc):
+    // the carousel is very often anchored inside the page's existing layout
+    // (see ensureHomeCarouselRoot), not rendered full-bleed against the
+    // viewport, so a 100vw-relative calc would center against the wrong box
+    // and could leave a large, asymmetric gap before the first card.
+    ".lupp-home-carousel-track{display:flex;gap:" +
+    config.cardGap +
+    "px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;padding:4px " +
+    config.sectionPaddingX +
+    "px 10px;-webkit-overflow-scrolling:touch;scrollbar-width:none}" +
     ".lupp-home-carousel-track::-webkit-scrollbar{display:none}" +
     ".lupp-home-carousel-track:focus-visible{outline:2px solid " +
     accent +
     ";outline-offset:-2px}" +
     // Subtle edge fade hints there's more to scroll horizontally — the
     // classic "content continues" affordance for an overflow-x list with no
-    // visible scrollbar.
-    ".lupp-home-carousel-edge-fade{position:absolute;top:24px;bottom:30px;width:32px;pointer-events:none;z-index:1}" +
-    ".lupp-home-carousel-edge-fade--left{left:0;background:linear-gradient(to right,#fff,rgba(255,255,255,0))}" +
-    ".lupp-home-carousel-edge-fade--right{right:0;background:linear-gradient(to left,#fff,rgba(255,255,255,0))}" +
-    ".lupp-home-carousel-card{position:relative;display:block;flex:0 0 clamp(178px,14.2vw,250px);aspect-ratio:9/16;border:0;border-radius:12px;background:#f3f4f6;box-shadow:0 14px 28px rgba(15,23,42,.12);overflow:hidden;cursor:pointer;scroll-snap-align:center;padding:0;color:inherit}" +
+    // visible scrollbar. Only injected when config.showScrollHint is on
+    // (edgeFadeHtml is empty otherwise), but the rule is harmless either way.
+    ".lupp-home-carousel-edge-fade{position:absolute;top:" +
+    config.sectionPaddingY +
+    "px;bottom:" +
+    config.sectionPaddingY +
+    "px;width:32px;pointer-events:none;z-index:1}" +
+    ".lupp-home-carousel-edge-fade--left{left:0;background:linear-gradient(to right," +
+    hexToRgba(config.backgroundColor, 1) +
+    "," +
+    hexToRgba(config.backgroundColor, 0) +
+    ")}" +
+    ".lupp-home-carousel-edge-fade--right{right:0;background:linear-gradient(to left," +
+    hexToRgba(config.backgroundColor, 1) +
+    "," +
+    hexToRgba(config.backgroundColor, 0) +
+    ")}" +
+    // Desktop-only prev/next chevrons (hidden on mobile below — native touch
+    // swipe already covers that case) sit above the edge-fade (z-index 2).
+    // The zone spans the edge-fade's own top/bottom box (roughly the
+    // track's vertical span, staying aligned with the cards even when a
+    // title/description sits above) and is itself non-interactive; only the
+    // circular button centered inside it is actually clickable.
+    ".lupp-home-carousel-nav-zone{position:absolute;top:" +
+    config.sectionPaddingY +
+    "px;bottom:" +
+    config.sectionPaddingY +
+    "px;z-index:2;display:flex;align-items:center;pointer-events:none}" +
+    ".lupp-home-carousel-nav-zone--prev{left:8px}" +
+    ".lupp-home-carousel-nav-zone--next{right:8px}" +
+    ".lupp-home-carousel-nav{pointer-events:auto;width:40px;height:40px;border:0;border-radius:999px;background:rgba(255,255,255,.92);color:#16171a;font-size:26px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 8px 20px rgba(15,23,42,.18);transition:opacity .2s ease}" +
+    ".lupp-home-carousel-nav:hover{background:#fff}" +
+    ".lupp-home-carousel-nav:focus-visible{outline:3px solid " +
+    accent +
+    ";outline-offset:2px}" +
+    ".lupp-home-carousel-nav:disabled{opacity:0;pointer-events:none}" +
+    ".lupp-home-carousel-track{cursor:grab}" +
+    ".lupp-home-carousel-track[data-lupp-carousel-dragging]{cursor:grabbing;scroll-snap-type:none}" +
+    ".lupp-home-carousel-card{position:relative;display:block;flex:0 0 clamp(" +
+    cardMinWidth +
+    "px,14.2vw," +
+    cardMaxWidth +
+    "px);aspect-ratio:" +
+    aspectRatioToCss(config.cardAspectRatio) +
+    ";border:0;border-radius:" +
+    config.cardBorderRadius +
+    "px;background:" +
+    config.cardBackgroundColor +
+    ";" +
+    cardShadowCss +
+    "overflow:hidden;cursor:pointer;scroll-snap-align:center;padding:0;color:inherit}" +
     ".lupp-home-carousel-card:focus-visible{outline:3px solid " +
     accent +
     ";outline-offset:2px}" +
@@ -677,12 +1010,15 @@ export function renderCarousel(
     ".lupp-home-carousel-card--entrance{opacity:0;animation:lupp-home-carousel-card-in .38s ease-out forwards;animation-delay:calc(var(--lupp-card-index, 0) * 45ms)}" +
     "@keyframes lupp-home-carousel-card-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}" +
     "@media (prefers-reduced-motion: reduce){.lupp-home-carousel-card--entrance{animation-duration:.001s;animation-delay:0s}}" +
-    ".lupp-home-carousel-card:nth-child(4n){flex-basis:clamp(190px,15.5vw,270px)}" +
-    ".lupp-home-carousel-thumb{width:100%;height:100%;display:block;object-fit:cover;background:#e5e7eb;transition:transform .28s ease}" +
+    ".lupp-home-carousel-thumb{width:100%;height:100%;display:block;object-fit:cover;background:" +
+    config.cardBackgroundColor +
+    ";transition:transform .28s ease}" +
     ".lupp-home-carousel-card:hover .lupp-home-carousel-thumb{transform:scale(1.025)}" +
     ".lupp-home-carousel-product{position:absolute;left:8px;right:8px;bottom:9px;display:flex;flex-direction:column;align-items:stretch;gap:0;min-height:78px;padding:0;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:rgba(72,82,72,.82);box-shadow:0 10px 24px rgba(15,23,42,.2);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);text-align:left;overflow:hidden}" +
     ".lupp-home-carousel-product-main{display:flex;align-items:center;gap:7px;min-width:0;padding:7px 8px}" +
-    ".lupp-home-carousel-product-image{display:block;flex:0 0 42px;width:42px;height:42px;border-radius:8px;object-fit:cover;background:#eef2f7;border:1px solid rgba(255,255,255,.22)}" +
+    ".lupp-home-carousel-product-image{display:block;flex:0 0 42px;width:42px;height:42px;border-radius:8px;object-fit:cover;background:" +
+    config.cardBackgroundColor +
+    ";border:1px solid rgba(255,255,255,.22)}" +
     ".lupp-home-carousel-product-placeholder{background:" +
     accent +
     "}" +
@@ -693,16 +1029,14 @@ export function renderCarousel(
     ".lupp-home-carousel-product-cta{margin:7px 8px 8px;display:flex;align-items:center;justify-content:center;min-height:32px;border-radius:10px;background:#fff;color:#070d1d;border:2px solid " +
     accent +
     ";padding:7px 9px;text-align:center;font-size:11px;font-weight:800;line-height:1.1;letter-spacing:0}" +
-    "@media(max-width:640px){.lupp-home-carousel{padding:20px 0 24px}.lupp-home-carousel-track{gap:14px;padding-left:14px;padding-right:14px}.lupp-home-carousel-card{flex-basis:62vw}.lupp-home-carousel-card:nth-child(4n){flex-basis:66vw}.lupp-home-carousel-product{min-height:82px}.lupp-home-carousel-product-name{font-size:12px}.lupp-home-carousel-product-price{font-size:10.5px}.lupp-home-carousel-product-cta{min-height:31px;font-size:11px}}" +
+    "@media(max-width:640px){.lupp-home-carousel-nav-zone{display:none}.lupp-home-carousel-product{min-height:82px}.lupp-home-carousel-product-name{font-size:12px}.lupp-home-carousel-product-price{font-size:10.5px}.lupp-home-carousel-product-cta{min-height:31px;font-size:11px}}" +
     "</style>" +
-    '<h2 class="lupp-home-carousel-title">' +
-    escapeHtml(ctx.carouselConfig.title) +
-    "</h2>" +
+    titleHtml +
     descriptionHtml +
-    '<div class="lupp-home-carousel-edge-fade lupp-home-carousel-edge-fade--left" aria-hidden="true"></div>' +
-    '<div class="lupp-home-carousel-edge-fade lupp-home-carousel-edge-fade--right" aria-hidden="true"></div>' +
+    edgeFadeHtml +
+    navigationArrowsHtml +
     '<div class="lupp-home-carousel-track" role="region" aria-label="' +
-    escapeHtml(ctx.carouselConfig.title) +
+    escapeHtml(config.title) +
     '" tabindex="0">' +
     items
       .map(function (video, index) {
@@ -739,7 +1073,20 @@ export function renderCarousel(
   primeInlineVideos(root);
   triggerCarouselEntranceWhenVisible(root);
 
+  var track = root.querySelector(".lupp-home-carousel-track") as HTMLElement | null;
+  if (track) {
+    startCarouselAutoplay(root, track, items.length);
+    installCarouselDragToScroll(track);
+    installCarouselNavigationArrows(
+      track,
+      root.querySelector('[data-lupp-carousel-nav="prev"]') as HTMLButtonElement | null,
+      root.querySelector('[data-lupp-carousel-nav="next"]') as HTMLButtonElement | null,
+      config.cardGap,
+    );
+  }
+
   root.onclick = function (event) {
+    if (track && track.getAttribute("data-lupp-suppress-click") === "true") return;
     var target = event.target as HTMLElement | null;
     if (target && target.nodeType === 3) target = target.parentElement;
     var button = target && target.closest ? target.closest("[data-video]") : null;

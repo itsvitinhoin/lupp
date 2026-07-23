@@ -39,6 +39,37 @@ export type WidgetSettingsForm = {
   carouselMobileCount: string;
   carouselShowPrice: boolean;
   carouselShowCartActions: boolean;
+  carouselSectionPaddingX: string;
+  carouselSectionPaddingY: string;
+  carouselSectionMarginX: string;
+  carouselSectionMarginY: string;
+  carouselCardGap: string;
+  carouselShowScrollHint: boolean;
+  carouselShowNavigationArrows: boolean;
+  carouselBackgroundColor: string;
+  carouselTitleColor: string;
+  carouselDescriptionColor: string;
+  carouselAccentColor: string;
+  carouselFontSource: string;
+  carouselFontFamily: string;
+  carouselShowTitle: boolean;
+  carouselShowDescription: boolean;
+  carouselCardBorderRadius: string;
+  carouselCardMinWidth: string;
+  carouselCardMaxWidth: string;
+  carouselCardAspectRatio: string;
+  carouselCardBackgroundColor: string;
+  carouselCardShadowEnabled: boolean;
+  carouselCardShadowColor: string;
+  carouselCardShadowOpacity: string;
+  carouselCardShadowBlur: string;
+  carouselCardShadowOffsetX: string;
+  carouselCardShadowOffsetY: string;
+  carouselAutoplayEnabled: boolean;
+  carouselAutoplayIntervalMs: string;
+  carouselAutoplayDirection: string;
+  carouselAutoplayPauseOnHover: boolean;
+  carouselAutoplayLoop: boolean;
 };
 
 export type SetWidgetSettingsField = <K extends keyof WidgetSettingsForm>(
@@ -86,6 +117,37 @@ const defaultForm: WidgetSettingsForm = {
   carouselMobileCount: String(DEFAULTS.carousel.mobile_max_items),
   carouselShowPrice: DEFAULTS.carousel.show_price,
   carouselShowCartActions: DEFAULTS.carousel.show_cart_actions,
+  carouselSectionPaddingX: String(DEFAULTS.carousel.section_padding_x),
+  carouselSectionPaddingY: String(DEFAULTS.carousel.section_padding_y),
+  carouselSectionMarginX: String(DEFAULTS.carousel.section_margin_x),
+  carouselSectionMarginY: String(DEFAULTS.carousel.section_margin_y),
+  carouselCardGap: String(DEFAULTS.carousel.card_gap),
+  carouselShowScrollHint: DEFAULTS.carousel.show_scroll_hint,
+  carouselShowNavigationArrows: DEFAULTS.carousel.show_navigation_arrows,
+  carouselBackgroundColor: DEFAULTS.carousel.background_color,
+  carouselTitleColor: DEFAULTS.carousel.title_color,
+  carouselDescriptionColor: DEFAULTS.carousel.description_color,
+  carouselAccentColor: DEFAULTS.carousel.accent_color,
+  carouselFontSource: DEFAULTS.carousel.font_source,
+  carouselFontFamily: DEFAULTS.carousel.font_family,
+  carouselShowTitle: DEFAULTS.carousel.show_title,
+  carouselShowDescription: DEFAULTS.carousel.show_description,
+  carouselCardBorderRadius: String(DEFAULTS.carousel.card_border_radius),
+  carouselCardMinWidth: String(DEFAULTS.carousel.card_min_width),
+  carouselCardMaxWidth: String(DEFAULTS.carousel.card_max_width),
+  carouselCardAspectRatio: DEFAULTS.carousel.card_aspect_ratio,
+  carouselCardBackgroundColor: DEFAULTS.carousel.card_background_color,
+  carouselCardShadowEnabled: DEFAULTS.carousel.card_shadow_enabled,
+  carouselCardShadowColor: DEFAULTS.carousel.card_shadow_color,
+  carouselCardShadowOpacity: String(DEFAULTS.carousel.card_shadow_opacity),
+  carouselCardShadowBlur: String(DEFAULTS.carousel.card_shadow_blur),
+  carouselCardShadowOffsetX: String(DEFAULTS.carousel.card_shadow_offset_x),
+  carouselCardShadowOffsetY: String(DEFAULTS.carousel.card_shadow_offset_y),
+  carouselAutoplayEnabled: DEFAULTS.carousel.autoplay_enabled,
+  carouselAutoplayIntervalMs: String(DEFAULTS.carousel.autoplay_interval_ms),
+  carouselAutoplayDirection: DEFAULTS.carousel.autoplay_direction,
+  carouselAutoplayPauseOnHover: DEFAULTS.carousel.autoplay_pause_on_hover,
+  carouselAutoplayLoop: DEFAULTS.carousel.autoplay_loop,
 };
 
 export function asSettings(value: unknown): Record<string, any> {
@@ -183,6 +245,69 @@ export function useWidgetSettingsForm({
       ),
       carouselShowPrice: carousel.show_price !== false,
       carouselShowCartActions: carousel.show_cart_actions !== false,
+      carouselSectionPaddingX: String(
+        carousel.section_padding_x ?? DEFAULTS.carousel.section_padding_x,
+      ),
+      carouselSectionPaddingY: String(
+        carousel.section_padding_y ?? DEFAULTS.carousel.section_padding_y,
+      ),
+      carouselSectionMarginX: String(
+        carousel.section_margin_x ?? DEFAULTS.carousel.section_margin_x,
+      ),
+      carouselSectionMarginY: String(
+        carousel.section_margin_y ?? DEFAULTS.carousel.section_margin_y,
+      ),
+      carouselCardGap: String(carousel.card_gap ?? DEFAULTS.carousel.card_gap),
+      carouselShowScrollHint: carousel.show_scroll_hint !== false,
+      carouselShowNavigationArrows: carousel.show_navigation_arrows !== false,
+      carouselBackgroundColor: String(
+        carousel.background_color || DEFAULTS.carousel.background_color,
+      ),
+      carouselTitleColor: String(carousel.title_color || DEFAULTS.carousel.title_color),
+      carouselDescriptionColor: String(
+        carousel.description_color || DEFAULTS.carousel.description_color,
+      ),
+      carouselAccentColor: String(carousel.accent_color ?? DEFAULTS.carousel.accent_color),
+      carouselFontSource: String(carousel.font_source || DEFAULTS.carousel.font_source),
+      carouselFontFamily: String(carousel.font_family ?? DEFAULTS.carousel.font_family),
+      carouselShowTitle: carousel.show_title !== false,
+      carouselShowDescription: carousel.show_description !== false,
+      carouselCardBorderRadius: String(
+        carousel.card_border_radius ?? DEFAULTS.carousel.card_border_radius,
+      ),
+      carouselCardMinWidth: String(carousel.card_min_width || DEFAULTS.carousel.card_min_width),
+      carouselCardMaxWidth: String(carousel.card_max_width || DEFAULTS.carousel.card_max_width),
+      carouselCardAspectRatio: String(
+        carousel.card_aspect_ratio || DEFAULTS.carousel.card_aspect_ratio,
+      ),
+      carouselCardBackgroundColor: String(
+        carousel.card_background_color || DEFAULTS.carousel.card_background_color,
+      ),
+      carouselCardShadowEnabled: Boolean(carousel.card_shadow_enabled),
+      carouselCardShadowColor: String(
+        carousel.card_shadow_color || DEFAULTS.carousel.card_shadow_color,
+      ),
+      carouselCardShadowOpacity: String(
+        carousel.card_shadow_opacity ?? DEFAULTS.carousel.card_shadow_opacity,
+      ),
+      carouselCardShadowBlur: String(
+        carousel.card_shadow_blur ?? DEFAULTS.carousel.card_shadow_blur,
+      ),
+      carouselCardShadowOffsetX: String(
+        carousel.card_shadow_offset_x ?? DEFAULTS.carousel.card_shadow_offset_x,
+      ),
+      carouselCardShadowOffsetY: String(
+        carousel.card_shadow_offset_y ?? DEFAULTS.carousel.card_shadow_offset_y,
+      ),
+      carouselAutoplayEnabled: Boolean(carousel.autoplay_enabled),
+      carouselAutoplayIntervalMs: String(
+        carousel.autoplay_interval_ms || DEFAULTS.carousel.autoplay_interval_ms,
+      ),
+      carouselAutoplayDirection: String(
+        carousel.autoplay_direction || DEFAULTS.carousel.autoplay_direction,
+      ),
+      carouselAutoplayPauseOnHover: carousel.autoplay_pause_on_hover !== false,
+      carouselAutoplayLoop: carousel.autoplay_loop !== false,
     });
   }, [floatingWidget?.id, floatingWidget?.updated_at]);
 
@@ -238,6 +363,43 @@ export function useWidgetSettingsForm({
       mobile_max_items: Number(form.carouselMobileCount) || DEFAULTS.carousel.mobile_max_items,
       show_price: form.carouselShowPrice,
       show_cart_actions: form.carouselShowCartActions,
+      section_padding_x:
+        Number(form.carouselSectionPaddingX) || DEFAULTS.carousel.section_padding_x,
+      section_padding_y:
+        Number(form.carouselSectionPaddingY) || DEFAULTS.carousel.section_padding_y,
+      section_margin_x: Number(form.carouselSectionMarginX) || 0,
+      section_margin_y: Number(form.carouselSectionMarginY) || 0,
+      card_gap: Number(form.carouselCardGap) || DEFAULTS.carousel.card_gap,
+      show_scroll_hint: form.carouselShowScrollHint,
+      show_navigation_arrows: form.carouselShowNavigationArrows,
+      background_color: form.carouselBackgroundColor,
+      title_color: form.carouselTitleColor,
+      description_color: form.carouselDescriptionColor,
+      accent_color: form.carouselAccentColor.trim(),
+      font_source: form.carouselFontSource,
+      font_family: form.carouselFontFamily.trim(),
+      show_title: form.carouselShowTitle,
+      show_description: form.carouselShowDescription,
+      card_border_radius:
+        Number(form.carouselCardBorderRadius) || DEFAULTS.carousel.card_border_radius,
+      card_min_width: Number(form.carouselCardMinWidth) || DEFAULTS.carousel.card_min_width,
+      card_max_width: Number(form.carouselCardMaxWidth) || DEFAULTS.carousel.card_max_width,
+      card_aspect_ratio: form.carouselCardAspectRatio,
+      card_background_color: form.carouselCardBackgroundColor,
+      card_shadow_enabled: form.carouselCardShadowEnabled,
+      card_shadow_color: form.carouselCardShadowColor,
+      card_shadow_opacity:
+        Number(form.carouselCardShadowOpacity) || DEFAULTS.carousel.card_shadow_opacity,
+      card_shadow_blur: Number(form.carouselCardShadowBlur) || DEFAULTS.carousel.card_shadow_blur,
+      card_shadow_offset_x: Number(form.carouselCardShadowOffsetX) || 0,
+      card_shadow_offset_y:
+        Number(form.carouselCardShadowOffsetY) || DEFAULTS.carousel.card_shadow_offset_y,
+      autoplay_enabled: form.carouselAutoplayEnabled,
+      autoplay_interval_ms:
+        Number(form.carouselAutoplayIntervalMs) || DEFAULTS.carousel.autoplay_interval_ms,
+      autoplay_direction: form.carouselAutoplayDirection,
+      autoplay_pause_on_hover: form.carouselAutoplayPauseOnHover,
+      autoplay_loop: form.carouselAutoplayLoop,
     },
   });
 

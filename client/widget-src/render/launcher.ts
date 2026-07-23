@@ -3,7 +3,7 @@
 import { escapeHtml, normalizedHostname } from "../utils";
 import { primeInlineVideos } from "../hls";
 import { ctx, videoMediaUrl } from "../context";
-import { openFeedOverlay } from "../overlay";
+import { openFeedOverlay } from "../feed";
 import type { SlimVideo, StorePayload } from "../types";
 
 function shouldAutoplayLauncherPreview(): boolean {

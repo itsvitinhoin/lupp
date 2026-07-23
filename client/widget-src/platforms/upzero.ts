@@ -39,6 +39,19 @@ type UpzeroActionResult = {
   var getUrlPathname = bridge.utils.getUrlPathname;
   var sameStorefrontHostname = bridge.utils.sameStorefrontHostname;
   var emitCartEvent = bridge.utils.emitCartEvent;
+  var debugLog = bridge.utils.debugLog;
+
+  // Opt-in trace of which of detectUpzeroCustomerStatus's several detection
+  // strategies actually answered — set window.__LUUP_DEBUG__ = true before
+  // the widget loads, then read window.__LUPP_WIDGET_BRIDGE__.state
+  // .upzeroCustomerStatusCache after a (re)load. A status whose `source`
+  // isn't backed by a real login (e.g. a generic "window"/"token" artifact
+  // the storefront itself sets for anonymous/guest sessions) getting read as
+  // approved is the most likely cause of price gating flip-flopping between
+  // a cold load and a reload with no actual login in between.
+  function debugLogCustomerStatus(strategy: string, status: CustomerStatus): void {
+    debugLog("upzero customer status", { strategy: strategy, status: status });
+  }
   var isUpzeroStore = bridge.isUpzeroStore;
   var isTrustedLuppFrameOrigin = bridge.isTrustedLuppFrameOrigin;
   var postFrameResponse = bridge.postFrameResponse;
@@ -279,14 +292,18 @@ type UpzeroActionResult = {
         .toLowerCase();
       if (!text) return null;
 
-      var showsAccount =
-        text.indexOf("minha conta") > -1 ||
-        text.indexOf("minhas compras") > -1 ||
-        text.indexOf("meus pedidos") > -1 ||
-        text.indexOf("meus dados") > -1 ||
-        text.indexOf("olá,") > -1 ||
-        text.indexOf("sair") > -1 ||
-        text.indexOf("logout") > -1;
+      // Only ever a NEGATIVE signal: the storefront's own "cadastre-se para
+      // ver o preço" copy on a price-gated product is reliable evidence this
+      // visitor isn't wholesale-approved. There used to be a positive
+      // ("showsAccount") signal here too — generic account-nav words like
+      // "Minha conta"/"Meus pedidos" — but those are standard footer/header
+      // chrome shown to every visitor, logged in or not, on effectively
+      // every storefront theme. Treating that as proof of an approved
+      // session made every anonymous visitor resolve as approved the moment
+      // the page rendered, silently overriding this exact asksForLogin
+      // signal on the very same page. A positive verdict must come from a
+      // real signal instead (a known customer global, a decoded/validated
+      // token, or the authoritative proxy call below).
       var asksForLogin =
         text.indexOf("cadastre-se para ver") > -1 ||
         text.indexOf("faça login para ver") > -1 ||
@@ -294,21 +311,12 @@ type UpzeroActionResult = {
         text.indexOf("entre ou cadastre-se") > -1 ||
         text.indexOf("visualizar valores") > -1;
 
-      if (asksForLogin && !showsAccount) {
+      if (asksForLogin) {
         return {
           approved: false,
           loggedIn: false,
           source: "page",
           status: "UNAUTHENTICATED",
-        };
-      }
-
-      if (showsAccount) {
-        return {
-          approved: true,
-          loggedIn: true,
-          source: "page",
-          status: "ACTIVE",
         };
       }
     } catch (_) {}
@@ -376,19 +384,19 @@ type UpzeroActionResult = {
       state.upzeroCustomerStatusLastRefreshAt = Date.now();
       // isLoggedOutUpzeroStatus is only true for a non-null status, so the
       // cache is a CustomerStatus here (tsc cannot see through the helper).
+      debugLogCustomerStatus("page_logged_out", state.upzeroCustomerStatusCache as CustomerStatus);
       return Promise.resolve(state.upzeroCustomerStatusCache as CustomerStatus);
     }
 
     if (state.upzeroCustomerStatusCache && !forceRefresh) {
+      debugLogCustomerStatus("cache", state.upzeroCustomerStatusCache);
       return Promise.resolve(state.upzeroCustomerStatusCache);
     }
 
-    if (inferredCustomer && inferredCustomer.approved) {
-      state.upzeroCustomerStatusCache = inferredCustomer;
-      state.upzeroCustomerStatusLastRefreshAt = Date.now();
-      return Promise.resolve(state.upzeroCustomerStatusCache);
-    }
-
+    // inferredCustomer can only be null here — its only non-null shape
+    // (UNAUTHENTICATED) was already caught and returned above by
+    // isLoggedOutUpzeroStatus, since inferUpzeroCustomerStatusFromPage never
+    // reports a positive/approved verdict (see its comment).
     var knownCustomer = readKnownUpzeroCustomer();
     if (
       knownCustomer &&
@@ -401,12 +409,8 @@ type UpzeroActionResult = {
         status: normalizeCustomerStatus(knownCustomer.status || "UNKNOWN"),
       };
       state.upzeroCustomerStatusLastRefreshAt = Date.now();
-      return Promise.resolve(state.upzeroCustomerStatusCache);
-    }
-
-    if (inferredCustomer) {
-      state.upzeroCustomerStatusCache = inferredCustomer;
-      state.upzeroCustomerStatusLastRefreshAt = Date.now();
+      debugLogCustomerStatus("window", state.upzeroCustomerStatusCache);
+      debugLog("upzero customer status: window object seen", knownCustomer);
       return Promise.resolve(state.upzeroCustomerStatusCache);
     }
 
@@ -441,6 +445,13 @@ type UpzeroActionResult = {
                 ? payload.data
                 : payload;
             var status = normalizeCustomerStatus(client && client.status);
+            // Raw payload trace: isApprovedCustomerStatus treats both
+            // "APPROVED" and "ACTIVE" as approved, but /v1/clients/me's
+            // "ACTIVE" may just mean "this client record isn't
+            // disabled" rather than "approved for wholesale pricing" — if
+            // that's the whole payload's actual shape, this is the field to
+            // repoint isApprovedCustomerStatus at instead.
+            debugLog("upzero /v1/clients/me raw payload", { authToken: Boolean(authToken), client: client });
             return {
               approved: isApprovedCustomerStatus(status),
               loggedIn: true,
@@ -457,6 +468,10 @@ type UpzeroActionResult = {
 
     var authToken = readUpzeroAuthToken();
     var tokenStatus = statusFromToken(authToken);
+    debugLog("upzero customer status: no page/cache/window signal, falling back to network", {
+      hasAuthToken: Boolean(authToken),
+      tokenStatus: tokenStatus || null,
+    });
     var request = authToken
       ? fetchUpzeroCustomerStatus(authToken)
           .then(function (status) {
@@ -490,6 +505,7 @@ type UpzeroActionResult = {
       .then(function (status) {
         state.upzeroCustomerStatusCache = status;
         state.upzeroCustomerStatusLastRefreshAt = Date.now();
+        debugLogCustomerStatus(status.source || "network", status);
         return status;
       });
   }

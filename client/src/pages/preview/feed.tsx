@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/drawer";
 import { CommerceProductCard } from "@/components/shared/CommerceProductCard";
 import { LazyVideoPlayer } from "@/components/shared/LazyVideoPlayer";
+import { useDragToScroll } from "@/hooks/useDragToScroll";
 import {
   pickMostVisibleVideoId,
   resolveKeyboardNavigationIndex,
@@ -2932,6 +2933,7 @@ const FeedItem = React.memo(function FeedItem({
     () => setVideoRef(video.id),
     [setVideoRef, video.id],
   );
+  const multiProductRowRef = useDragToScroll<HTMLDivElement>();
 
   const [controlsVisible, setControlsVisible] = React.useState(false);
   const controlsTimerRef = React.useRef<number | null>(null);
@@ -3197,7 +3199,10 @@ const FeedItem = React.memo(function FeedItem({
 
         {visibleProducts.length > 0 &&
           (visibleProducts.length > 1 ? (
-            <div className="-mx-4 flex gap-3 overflow-x-auto pl-4 pr-16 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div
+              ref={multiProductRowRef}
+              className="-mx-4 flex gap-3 overflow-x-auto pl-4 pr-16 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
               {visibleProducts.map((item) => {
                 const itemRestricted = Boolean(
                   isUpzeroCommerce(store, item.product) && !customerApproved,

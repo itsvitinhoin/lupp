@@ -66,6 +66,37 @@ export type CarouselServerConfig = {
   mobile_max_items?: number;
   show_price?: boolean;
   show_cart_actions?: boolean;
+  section_padding_x?: number;
+  section_padding_y?: number;
+  section_margin_x?: number;
+  section_margin_y?: number;
+  card_gap?: number;
+  show_scroll_hint?: boolean;
+  show_navigation_arrows?: boolean;
+  background_color?: string;
+  title_color?: string;
+  description_color?: string;
+  accent_color?: string;
+  font_source?: string;
+  font_family?: string;
+  show_title?: boolean;
+  show_description?: boolean;
+  card_border_radius?: number;
+  card_min_width?: number;
+  card_max_width?: number;
+  card_aspect_ratio?: string;
+  card_background_color?: string;
+  card_shadow_enabled?: boolean;
+  card_shadow_color?: string;
+  card_shadow_opacity?: number;
+  card_shadow_blur?: number;
+  card_shadow_offset_x?: number;
+  card_shadow_offset_y?: number;
+  autoplay_enabled?: boolean;
+  autoplay_interval_ms?: number;
+  autoplay_direction?: string;
+  autoplay_pause_on_hover?: boolean;
+  autoplay_loop?: boolean;
   disabled_reason?: string;
 }
 
@@ -143,6 +174,40 @@ export type CarouselConfig = {
   mobileMaxItems: number;
   showPrice: boolean;
   showCartActions: boolean;
+  sectionPaddingX: number;
+  sectionPaddingY: number;
+  sectionMarginX: number;
+  sectionMarginY: number;
+  cardGap: number;
+  showScrollHint: boolean;
+  showNavigationArrows: boolean;
+  backgroundColor: string;
+  titleColor: string;
+  descriptionColor: string;
+  /** "" means inherit the launcher's accentColor. */
+  accentColor: string;
+  /** "store" | "launcher" | "custom" — see fontFamily. */
+  fontSource: string;
+  /** Only read when fontSource === "custom". */
+  fontFamily: string;
+  showTitle: boolean;
+  showDescription: boolean;
+  cardBorderRadius: number;
+  cardMinWidth: number;
+  cardMaxWidth: number;
+  cardAspectRatio: string;
+  cardBackgroundColor: string;
+  cardShadowEnabled: boolean;
+  cardShadowColor: string;
+  cardShadowOpacity: number;
+  cardShadowBlur: number;
+  cardShadowOffsetX: number;
+  cardShadowOffsetY: number;
+  autoplayEnabled: boolean;
+  autoplayIntervalMs: number;
+  autoplayDirection: string;
+  autoplayPauseOnHover: boolean;
+  autoplayLoop: boolean;
 }
 
 // ---------------------------------------------------------------------------

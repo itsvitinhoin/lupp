@@ -10,12 +10,49 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { CodeBlock } from "@/components/shared/CodeBlock";
-import { ArrowLeft, Code2, LockKeyhole, Save, Video } from "lucide-react";
+import { ColorPickerField } from "@/components/shared/ColorPickerField";
+import {
+  ArrowLeft,
+  Code2,
+  LayoutGrid,
+  LockKeyhole,
+  Palette,
+  PlayCircle,
+  Ruler,
+  Save,
+  Video,
+} from "lucide-react";
 import { AdvancedSwitch } from "./AdvancedSwitch";
 import type {
   SetWidgetSettingsField,
   WidgetSettingsForm,
 } from "./useWidgetSettingsForm";
+
+function SectionDivider() {
+  return <div className="-mx-6 border-t border-border" />;
+}
+
+function NumberField(props: {
+  label: string;
+  max: number;
+  min: number;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label className="font-semibold text-muted-foreground">{props.label}</Label>
+      <Input
+        type="number"
+        min={props.min}
+        max={props.max}
+        value={props.value}
+        onChange={(event) => props.onChange(event.target.value)}
+        className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground"
+      />
+    </div>
+  );
+}
 
 export function HorizontalFeedEditor(props: {
   activeWidgetCount: number;
@@ -274,6 +311,320 @@ export function HorizontalFeedEditor(props: {
                 />
               </div>
             </div>
+
+            <SectionDivider />
+
+            <div className="flex items-center gap-3">
+              <Ruler className="h-5 w-5 text-foreground/80" />
+              <h4 className="text-base font-bold text-foreground">
+                Espaçamento e layout
+              </h4>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <NumberField
+                label="Espaçamento horizontal (px)"
+                min={0}
+                max={120}
+                value={form.carouselSectionPaddingX}
+                onChange={(value) => setField("carouselSectionPaddingX", value)}
+              />
+              <NumberField
+                label="Espaçamento vertical (px)"
+                min={0}
+                max={120}
+                value={form.carouselSectionPaddingY}
+                onChange={(value) => setField("carouselSectionPaddingY", value)}
+              />
+              <NumberField
+                label="Margem horizontal (px)"
+                min={0}
+                max={120}
+                value={form.carouselSectionMarginX}
+                onChange={(value) => setField("carouselSectionMarginX", value)}
+              />
+              <NumberField
+                label="Margem vertical (px)"
+                min={0}
+                max={120}
+                value={form.carouselSectionMarginY}
+                onChange={(value) => setField("carouselSectionMarginY", value)}
+              />
+              <NumberField
+                label="Espaço entre cartões (px)"
+                min={0}
+                max={80}
+                value={form.carouselCardGap}
+                onChange={(value) => setField("carouselCardGap", value)}
+              />
+            </div>
+
+            <AdvancedSwitch
+              checked={form.carouselShowScrollHint}
+              description="Mostra um leve degradê nas bordas indicando que dá para arrastar o carrossel para os lados."
+              label="Mostrar indicador de rolagem"
+              onChange={(value) => setField("carouselShowScrollHint", value)}
+            />
+
+            <AdvancedSwitch
+              checked={form.carouselShowNavigationArrows}
+              description="Mostra setas de avançar/voltar nos cantos do carrossel em telas desktop, que passam um vídeo por vez. O carrossel também pode ser arrastado com o mouse; no celular, o gesto de arrastar já funciona nativamente."
+              label="Mostrar setas de navegação"
+              onChange={(value) => setField("carouselShowNavigationArrows", value)}
+            />
+
+            <SectionDivider />
+
+            <div className="flex items-center gap-3">
+              <Palette className="h-5 w-5 text-foreground/80" />
+              <h4 className="text-base font-bold text-foreground">Cores e fonte</h4>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <ColorPickerField
+                id="carousel-background-color"
+                label="Cor de fundo"
+                value={form.carouselBackgroundColor}
+                onChange={(value) => setField("carouselBackgroundColor", value)}
+              />
+              <ColorPickerField
+                id="carousel-title-color"
+                label="Cor do título"
+                value={form.carouselTitleColor}
+                onChange={(value) => setField("carouselTitleColor", value)}
+              />
+              <ColorPickerField
+                id="carousel-description-color"
+                label="Cor da descrição"
+                value={form.carouselDescriptionColor}
+                onChange={(value) => setField("carouselDescriptionColor", value)}
+              />
+            </div>
+
+            <AdvancedSwitch
+              checked={Boolean(form.carouselAccentColor)}
+              description="Cor de destaque usada na borda dos cartões e no botão de compra. Quando desativado, usa a mesma cor de destaque da miniatura flutuante."
+              label="Cor de destaque própria"
+              onChange={(value) =>
+                setField("carouselAccentColor", value ? form.launcherAccent : "")
+              }
+            />
+            {form.carouselAccentColor ? (
+              <ColorPickerField
+                id="carousel-accent-color"
+                label="Cor de destaque do carrossel"
+                value={form.carouselAccentColor}
+                onChange={(value) => setField("carouselAccentColor", value)}
+              />
+            ) : null}
+
+            <div className="space-y-2">
+              <Label className="font-semibold text-muted-foreground">Fonte do carrossel</Label>
+              <Select
+                value={form.carouselFontSource}
+                onValueChange={(value) => setField("carouselFontSource", value)}
+              >
+                <SelectTrigger className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="store">Fonte da loja (padrão)</SelectItem>
+                  <SelectItem value="launcher">Mesma da miniatura flutuante</SelectItem>
+                  <SelectItem value="custom">Personalizada</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs font-semibold leading-5 text-muted-foreground">
+                “Fonte da loja” herda automaticamente a fonte que o tema da sua
+                loja já usa, sem precisar configurar nada.
+              </p>
+            </div>
+            {form.carouselFontSource === "custom" ? (
+              <div className="space-y-2">
+                <Label className="font-semibold text-muted-foreground">
+                  Família da fonte (CSS)
+                </Label>
+                <Input
+                  value={form.carouselFontFamily}
+                  onChange={(event) => setField("carouselFontFamily", event.target.value)}
+                  placeholder="Inter, system-ui, sans-serif"
+                  className="h-11 rounded-xl border-border bg-card font-mono text-sm text-foreground"
+                />
+              </div>
+            ) : null}
+
+            <AdvancedSwitch
+              checked={form.carouselShowTitle}
+              description="Quando desativado, o título acima do carrossel não é exibido (o texto continua salvo)."
+              label="Mostrar título"
+              onChange={(value) => setField("carouselShowTitle", value)}
+            />
+            <AdvancedSwitch
+              checked={form.carouselShowDescription}
+              description="Quando desativado, a descrição acima do carrossel não é exibida (o texto continua salvo)."
+              label="Mostrar descrição"
+              onChange={(value) => setField("carouselShowDescription", value)}
+            />
+
+            <SectionDivider />
+
+            <div className="flex items-center gap-3">
+              <LayoutGrid className="h-5 w-5 text-foreground/80" />
+              <h4 className="text-base font-bold text-foreground">
+                Cartão de produto
+              </h4>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <NumberField
+                label="Arredondamento (px)"
+                min={0}
+                max={40}
+                value={form.carouselCardBorderRadius}
+                onChange={(value) => setField("carouselCardBorderRadius", value)}
+              />
+              <div className="space-y-2">
+                <Label className="font-semibold text-muted-foreground">
+                  Proporção do cartão
+                </Label>
+                <Select
+                  value={form.carouselCardAspectRatio}
+                  onValueChange={(value) => setField("carouselCardAspectRatio", value)}
+                >
+                  <SelectTrigger className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="9:16">9:16 (retrato)</SelectItem>
+                    <SelectItem value="4:5">4:5</SelectItem>
+                    <SelectItem value="3:4">3:4</SelectItem>
+                    <SelectItem value="1:1">1:1 (quadrado)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <NumberField
+                label="Largura mínima (px)"
+                min={120}
+                max={360}
+                value={form.carouselCardMinWidth}
+                onChange={(value) => setField("carouselCardMinWidth", value)}
+              />
+              <NumberField
+                label="Largura máxima (px)"
+                min={120}
+                max={360}
+                value={form.carouselCardMaxWidth}
+                onChange={(value) => setField("carouselCardMaxWidth", value)}
+              />
+            </div>
+
+            <ColorPickerField
+              id="carousel-card-background-color"
+              label="Cor de fundo do cartão (antes de carregar a miniatura)"
+              value={form.carouselCardBackgroundColor}
+              onChange={(value) => setField("carouselCardBackgroundColor", value)}
+            />
+
+            <AdvancedSwitch
+              checked={form.carouselCardShadowEnabled}
+              description="Adiciona uma sombra suave abaixo de cada cartão. Desativado por padrão."
+              label="Sombra no cartão"
+              onChange={(value) => setField("carouselCardShadowEnabled", value)}
+            />
+            {form.carouselCardShadowEnabled ? (
+              <div className="space-y-4">
+                <ColorPickerField
+                  id="carousel-card-shadow-color"
+                  label="Cor da sombra"
+                  value={form.carouselCardShadowColor}
+                  onChange={(value) => setField("carouselCardShadowColor", value)}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <NumberField
+                    label="Opacidade (%)"
+                    min={0}
+                    max={100}
+                    value={form.carouselCardShadowOpacity}
+                    onChange={(value) => setField("carouselCardShadowOpacity", value)}
+                  />
+                  <NumberField
+                    label="Desfoque (px)"
+                    min={0}
+                    max={80}
+                    value={form.carouselCardShadowBlur}
+                    onChange={(value) => setField("carouselCardShadowBlur", value)}
+                  />
+                  <NumberField
+                    label="Deslocamento horizontal (px)"
+                    min={-40}
+                    max={40}
+                    value={form.carouselCardShadowOffsetX}
+                    onChange={(value) => setField("carouselCardShadowOffsetX", value)}
+                  />
+                  <NumberField
+                    label="Deslocamento vertical (px)"
+                    min={-40}
+                    max={40}
+                    value={form.carouselCardShadowOffsetY}
+                    onChange={(value) => setField("carouselCardShadowOffsetY", value)}
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            <SectionDivider />
+
+            <div className="flex items-center gap-3">
+              <PlayCircle className="h-5 w-5 text-foreground/80" />
+              <h4 className="text-base font-bold text-foreground">Rolagem automática</h4>
+            </div>
+
+            <AdvancedSwitch
+              checked={form.carouselAutoplayEnabled}
+              description="O carrossel avança automaticamente de tempos em tempos. Nunca roda para visitantes com redução de movimento ativada no navegador."
+              label="Ativar rolagem automática"
+              onChange={(value) => setField("carouselAutoplayEnabled", value)}
+            />
+
+            {form.carouselAutoplayEnabled ? (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <NumberField
+                    label="Intervalo entre avanços (ms)"
+                    min={1500}
+                    max={15000}
+                    value={form.carouselAutoplayIntervalMs}
+                    onChange={(value) => setField("carouselAutoplayIntervalMs", value)}
+                  />
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-muted-foreground">Direção</Label>
+                    <Select
+                      value={form.carouselAutoplayDirection}
+                      onValueChange={(value) => setField("carouselAutoplayDirection", value)}
+                    >
+                      <SelectTrigger className="h-11 rounded-xl border-border bg-card text-sm font-semibold text-foreground">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="forward">Para frente</SelectItem>
+                        <SelectItem value="backward">Para trás</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <AdvancedSwitch
+                  checked={form.carouselAutoplayPauseOnHover}
+                  description="Pausa a rolagem automática enquanto o mouse estiver sobre o carrossel."
+                  label="Pausar ao passar o mouse"
+                  onChange={(value) => setField("carouselAutoplayPauseOnHover", value)}
+                />
+                <AdvancedSwitch
+                  checked={form.carouselAutoplayLoop}
+                  description="Quando chega ao final, volta para o primeiro vídeo e continua. Quando desativado, a rolagem automática para no último vídeo."
+                  label="Repetir em loop"
+                  onChange={(value) => setField("carouselAutoplayLoop", value)}
+                />
+              </>
+            ) : null}
 
             <CodeBlock code={props.embedCode} />
           </div>

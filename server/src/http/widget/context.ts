@@ -65,6 +65,37 @@ export type ResolvedWidgetConfig = {
     mobile_max_items: number;
     show_price: boolean;
     show_cart_actions: boolean;
+    section_padding_x: number;
+    section_padding_y: number;
+    section_margin_x: number;
+    section_margin_y: number;
+    card_gap: number;
+    show_scroll_hint: boolean;
+    show_navigation_arrows: boolean;
+    background_color: string;
+    title_color: string;
+    description_color: string;
+    accent_color: string;
+    font_source: string;
+    font_family: string;
+    show_title: boolean;
+    show_description: boolean;
+    card_border_radius: number;
+    card_min_width: number;
+    card_max_width: number;
+    card_aspect_ratio: string;
+    card_background_color: string;
+    card_shadow_enabled: boolean;
+    card_shadow_color: string;
+    card_shadow_opacity: number;
+    card_shadow_blur: number;
+    card_shadow_offset_x: number;
+    card_shadow_offset_y: number;
+    autoplay_enabled: boolean;
+    autoplay_interval_ms: number;
+    autoplay_direction: string;
+    autoplay_pause_on_hover: boolean;
+    autoplay_loop: boolean;
     disabled_reason?: string;
   };
 };
@@ -279,6 +310,62 @@ export function resolveWidgetConfig(
       show_price: "show_price" in carousel ? carousel.show_price !== false : true,
       show_cart_actions:
         "show_cart_actions" in carousel ? carousel.show_cart_actions !== false : true,
+      section_padding_x:
+        Number(carousel.section_padding_x) || DEFAULTS.carousel.section_padding_x,
+      section_padding_y:
+        Number(carousel.section_padding_y) || DEFAULTS.carousel.section_padding_y,
+      section_margin_x: Number.isFinite(Number(carousel.section_margin_x))
+        ? Number(carousel.section_margin_x)
+        : DEFAULTS.carousel.section_margin_x,
+      section_margin_y: Number.isFinite(Number(carousel.section_margin_y))
+        ? Number(carousel.section_margin_y)
+        : DEFAULTS.carousel.section_margin_y,
+      card_gap: Number.isFinite(Number(carousel.card_gap))
+        ? Number(carousel.card_gap)
+        : DEFAULTS.carousel.card_gap,
+      show_scroll_hint:
+        "show_scroll_hint" in carousel ? carousel.show_scroll_hint !== false : true,
+      show_navigation_arrows:
+        "show_navigation_arrows" in carousel ? carousel.show_navigation_arrows !== false : true,
+      background_color: text(carousel.background_color) || DEFAULTS.carousel.background_color,
+      title_color: text(carousel.title_color) || DEFAULTS.carousel.title_color,
+      description_color: text(carousel.description_color) || DEFAULTS.carousel.description_color,
+      // "" is meaningful (inherit the launcher's accent/font) — only swap in
+      // the default when the field is missing entirely, not when it's "".
+      accent_color: typeof carousel.accent_color === "string" ? carousel.accent_color : DEFAULTS.carousel.accent_color,
+      font_source: text(carousel.font_source) || DEFAULTS.carousel.font_source,
+      font_family: typeof carousel.font_family === "string" ? carousel.font_family : DEFAULTS.carousel.font_family,
+      show_title: "show_title" in carousel ? carousel.show_title !== false : true,
+      show_description: "show_description" in carousel ? carousel.show_description !== false : true,
+      card_border_radius: Number.isFinite(Number(carousel.card_border_radius))
+        ? Number(carousel.card_border_radius)
+        : DEFAULTS.carousel.card_border_radius,
+      card_min_width: Number(carousel.card_min_width) || DEFAULTS.carousel.card_min_width,
+      card_max_width: Number(carousel.card_max_width) || DEFAULTS.carousel.card_max_width,
+      card_aspect_ratio: text(carousel.card_aspect_ratio) || DEFAULTS.carousel.card_aspect_ratio,
+      card_background_color:
+        text(carousel.card_background_color) || DEFAULTS.carousel.card_background_color,
+      card_shadow_enabled: Boolean(carousel.card_shadow_enabled),
+      card_shadow_color: text(carousel.card_shadow_color) || DEFAULTS.carousel.card_shadow_color,
+      card_shadow_opacity: Number.isFinite(Number(carousel.card_shadow_opacity))
+        ? Number(carousel.card_shadow_opacity)
+        : DEFAULTS.carousel.card_shadow_opacity,
+      card_shadow_blur: Number.isFinite(Number(carousel.card_shadow_blur))
+        ? Number(carousel.card_shadow_blur)
+        : DEFAULTS.carousel.card_shadow_blur,
+      card_shadow_offset_x: Number.isFinite(Number(carousel.card_shadow_offset_x))
+        ? Number(carousel.card_shadow_offset_x)
+        : DEFAULTS.carousel.card_shadow_offset_x,
+      card_shadow_offset_y: Number.isFinite(Number(carousel.card_shadow_offset_y))
+        ? Number(carousel.card_shadow_offset_y)
+        : DEFAULTS.carousel.card_shadow_offset_y,
+      autoplay_enabled: Boolean(carousel.autoplay_enabled),
+      autoplay_interval_ms:
+        Number(carousel.autoplay_interval_ms) || DEFAULTS.carousel.autoplay_interval_ms,
+      autoplay_direction: text(carousel.autoplay_direction) || DEFAULTS.carousel.autoplay_direction,
+      autoplay_pause_on_hover:
+        "autoplay_pause_on_hover" in carousel ? carousel.autoplay_pause_on_hover !== false : true,
+      autoplay_loop: "autoplay_loop" in carousel ? carousel.autoplay_loop !== false : true,
     },
   };
 
