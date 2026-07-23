@@ -719,19 +719,61 @@ function normalizeAttributeItems(value: unknown): Array<Record<string, unknown>>
   });
 }
 
+function asPlainRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+// Upzero's actual variant attribute shape (verified against live synced
+// data): each entry is `{ attribute: { id, code, name }, term: { code, name } }`
+// — the attribute DEFINITION (is this "color" or "size"?) nested under
+// `attribute`, the actual VALUE ("BLUSH", "42") nested under `term`. Every
+// synced variant for at least one real store had 100% NULL color/size
+// columns because these helpers only ever looked for flat
+// `attribute_code`/`term_name`-style keys or a bare string `item.attribute`,
+// never this nested-object shape — `item.attribute` being an object made
+// `attributeCode` stringify it to "[object object]" instead of falling
+// through to a real value.
 function attributeCode(item: Record<string, unknown>) {
+  const nestedAttribute = asPlainRecord(item.attribute);
+  if (nestedAttribute) {
+    const nestedCode = nestedAttribute.code ?? nestedAttribute.id ?? nestedAttribute.name;
+    if (nestedCode !== undefined && nestedCode !== null && nestedCode !== "") {
+      return String(nestedCode).toLowerCase();
+    }
+  }
   return String(
-    item.attribute_code ?? item.attributeCode ?? item.code ?? item.attribute ?? item.name ?? "",
+    item.attribute_code ??
+      item.attributeCode ??
+      item.code ??
+      (typeof item.attribute === "string" ? item.attribute : undefined) ??
+      item.name ??
+      "",
   ).toLowerCase();
 }
 
 function attributeName(item: Record<string, unknown>) {
+  const nestedAttribute = asPlainRecord(item.attribute);
+  if (nestedAttribute) {
+    const nestedName = nestedAttribute.name ?? nestedAttribute.code;
+    if (nestedName !== undefined && nestedName !== null && nestedName !== "") {
+      return String(nestedName).toLowerCase();
+    }
+  }
   return String(
     item.attribute_name ?? item.attributeName ?? item.name ?? item.label ?? item.attribute_code ?? "",
   ).toLowerCase();
 }
 
 function attributeValueName(item: Record<string, unknown>) {
+  const nestedTerm = asPlainRecord(item.term);
+  if (nestedTerm) {
+    const nestedName = nestedTerm.name ?? nestedTerm.code;
+    if (nestedName !== undefined && nestedName !== null && nestedName !== "") {
+      return String(nestedName).trim();
+    }
+  }
   return String(
     item.value_name ??
       item.valueName ??
@@ -745,6 +787,13 @@ function attributeValueName(item: Record<string, unknown>) {
 }
 
 function attributeValueCode(item: Record<string, unknown>) {
+  const nestedTerm = asPlainRecord(item.term);
+  if (nestedTerm) {
+    const nestedCode = nestedTerm.code ?? nestedTerm.name;
+    if (nestedCode !== undefined && nestedCode !== null && nestedCode !== "") {
+      return String(nestedCode).trim();
+    }
+  }
   return String(
     item.value_code ??
       item.valueCode ??
@@ -762,6 +811,10 @@ function attributeHex(item: Record<string, unknown>) {
   if (meta && typeof meta === "object" && !Array.isArray(meta)) {
     const candidate = (meta as Record<string, unknown>).hex;
     if (typeof candidate === "string" && candidate.trim()) return candidate;
+  }
+  const nestedTerm = asPlainRecord(item.term);
+  if (nestedTerm && typeof nestedTerm.hex === "string" && (nestedTerm.hex as string).trim()) {
+    return nestedTerm.hex as string;
   }
   const candidate = item.hex ?? item.color_hex ?? item.colorHex;
   return typeof candidate === "string" && candidate.trim() ? candidate : null;

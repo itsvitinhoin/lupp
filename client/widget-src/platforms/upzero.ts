@@ -292,18 +292,14 @@ type UpzeroActionResult = {
         .toLowerCase();
       if (!text) return null;
 
-      // Only ever a NEGATIVE signal: the storefront's own "cadastre-se para
-      // ver o preço" copy on a price-gated product is reliable evidence this
-      // visitor isn't wholesale-approved. There used to be a positive
-      // ("showsAccount") signal here too — generic account-nav words like
-      // "Minha conta"/"Meus pedidos" — but those are standard footer/header
-      // chrome shown to every visitor, logged in or not, on effectively
-      // every storefront theme. Treating that as proof of an approved
-      // session made every anonymous visitor resolve as approved the moment
-      // the page rendered, silently overriding this exact asksForLogin
-      // signal on the very same page. A positive verdict must come from a
-      // real signal instead (a known customer global, a decoded/validated
-      // token, or the authoritative proxy call below).
+      // The storefront's own "cadastre-se para ver o preço" copy on a
+      // price-gated product is reliable evidence this visitor isn't
+      // wholesale-approved. There used to be a positive ("showsAccount")
+      // signal here too — generic account-nav words like "Minha conta"/
+      // "Meus pedidos" — but those are standard footer/header chrome shown
+      // to every visitor, logged in or not, on effectively every storefront
+      // theme, so it made every anonymous visitor resolve as approved the
+      // moment the page rendered.
       var asksForLogin =
         text.indexOf("cadastre-se para ver") > -1 ||
         text.indexOf("faça login para ver") > -1 ||
@@ -317,6 +313,28 @@ type UpzeroActionResult = {
           loggedIn: false,
           source: "page",
           status: "UNAUTHENTICATED",
+        };
+      }
+
+      // Upzero's customer session cookie is HttpOnly (verified live on two
+      // stores' storefronts) — no client-side JS, including this widget,
+      // can ever read its value, so a real logged-in visitor can never be
+      // detected via a token. The one thing that *does* differ in the
+      // server-rendered HTML: every price-gated product card carries its
+      // own "SKU: n" label followed by either the price-gate copy above (an
+      // anonymous/unapproved visitor) or the real price (an approved one).
+      // Verified live, logged in as a real wholesale customer: the gate
+      // copy disappears from every card and real "R$" prices take its
+      // place — so product cards existing on the page (a "sku:" label)
+      // with none of them showing the gate copy is reliable positive
+      // evidence, not a guess. A page with no product cards at all (no
+      // "sku:") stays undecided and falls through to the checks below.
+      if (text.indexOf("sku:") > -1) {
+        return {
+          approved: true,
+          loggedIn: true,
+          source: "page",
+          status: "ACTIVE",
         };
       }
     } catch (_) {}
@@ -364,6 +382,30 @@ type UpzeroActionResult = {
     });
   }
 
+  // Upzero storefronts stream in their personalized content (real prices,
+  // gate copy) asynchronously after the initial page load rather than
+  // having it all present synchronously — verified live: a check made too
+  // soon after load sees neither signal and wrongly falls through to the
+  // network path, which can't identify a specific visitor at all (see
+  // fetchUpzeroCustomerStatus's comment) and answers UNAUTHENTICATED for
+  // everyone. Retrying the page check a few times first, before ever
+  // reaching the network fallback, gives that streamed-in content a real
+  // chance to land.
+  var PAGE_INFER_RETRY_ATTEMPTS = 6;
+  var PAGE_INFER_RETRY_DELAY_MS = 500;
+
+  function resolveInferredCustomerWithRetry(
+    attemptsLeft: number,
+  ): Promise<CustomerStatus | null> {
+    var result = inferUpzeroCustomerStatusFromPage();
+    if (result || attemptsLeft <= 1) return Promise.resolve(result);
+    return new Promise(function (resolve) {
+      window.setTimeout(function () {
+        resolve(resolveInferredCustomerWithRetry(attemptsLeft - 1));
+      }, PAGE_INFER_RETRY_DELAY_MS);
+    });
+  }
+
   function detectUpzeroCustomerStatus(
     store: StorePayload | null,
     options?: { forceRefresh?: boolean },
@@ -378,42 +420,54 @@ type UpzeroActionResult = {
       });
     }
 
-    var inferredCustomer = inferUpzeroCustomerStatusFromPage();
-    if (isLoggedOutUpzeroStatus(inferredCustomer)) {
-      state.upzeroCustomerStatusCache = inferredCustomer;
-      state.upzeroCustomerStatusLastRefreshAt = Date.now();
-      // isLoggedOutUpzeroStatus is only true for a non-null status, so the
-      // cache is a CustomerStatus here (tsc cannot see through the helper).
-      debugLogCustomerStatus("page_logged_out", state.upzeroCustomerStatusCache as CustomerStatus);
-      return Promise.resolve(state.upzeroCustomerStatusCache as CustomerStatus);
-    }
-
-    if (state.upzeroCustomerStatusCache && !forceRefresh) {
-      debugLogCustomerStatus("cache", state.upzeroCustomerStatusCache);
-      return Promise.resolve(state.upzeroCustomerStatusCache);
-    }
-
-    // inferredCustomer can only be null here — its only non-null shape
-    // (UNAUTHENTICATED) was already caught and returned above by
-    // isLoggedOutUpzeroStatus, since inferUpzeroCustomerStatusFromPage never
-    // reports a positive/approved verdict (see its comment).
-    var knownCustomer = readKnownUpzeroCustomer();
-    if (
-      knownCustomer &&
-      (!forceRefresh || isApprovedCustomerStatus(knownCustomer.status))
+    return resolveInferredCustomerWithRetry(PAGE_INFER_RETRY_ATTEMPTS).then(function (
+      inferredCustomer,
     ) {
-      state.upzeroCustomerStatusCache = {
-        approved: isApprovedCustomerStatus(knownCustomer.status),
-        loggedIn: true,
-        source: "window",
-        status: normalizeCustomerStatus(knownCustomer.status || "UNKNOWN"),
-      };
-      state.upzeroCustomerStatusLastRefreshAt = Date.now();
-      debugLogCustomerStatus("window", state.upzeroCustomerStatusCache);
-      debugLog("upzero customer status: window object seen", knownCustomer);
-      return Promise.resolve(state.upzeroCustomerStatusCache);
-    }
+      if (isLoggedOutUpzeroStatus(inferredCustomer)) {
+        state.upzeroCustomerStatusCache = inferredCustomer;
+        state.upzeroCustomerStatusLastRefreshAt = Date.now();
+        // isLoggedOutUpzeroStatus is only true for a non-null status, so the
+        // cache is a CustomerStatus here (tsc cannot see through the helper).
+        debugLogCustomerStatus("page_logged_out", state.upzeroCustomerStatusCache as CustomerStatus);
+        return state.upzeroCustomerStatusCache as CustomerStatus;
+      }
 
+      if (state.upzeroCustomerStatusCache && !forceRefresh) {
+        debugLogCustomerStatus("cache", state.upzeroCustomerStatusCache);
+        return state.upzeroCustomerStatusCache;
+      }
+
+      if (inferredCustomer && inferredCustomer.approved) {
+        state.upzeroCustomerStatusCache = inferredCustomer;
+        state.upzeroCustomerStatusLastRefreshAt = Date.now();
+        debugLogCustomerStatus("page_approved", state.upzeroCustomerStatusCache);
+        return state.upzeroCustomerStatusCache;
+      }
+
+      // inferredCustomer can only be null here — its two non-null shapes
+      // (UNAUTHENTICATED / approved) were already caught and returned above.
+      var knownCustomer = readKnownUpzeroCustomer();
+      if (
+        knownCustomer &&
+        (!forceRefresh || isApprovedCustomerStatus(knownCustomer.status))
+      ) {
+        state.upzeroCustomerStatusCache = {
+          approved: isApprovedCustomerStatus(knownCustomer.status),
+          loggedIn: true,
+          source: "window",
+          status: normalizeCustomerStatus(knownCustomer.status || "UNKNOWN"),
+        };
+        state.upzeroCustomerStatusLastRefreshAt = Date.now();
+        debugLogCustomerStatus("window", state.upzeroCustomerStatusCache);
+        debugLog("upzero customer status: window object seen", knownCustomer);
+        return state.upzeroCustomerStatusCache;
+      }
+
+      return detectUpzeroCustomerStatusViaNetwork();
+    });
+  }
+
+  function detectUpzeroCustomerStatusViaNetwork(): Promise<CustomerStatus> {
     function fetchUpzeroCustomerStatus(
       authToken: string,
     ): Promise<CustomerStatus> {

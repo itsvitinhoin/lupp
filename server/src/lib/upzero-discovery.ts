@@ -14,18 +14,41 @@
 const CHUNK_FETCH_LIMIT = 24;
 const FETCH_TIMEOUT_MS = 5_000;
 
-export function extractUpzeroCartActionIds(text: string): string[] {
+// Verified against a real, current Upzero storefront bundle: action ids are
+// 42 hex chars here (not 40 — Next.js's action-id length isn't a fixed,
+// documented constant across versions), and the bundler emits the
+// reference as `(0,ns.createServerReference)("<id>",...)` — the `(0, ns.)`
+// indirection (used to call the method unbound) means a few characters
+// always sit between the identifier and the opening quote, not zero.
+const NAMED_ACTION_PATTERN =
+  /createServerReference[^"']{0,6}["']([a-f0-9]{40,44})["'][^)]{0,200}?["']addStorefrontCartItemsBatchAction["']/gi;
+
+const FALLBACK_ACTION_PATTERNS = [
+  /"([a-f0-9]{40,44})"(?=[^]{0,900}(?:cart|carrinho|sessionId|productVariantId|storeId|items))/gi,
+  /(?:cart|carrinho|sessionId|productVariantId|storeId|items)[^]{0,900}"([a-f0-9]{40,44})"/gi,
+  /Next-Action["']?\s*[:=]\s*["']([a-f0-9]{40,44})["']/gi,
+];
+
+/**
+ * The specific, high-confidence match: the action id bound to the exact
+ * addStorefrontCartItemsBatchAction reference. Callers should search every
+ * fetched source (HTML + all chunks) for this before ever accepting a
+ * fallback match — a broad-heuristic hit in an early chunk must not
+ * pre-empt the correctly-named action sitting in a later one.
+ */
+export function extractNamedUpzeroCartActionId(text: string): string | null {
+  const source = String(text || "");
+  NAMED_ACTION_PATTERN.lastIndex = 0;
+  const match = NAMED_ACTION_PATTERN.exec(source);
+  return match ? String(match[1] || "").toLowerCase() : null;
+}
+
+function extractFallbackUpzeroCartActionIds(text: string): string[] {
   const source = String(text || "");
   const matches: string[] = [];
   const seen = new Set<string>();
-  const patterns = [
-    /createServerReference\(["']([a-f0-9]{40})["'][^)]*["']addStorefrontCartItemsBatchAction["']/gi,
-    /"([a-f0-9]{40})"(?=[^]{0,900}(?:cart|carrinho|sessionId|productVariantId|storeId|items))/gi,
-    /(?:cart|carrinho|sessionId|productVariantId|storeId|items)[^]{0,900}"([a-f0-9]{40})"/gi,
-    /Next-Action["']?\s*[:=]\s*["']([a-f0-9]{40})["']/gi,
-  ];
-
-  for (const pattern of patterns) {
+  for (const pattern of FALLBACK_ACTION_PATTERNS) {
+    pattern.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(source))) {
       const id = String(match[1] || "").toLowerCase();
@@ -36,6 +59,12 @@ export function extractUpzeroCartActionIds(text: string): string[] {
     }
   }
   return matches;
+}
+
+export function extractUpzeroCartActionIds(text: string): string[] {
+  const named = extractNamedUpzeroCartActionId(text);
+  const fallback = extractFallbackUpzeroCartActionIds(text).filter((id) => id !== named);
+  return named ? [named, ...fallback] : fallback;
 }
 
 function findStoreIdInObject(value: unknown, depth: number): number | null {
@@ -165,21 +194,35 @@ export async function discoverUpzeroCartContext(pageUrl: string): Promise<Upzero
   const origin = new URL(pageUrl).origin;
   const html = await fetchText(pageUrl);
 
-  let actionIds = extractUpzeroCartActionIds(html);
+  let namedActionId = extractNamedUpzeroCartActionId(html);
+  let fallbackActionIds = namedActionId ? [] : extractFallbackUpzeroCartActionIds(html);
   let storefrontStoreId = extractUpzeroStorefrontStoreId(html);
 
-  if (!actionIds.length || !storefrontStoreId) {
+  if (!namedActionId || !storefrontStoreId) {
     const chunkUrls = extractScriptSources(html, pageUrl)
       .filter((src) => src.startsWith(origin) && src.includes("/_next/static/"))
       .slice(0, CHUNK_FETCH_LIMIT);
 
     for (const chunkUrl of chunkUrls) {
-      if (actionIds.length && storefrontStoreId) break;
+      if (namedActionId && storefrontStoreId) break;
       const chunkText = await fetchText(chunkUrl);
-      if (!actionIds.length) actionIds = extractUpzeroCartActionIds(chunkText);
+      // Keep searching every chunk for the specific, correctly-named action
+      // even once a fallback candidate has been seen — a low-confidence
+      // heuristic match from an earlier chunk must never short-circuit the
+      // search before the high-confidence match has a chance to be found.
+      if (!namedActionId) {
+        namedActionId = extractNamedUpzeroCartActionId(chunkText);
+        if (!namedActionId && !fallbackActionIds.length) {
+          fallbackActionIds = extractFallbackUpzeroCartActionIds(chunkText);
+        }
+      }
       if (!storefrontStoreId) storefrontStoreId = extractUpzeroStorefrontStoreId(chunkText);
     }
   }
+
+  const actionIds = namedActionId
+    ? [namedActionId, ...fallbackActionIds.filter((id) => id !== namedActionId)]
+    : fallbackActionIds;
 
   return { cart_action_ids: actionIds, storefront_store_id: storefrontStoreId };
 }
