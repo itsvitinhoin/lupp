@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import { app } from "@/app";
 import { env } from "@/env";
@@ -15,10 +15,23 @@ describe("POST /api/videos/thumbnail (e2e)", () => {
     await app.close();
   });
 
+  // These tests assert an exact "unconfigured" and "default hostname" state,
+  // which must not depend on whatever real Bunny credentials happen to be
+  // set in this machine's .env (needed for actually exercising the real API
+  // elsewhere) — reset to a known-clean baseline before every test, not just
+  // after the tests that opt into real values.
+  beforeEach(() => {
+    env.BUNNY_STORAGE_ZONE_NAME = undefined;
+    env.BUNNY_STORAGE_API_KEY = undefined;
+    env.BUNNY_STORAGE_CDN_HOSTNAME = undefined;
+    env.BUNNY_STORAGE_HOSTNAME = "storage.bunnycdn.com";
+  });
+
   afterEach(() => {
     env.BUNNY_STORAGE_ZONE_NAME = undefined;
     env.BUNNY_STORAGE_API_KEY = undefined;
     env.BUNNY_STORAGE_CDN_HOSTNAME = undefined;
+    env.BUNNY_STORAGE_HOSTNAME = "storage.bunnycdn.com";
     vi.unstubAllGlobals();
   });
 
