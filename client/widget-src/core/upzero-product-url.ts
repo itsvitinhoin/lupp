@@ -101,7 +101,10 @@ function upzeroReferenceSlugFromProduct(
     }
     const numeric = decoded.match(/^\s*(\d+[a-z0-9-]*)\s*$/i);
     if (numeric && numeric[1] && !numericFallback) {
-      numericFallback = "ref" + numeric[1].replace(/[^a-z0-9-]/gi, "").toLowerCase();
+      // No "ref" prefix invented here — a bare numeric id (this store's
+      // real, verified-live URL scheme: e.g. "27082-vt-linho-gerlane", no
+      // "ref" anywhere) must stay bare or the resulting slug 404s.
+      numericFallback = numeric[1].replace(/[^a-z0-9-]/gi, "").toLowerCase();
     }
   }
 
@@ -118,9 +121,6 @@ function upzeroProductHandleFromProduct(
     try {
       savedHandle = decodeURIComponent(savedHandle);
     } catch (_) {}
-    savedHandle = savedHandle
-      .replace(/^\s*ref\s*[:#-]?\s*(\d+)/i, "ref$1")
-      .replace(/^(\d+)/, "ref$1");
     const savedSlug = slugifyForPath(savedHandle);
     if (savedSlug) {
       if (referenceSlug && savedSlug.indexOf(referenceSlug) !== 0) {
@@ -157,13 +157,18 @@ export function repairUpzeroProductUrl(
 
   try {
     const parsed = new URL(url || base, base);
-    const originalVariantMatch = parsed.pathname.match(/^\/produtos?\/[^/]+\/([^/?#]+)/i);
+    // Some storefront templates require a tenant path segment before
+    // "/produtos/" (e.g. "/40/produtos/..." — verified live on a shared
+    // Upzero template); preserve whatever precedes it in the saved URL
+    // rather than assuming "/produtos/" always starts the path.
+    const prefixMatch = parsed.pathname.match(/^(.*?)\/produtos?\//i);
+    const prefix = prefixMatch ? prefixMatch[1] : "";
+    const originalVariantMatch = parsed.pathname.match(/\/produtos?\/[^/]+\/([^/?#]+)/i);
     const existingColorSlug =
       originalVariantMatch && originalVariantMatch[1]
         ? slugifyForPath(decodeURIComponent(originalVariantMatch[1]))
         : "";
-    const productPath = parsed.pathname.match(/^\/produtos?\//i);
-    parsed.pathname = (productPath ? "/produtos/" : "/produtos/") + handle;
+    parsed.pathname = prefix + "/produtos/" + handle;
     // Slim server products carry no variants, so only a colour slug already
     // present in the saved URL can be preserved.
     if (existingColorSlug) parsed.pathname += "/" + existingColorSlug;

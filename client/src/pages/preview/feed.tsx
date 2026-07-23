@@ -263,10 +263,18 @@ function slugifyProductName(value?: string | null) {
 function upzeroReferenceSlug(value?: string | null) {
   const raw = String(value || "").trim();
   if (!raw) return "";
-  const refMatch = raw.match(/\bref\s*[:#-]?\s*(\d+[a-z0-9-]*)/i);
+  // The trailing character class must stop at the first hyphen — matching
+  // against a full saved URL like ".../produtos/ref27082-vt-linho-gerlane"
+  // otherwise swallows the whole name slug into the "reference", and it
+  // then gets concatenated again with a freshly computed name slug below,
+  // duplicating it (the exact bug this guards against). And a bare numeric
+  // id must NOT get a "ref" prefix invented — this store's real, verified-
+  // live URL scheme (e.g. "27082-vt-linho-gerlane") never has one; only
+  // preserve "ref" when the source text actually contains it.
+  const refMatch = raw.match(/\bref\s*[:#-]?\s*(\d+[a-z0-9]*)/i);
   if (refMatch?.[1]) return `ref${slugifyProductName(refMatch[1])}`;
-  const numericMatch = raw.match(/\b(\d{3,}[a-z0-9-]*)\b/i);
-  if (numericMatch?.[1]) return `ref${slugifyProductName(numericMatch[1])}`;
+  const numericMatch = raw.match(/\b(\d{3,}[a-z0-9]*)\b/i);
+  if (numericMatch?.[1]) return slugifyProductName(numericMatch[1]);
   return slugifyProductName(raw.replace(/^ref\s*[:#-]?\s*/i, "ref"));
 }
 
@@ -333,20 +341,29 @@ function firstUpzeroColorSlug(product: any) {
 }
 
 function repairUpzeroProductUrl(product: any, savedUrl?: string | null, storeUrl?: string | null) {
-  const base = (() => {
+  const parsedSaved = (() => {
     try {
-      return new URL(savedUrl || storeUrl || window.location.origin).origin;
+      return new URL(savedUrl || storeUrl || window.location.origin);
     } catch (_) {
-      return String(storeUrl || window.location.origin || "").replace(/\/+$/, "");
+      return null;
     }
   })();
+  const base = parsedSaved
+    ? parsedSaved.origin
+    : String(storeUrl || window.location.origin || "").replace(/\/+$/, "");
+  // Some storefront templates require a tenant path segment before
+  // "/produtos/" (e.g. "/40/produtos/..." — verified live on a shared
+  // Upzero template); preserve whatever precedes it in the saved URL
+  // rather than assuming "/produtos/" always starts the path.
+  const prefixMatch = parsedSaved?.pathname.match(/^(.*?)\/produtos?\//i);
+  const prefix = prefixMatch ? prefixMatch[1] : "";
   const referenceSlug = upzeroReferenceSlug(
     product?.product_url || product?.external_id || product?.name || product?.title,
   );
   const nameSlug = slugifyProductName(product?.name || product?.title);
   if (!base || !referenceSlug || !nameSlug) return savedUrl || null;
   const colorSlug = firstUpzeroColorSlug(product);
-  const path = `/produtos/${referenceSlug}-${nameSlug}${colorSlug ? `/${colorSlug}` : ""}`;
+  const path = `${prefix}/produtos/${referenceSlug}-${nameSlug}${colorSlug ? `/${colorSlug}` : ""}`;
   try {
     return new URL(path, `${base}/`).href;
   } catch (_) {

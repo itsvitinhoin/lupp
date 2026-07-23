@@ -11,6 +11,7 @@ import {
   UPZERO_DETAIL_FETCH_TIMEOUT_MS,
 } from "@/lib/upzero";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
+import { discoverUpzeroCartContext } from "@/lib/upzero-discovery";
 import { Prisma } from "../../../generated/prisma/client";
 
 // Ported from supabase/functions/upzero-sync-products: storefront
@@ -26,6 +27,7 @@ type Settings = {
   last_connection_source?: string | null;
   product_url_pattern?: string | null;
   storefront_url?: string | null;
+  storefront_store_id?: number | string | null;
   [key: string]: unknown;
 };
 
@@ -214,10 +216,15 @@ function slugify(value: unknown) {
 function upzeroReferenceSlug(value: unknown) {
   const raw = String(value || "").trim();
   if (!raw) return "";
-  const refMatch = raw.match(/\bref\s*[:#-]?\s*(\d+[a-z0-9-]*)/i);
+  // Only ever preserve a literal "ref" if the source text actually has one
+  // (some Upzero product codes really are "REF123") — a bare numeric id
+  // (Upzero's real, verified-live URL scheme for this store: e.g.
+  // "27082-vt-linho-gerlane", no "ref" anywhere) must NOT get one invented,
+  // or the resulting slug 404s / mismatches the storefront's own routing.
+  const refMatch = raw.match(/\bref\s*[:#-]?\s*(\d+[a-z0-9]*)/i);
   if (refMatch?.[1]) return `ref${slugify(refMatch[1])}`;
-  const numericMatch = raw.match(/\b(\d{3,}[a-z0-9-]*)\b/i);
-  if (numericMatch?.[1]) return `ref${slugify(numericMatch[1])}`;
+  const numericMatch = raw.match(/\b(\d{3,}[a-z0-9]*)\b/i);
+  if (numericMatch?.[1]) return slugify(numericMatch[1]);
   return slugify(raw.replace(/^ref\s*[:#-]?\s*/i, "ref"));
 }
 
@@ -243,6 +250,7 @@ function buildProductUrl(
   storefrontUrl: string | null | undefined,
   pattern: string | null | undefined,
   product: SluggableProduct,
+  storefrontStoreId?: number | string | null,
 ) {
   const base = String(storefrontUrl || "")
     .trim()
@@ -271,7 +279,15 @@ function buildProductUrl(
       encodeURIComponent(referenceSlug || productSlug || String(product.code || slug)),
     )
     .replace(/\{id\}/g, encodeURIComponent(String(product.id || slug)));
-  return `${base}${path.startsWith("/") ? "" : "/"}${path}`;
+  // Verified live: this storefront template (vitrine-plus.upzero.com.br,
+  // shared across multiple Upzero stores) requires the tenant's numeric
+  // storefront id as the first path segment — "/40/produtos/..." — or the
+  // route 404s/mismatches. Only known once discovered (see
+  // upzeroSyncProductsHandler); omitted here when not yet cached.
+  const idPrefix = storefrontStoreId
+    ? `/${String(storefrontStoreId).replace(/^\/+|\/+$/g, "")}`
+    : "";
+  return `${base}${idPrefix}${path.startsWith("/") ? "" : "/"}${path}`;
 }
 
 function productUrlHandle(
@@ -1224,6 +1240,7 @@ function storefrontRows(
           settings.storefront_url,
           settings.product_url_pattern,
           { ...product, name: product.name },
+          settings.storefront_store_id,
         ),
         status: "active" as const,
         store_id: storeId,
@@ -1454,6 +1471,7 @@ function externalRows(
             name: product.name,
             slug: product.code,
           },
+          settings.storefront_store_id,
         ),
         status: (product.status === "archived"
           ? "archived"
@@ -1644,6 +1662,31 @@ export async function upzeroSyncProductsHandler(
         .trim()
         .replace(/\/+$/, "") || null;
   }
+
+  // Best-effort: some Upzero storefront templates (verified live —
+  // vitrine-plus.upzero.com.br, shared across multiple tenant stores)
+  // require the numeric storefront id as the URL's first path segment, or
+  // product links 404/mismatch. Resolve it once here (from any existing
+  // synced product's page, falling back to the bare storefront root) so
+  // this run's freshly built product_url values can include it; failures
+  // are silently ignored; a future sync will retry.
+  if (!settings.storefront_store_id && settings.storefront_url) {
+    try {
+      const existingProductWithUrl = await prisma.product.findFirst({
+        where: { store_id: storeId, platform: "upzero", NOT: { product_url: null } },
+        select: { product_url: true },
+      });
+      const discoveryUrl = existingProductWithUrl?.product_url || settings.storefront_url;
+      const discovered = await discoverUpzeroCartContext(discoveryUrl);
+      if (discovered.storefront_store_id) {
+        settings.storefront_store_id = discovered.storefront_store_id;
+      }
+    } catch {
+      // Non-fatal — product URLs just won't get the storefront-id prefix
+      // this run.
+    }
+  }
+
   const baseUrl = normalizeUpzeroBaseUrl(
     typeof settings.base_url === "string" ? settings.base_url : null,
   );
