@@ -15,6 +15,7 @@ type CommerceProductCardProps = {
   buyLabel?: string;
   className?: string;
   detailsLabel?: string;
+  disabled?: boolean;
   onAction?: () => void;
   onBuy?: () => void;
   onDetails?: () => void;
@@ -30,6 +31,7 @@ export function CommerceProductCard({
   buyLabel = "Comprar agora",
   className,
   detailsLabel = "Ver detalhes",
+  disabled = false,
   onAction,
   onBuy,
   onDetails,
@@ -99,6 +101,7 @@ export function CommerceProductCard({
           )}
           <Button
             className="h-9 bg-card/92 text-xs font-bold text-foreground hover:bg-card"
+            disabled={disabled}
             onClick={singleAction ? handlePrimaryAction : onBuy}
             type="button"
           >

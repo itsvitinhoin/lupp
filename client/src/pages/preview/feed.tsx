@@ -3202,28 +3202,37 @@ const FeedItem = React.memo(function FeedItem({
                 const itemRestricted = Boolean(
                   isUpzeroCommerce(store, item.product) && !customerApproved,
                 );
+                const itemUnavailable =
+                  !itemRestricted && !hasUsableQuickOrderGrid(item.product);
                 return (
                   <div key={item.product.id} className="w-[78%] shrink-0">
                     <CommerceProductCard
                       product={item.view}
                       singleAction
+                      disabled={itemUnavailable}
                       showAction={showBuyButton}
                       showName={showProductName}
                       showPrice={showPrice}
-                      actionLabel={commerceActionLabel(item.product)}
+                      actionLabel={
+                        itemUnavailable
+                          ? "Indisponível"
+                          : commerceActionLabel(item.product)
+                      }
                       onDetails={() =>
-                        itemRestricted
+                        itemRestricted || itemUnavailable
                           ? actions.onOpenProductPage(video, item.product)
                           : addToCartInline
                             ? actions.onAddToCart(video, item.product)
                             : actions.onOpenProductPage(video, item.product)
                       }
                       onAction={() =>
-                        itemRestricted
-                          ? actions.onOpenProductPage(video, item.product)
-                          : addToCartInline
-                            ? actions.onAddToCart(video, item.product)
-                            : actions.onOpenProductPage(video, item.product)
+                        itemUnavailable
+                          ? undefined
+                          : itemRestricted
+                            ? actions.onOpenProductPage(video, item.product)
+                            : addToCartInline
+                              ? actions.onAddToCart(video, item.product)
+                              : actions.onOpenProductPage(video, item.product)
                       }
                     />
                   </div>
@@ -3231,36 +3240,58 @@ const FeedItem = React.memo(function FeedItem({
               })}
             </div>
           ) : (
-            <CommerceProductCard
-              product={visibleProducts[0].view}
-              singleAction
-              showAction={showBuyButton}
-              showName={showProductName}
-              showPrice={showPrice}
-              actionLabel={commerceActionLabel(visibleProducts[0].product)}
-              onDetails={() =>
+            (() => {
+              const singleRestricted = Boolean(
                 isUpzeroCommerce(store, visibleProducts[0].product) &&
-                !customerApproved
-                  ? actions.onOpenProductPage(video, visibleProducts[0].product)
-                  : addToCartInline
-                    ? actions.onAddToCart(video, visibleProducts[0].product)
-                    : actions.onOpenProductPage(
-                        video,
-                        visibleProducts[0].product,
-                      )
-              }
-              onAction={() =>
-                isUpzeroCommerce(store, visibleProducts[0].product) &&
-                !customerApproved
-                  ? actions.onOpenProductPage(video, visibleProducts[0].product)
-                  : addToCartInline
-                    ? actions.onAddToCart(video, visibleProducts[0].product)
-                    : actions.onOpenProductPage(
-                        video,
-                        visibleProducts[0].product,
-                      )
-              }
-            />
+                  !customerApproved,
+              );
+              const singleUnavailable =
+                !singleRestricted &&
+                !hasUsableQuickOrderGrid(visibleProducts[0].product);
+              return (
+                <CommerceProductCard
+                  product={visibleProducts[0].view}
+                  singleAction
+                  disabled={singleUnavailable}
+                  showAction={showBuyButton}
+                  showName={showProductName}
+                  showPrice={showPrice}
+                  actionLabel={
+                    singleUnavailable
+                      ? "Indisponível"
+                      : commerceActionLabel(visibleProducts[0].product)
+                  }
+                  onDetails={() =>
+                    singleRestricted || singleUnavailable
+                      ? actions.onOpenProductPage(
+                          video,
+                          visibleProducts[0].product,
+                        )
+                      : addToCartInline
+                        ? actions.onAddToCart(video, visibleProducts[0].product)
+                        : actions.onOpenProductPage(
+                            video,
+                            visibleProducts[0].product,
+                          )
+                  }
+                  onAction={() =>
+                    singleUnavailable
+                      ? undefined
+                      : singleRestricted
+                        ? actions.onOpenProductPage(
+                            video,
+                            visibleProducts[0].product,
+                          )
+                        : addToCartInline
+                          ? actions.onAddToCart(video, visibleProducts[0].product)
+                          : actions.onOpenProductPage(
+                              video,
+                              visibleProducts[0].product,
+                            )
+                  }
+                />
+              );
+            })()
           ))}
       </div>
 
