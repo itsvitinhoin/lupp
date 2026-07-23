@@ -36,7 +36,12 @@ cd client && npm run build:widget   # esbuild widget-src/*.ts -> public/widget*.
   a default there changes what un-configured stores render.
   `PATCH /api/widgets/:id` MERGES settings section-wise and normalizes
   (enums/colors/ranges) via `mergeWidgetSettings` — it is not a whole-object
-  replace (`server/src/http/widgets/update-widget.ts`).
+  replace (`server/src/http/widgets/update-widget.ts`). The carousel's
+  `show_price`/`show_cart_actions` toggles live here and are carousel-only —
+  don't conflate them with the vertical feed's separate
+  `show_price`/`show_buy_button` in `feed_settings.settings.feed_options`
+  (`client/src/pages/feed.tsx`), a different data model that the overlay feed
+  already inherits via its iframe.
 - **Embed attribute precedence**: explicit `data-*` attrs on the script tag
   override dashboard settings, which override defaults. Attribute/query names
   and defaults in `widget-src/main.ts` (`SCRIPT_VALUE_SPECS`) are public
@@ -49,6 +54,13 @@ cd client && npm run build:widget   # esbuild widget-src/*.ts -> public/widget*.
   Admin trial extension: admin console (`/admin`; access requires
   `users.role = 'admin'`, roles admin|manager|agent) or
   `POST /api/admin-console {action:"extend_trial"}`. `/master` redirects.
+- **Admin-console actions are two-tier**: `POST /api/admin-console` first
+  dispatches the platform-wide user actions (set_user_role,
+  set_user_email_confirmed, reset_user_password, add/remove_user_from_store —
+  `user-actions.ts`, target `user_id`, no `store_id`) via `platformUserActions`
+  and only then enforces the `store_id` requirement for the store-scoped
+  actions in `actions.ts`. The `/admin/users` tab lists via cursor-paginated
+  `GET /api/admin-console/users` (`user-lists.ts`).
 - **Auth**: 15-min access JWT in localStorage + 7-day httpOnly refresh cookie.
   The refresh call in `client/src/services/auth.service.ts` deliberately uses
   raw `fetch` — routing it through the shared client re-enters the bearer
@@ -86,6 +98,14 @@ cd client && npm run build:widget   # esbuild widget-src/*.ts -> public/widget*.
   - *Classic mode* (toggle OFF): upload `public/nuvemshop-nubesdk.js`, the
     DOM loader that chain-loads `nuvemshop-script.js` → `widget.js` directly
     on the page (works on any theme; used by the legacy app).
+- **Upzero cart calls are spec-pinned**: `POST /v1/cart/batch` takes exactly
+  `{items: [{product_variant_id, quantity, asset_id?}], type}` — the tenant
+  comes from the `X-API-Key` header and cart continuity from a `sessionID`
+  cookie the server proxy sets from the widget's `session_id` body field
+  (`widget-src/platforms/upzero.ts`, `server/src/lib/upzero.ts`,
+  `server/src/http/upzero/storefront-proxy.ts`). Don't re-add session/store
+  ids to the cart body — the old guess-the-shape payloads were a production
+  bug ("missing field `items`").
 - **Default hosts**: app/widget `https://luup.dzns.com.br`, API
   `https://luup.dzns.net` (client `env.ts` fallbacks, widget `PROD_API_URL`).
   API CORS is currently `origin: true` (allow-all; the old allowlist is

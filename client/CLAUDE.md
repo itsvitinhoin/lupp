@@ -55,8 +55,8 @@ npx tsc -p tsconfig.json --noEmit   # typecheck (widget has its own tsconfig)
 ## Structure
 
 - `src/pages/` — route chunks (all lazy in `src/routes/AppRoutes.tsx`).
-  `admin/` is the role-gated console (`/admin`, `/admin/:storeId` with tab
-  modules under `admin/store/`).
+  `admin/` is the role-gated console (`/admin`, `/admin/users`,
+  `/admin/asaas`, `/admin/:storeId` with tab modules under `admin/store/`).
 - `src/components/ui/` — shadcn-style primitives (token-based, don't fork).
 - `src/services/` — REST wrappers over `src/lib/api.ts`.
 - `widget-src/`, `nubesdk-src/` — compiled embeds; see root CLAUDE.md for the

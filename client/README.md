@@ -7,7 +7,8 @@ sources. Three surfaces ship from this workspace:
   products, integrations and billing.
 - **Admin console** (`/admin`) — internal operations (role `admin` required):
   stores, subscriptions, integrations/secrets, users, paginated
-  products/videos/events/comments, audit log.
+  products/videos/events/comments, audit log; platform-wide user management
+  at `/admin/users` and live Asaas financials at `/admin/asaas`.
 - **Widget** (`widget-src/` → `public/widget*.js`) — the script merchants
   embed; also the Nuvemshop NubeSDK app (`nubesdk-src/`).
 

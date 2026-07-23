@@ -78,7 +78,7 @@ analytics/videos/widgets/integrations domains not listed here.
 | `GET /api/widget/bootstrap` | lupp-widget-bootstrap (GET) — now also "context mode" (`url=` param → server-side display rules, page/product matching and slim render-ready cards under ETag/60s cache; see `src/http/widget/context.ts`) | public + billing gate |
 | `POST /api/widget/events` | lupp-widget-bootstrap (POST) | public |
 | `POST /api/widget/likes` | — (new; per-visitor like beacon, idempotent) | public |
-| `GET\|POST /api/master-console` | master-console | JWT + admin allowlist |
+| `GET\|POST /api/admin-console` (+ `GET /users` and `GET /stores/:storeId[/events\|products\|videos\|comments]` sub-lists) | admin-console (lived at `/api/master-console` before the rename) | JWT + admin role (re-read from DB) |
 
 Known deferred seams (marked with TODO comments at the exact plug-in points):
 the Bunny processing-status refresh inside `GET /api/widget/bootstrap`, and

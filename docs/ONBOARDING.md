@@ -180,7 +180,7 @@ growth/pro/scale).
 
 | Sintoma | Causa provável | Ação |
 |---|---|---|
-| Widget não aparece, bootstrap `trial_expired` | Trial vencido sem assinatura | Estender trial (master console) ou assinar plano |
+| Widget não aparece, bootstrap `trial_expired` | Trial vencido sem assinatura | Estender trial (console admin, `/admin`) ou assinar plano |
 | Bootstrap `store_not_found` | Domínio da vitrine não resolve | Conferir `store_domains`/URL da loja; reconectar a integração (persiste domínios) |
 | Widget não aparece só em algumas páginas | `exclude_paths`/modo de exibição | Revisar "Experiência na loja" em `/app/widgets` |
 | Aparência não muda ao salvar | Snippet com `data-*` de aparência fixado | Remover atributos extras do snippet (precedência: atributo > painel) |
