@@ -5,6 +5,7 @@ import { app } from "@/app";
 import { prisma } from "@/lib/prisma";
 import { createStore } from "../../../test/utils/create-store";
 import { createUser } from "../../../test/utils/create-user";
+import { createVideo } from "../../../test/utils/create-video";
 import { Prisma } from "../../../generated/prisma/client";
 import { UpzeroRoutes } from "./routes";
 
@@ -346,6 +347,91 @@ describe("POST /api/integrations/upzero/sync-products (e2e)", () => {
     });
     expect(keptVariant.status).toBe("active");
     expect(keptVariant.stock_qty).toBe(3);
+  });
+
+  it("prunes a product Upzero stopped returning, re-linking any video to its same-named replacement first", async () => {
+    const { owner, store } = await createStore();
+    await seedIntegration(store.id);
+    const token = app.jwt.sign({ sub: owner.id, role: "agent" });
+    mockStorefrontApi(storefrontPayload([storefrontVariant5001]));
+
+    await request(app.server)
+      .post("/api/integrations/upzero/sync-products")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ store_id: store.id });
+
+    const staleProduct = await prisma.product.findUniqueOrThrow({
+      where: {
+        store_id_platform_external_id: {
+          store_id: store.id,
+          platform: "upzero",
+          external_id: "101",
+        },
+      },
+    });
+
+    const video = await createVideo({ storeId: store.id, productIds: [staleProduct.id] });
+
+    // Upzero now serves the exact same catalog item — same name — under a
+    // new product id (202); the old id (101) no longer appears at all.
+    fetchMock.mockImplementation(async (input: unknown) => {
+      const url = String(input);
+      if (url.includes("/v1/product-images") || url.includes("/v1/product/data/")) {
+        return jsonResponse({ error: "not_found" }, 404);
+      }
+      if (url.includes("/v1/products")) {
+        return jsonResponse({
+          items: [
+            {
+              product: {
+                id: 202,
+                code: "REF123",
+                name: "Vestido Azul",
+                description: "Um vestido",
+                slug: null,
+                card_data: { cover_image_url: "/images/cover.jpg", price_cents: 19900 },
+              },
+              variants: [storefrontVariant5001],
+            },
+          ],
+        });
+      }
+      return jsonResponse({}, 404);
+    });
+
+    const response = await request(app.server)
+      .post("/api/integrations/upzero/sync-products")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ store_id: store.id });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      ok: true,
+      catalog_fully_fetched: true,
+      pruned: 1,
+      relinked_videos: 1,
+    });
+
+    const freshProduct = await prisma.product.findUniqueOrThrow({
+      where: {
+        store_id_platform_external_id: {
+          store_id: store.id,
+          platform: "upzero",
+          external_id: "202",
+        },
+      },
+    });
+
+    await expect(
+      prisma.product.findUnique({ where: { id: staleProduct.id } }),
+    ).resolves.toBeNull();
+
+    const videoProducts = await prisma.videoProduct.findMany({
+      where: { video_id: video.id },
+    });
+    expect(videoProducts).toHaveLength(1);
+    expect(videoProducts[0].product_id).toBe(freshProduct.id);
+    expect(videoProducts[0].is_primary).toBe(true);
   });
 
   it("syncs via the external endpoint when it was the last successful connection source", async () => {

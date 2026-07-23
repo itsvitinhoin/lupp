@@ -139,8 +139,11 @@ export const UpzeroSyncProductsSchema = {
       "per-product detail enrichment, falling back to the partner `/external/v1/products` " +
       "cursor API) and upserts products and product variants keyed by " +
       "(store_id, platform, external_id). Variants of touched products are archived first so " +
-      "removed combinations end up archived with zero stock. Updates the integration's " +
-      "last_sync_at and sync stats.",
+      "removed combinations end up archived with zero stock. When pagination confirms the full " +
+      "catalog was fetched, products this run did not see are pruned: any video still linked to " +
+      "one is best-effort re-linked to a same-named product this run did see, then the stale " +
+      "row (and its now-orphaned variants) is deleted. Updates the integration's last_sync_at " +
+      "and sync stats.",
     tags: ["upzero"],
     operationId: "upzeroSyncProducts",
     security: [{ bearerAuth: [] }],
@@ -155,6 +158,9 @@ export const UpzeroSyncProductsSchema = {
         source: z.string(),
         variants: z.number(),
         images_found: z.number(),
+        catalog_fully_fetched: z.boolean(),
+        pruned: z.number(),
+        relinked_videos: z.number(),
       }),
       ...edgeErrorSchemas,
       // Sync failures echo the upstream attempts alongside the code.
@@ -1081,6 +1087,86 @@ async function saveProducts(storeId: string, rows: ProductRow[]) {
   }
 }
 
+// Upzero occasionally re-issues a product's id (observed live: a re-sync
+// returned the same catalog item — same name, same variants — under a new
+// numeric id). The old upsert-only flow left the previous row behind
+// forever: still linked from any video that referenced it, but permanently
+// stuck with whatever (possibly stale/incomplete) data it had at the time,
+// since nothing ever touches an external_id the API stops returning.
+// This prunes exactly that: products for this store that this sync run did
+// NOT see, best-effort re-linking any video still pointing at one over to a
+// same-named product this run DID see, before deleting the stale row
+// (cascades to its own now-orphaned variants).
+async function pruneStaleUpzeroProducts(storeId: string, freshExternalIds: Set<string>) {
+  // Never prune off an empty/near-empty fresh set — that almost certainly
+  // means an upstream hiccup produced a suspiciously small page, not that
+  // the store's real catalog just became empty. Callers only invoke this
+  // when the sync pagination reached a confirmed natural end, but this stays
+  // as a second, independent guard against wiping a whole catalog.
+  if (!freshExternalIds.size) return { relinked: 0, removed: 0 };
+
+  const existingProducts = await prisma.product.findMany({
+    where: { store_id: storeId, platform: "upzero" },
+    select: { id: true, external_id: true, name: true },
+  });
+
+  const staleProducts = existingProducts.filter(
+    (product) => !product.external_id || !freshExternalIds.has(product.external_id),
+  );
+  if (!staleProducts.length) return { relinked: 0, removed: 0 };
+
+  const freshIdByName = new Map<string, string>();
+  for (const product of existingProducts) {
+    if (product.external_id && freshExternalIds.has(product.external_id)) {
+      freshIdByName.set(product.name, product.id);
+    }
+  }
+
+  let relinked = 0;
+  for (const stale of staleProducts) {
+    const freshId = freshIdByName.get(stale.name);
+    if (!freshId) continue;
+
+    const staleLinks = await prisma.videoProduct.findMany({
+      where: { product_id: stale.id },
+      select: { id: true, video_id: true },
+    });
+    if (!staleLinks.length) continue;
+
+    // A video already linked to the fresh product can't take a second link
+    // to it (unique on video_id+product_id) — leave those stale rows alone;
+    // deleting the stale product cascades them away as redundant.
+    const alreadyLinkedVideoIds = new Set(
+      (
+        await prisma.videoProduct.findMany({
+          where: {
+            product_id: freshId,
+            video_id: { in: staleLinks.map((link) => link.video_id) },
+          },
+          select: { video_id: true },
+        })
+      ).map((link) => link.video_id),
+    );
+
+    const relinkableIds = staleLinks
+      .filter((link) => !alreadyLinkedVideoIds.has(link.video_id))
+      .map((link) => link.id);
+    if (relinkableIds.length) {
+      const result = await prisma.videoProduct.updateMany({
+        where: { id: { in: relinkableIds } },
+        data: { product_id: freshId },
+      });
+      relinked += result.count;
+    }
+  }
+
+  const { count: removed } = await prisma.product.deleteMany({
+    where: { id: { in: staleProducts.map((product) => product.id) } },
+  });
+
+  return { relinked, removed };
+}
+
 function storefrontRows(
   items: StorefrontProductItem[],
   storeId: string,
@@ -1570,6 +1656,13 @@ export async function upzeroSyncProductsHandler(
   const syncedProducts: ProductRow[] = [];
   const syncedVariants: VariantRow[] = [];
   let detailEnrichedCount = 0;
+  // Only true once a source's pagination loop reaches the natural end of the
+  // catalog (a short last page / an exhausted cursor) rather than just
+  // hitting the 20-page safety cap — pruning stale products is only safe
+  // when we know syncedProducts actually represents the FULL catalog, not a
+  // truncated slice of it.
+  let storefrontComplete = false;
+  let externalComplete = false;
 
   if (preferredSource === "external") {
     source = "external";
@@ -1649,7 +1742,10 @@ export async function upzeroSyncProductsHandler(
       syncedProducts.push(...storefrontRows(enrichedItems, storeId, settings));
       syncedVariants.push(...storefrontVariantRows(enrichedItems, storeId, settings));
       pages = page;
-      if (items.length < limit) break;
+      if (items.length < limit) {
+        storefrontComplete = true;
+        break;
+      }
     }
   }
 
@@ -1686,7 +1782,10 @@ export async function upzeroSyncProductsHandler(
       syncedVariants.push(...externalVariantRows(items, storeId, settings));
       pages = page;
       cursor = typeof payload.next_cursor === "string" ? payload.next_cursor : null;
-      if (!cursor) break;
+      if (!cursor) {
+        externalComplete = true;
+        break;
+      }
     }
   }
 
@@ -1703,6 +1802,17 @@ export async function upzeroSyncProductsHandler(
       details: variantsSaveResult.error,
       error: "luup_product_variants_save_failed",
     });
+  }
+
+  // Only safe once pagination confirmed it actually reached the end of the
+  // catalog for whichever source ended up being used — otherwise
+  // syncedProducts is a truncated slice and pruning would delete real,
+  // not-yet-fetched products.
+  const catalogFullyFetched = source === "external" ? externalComplete : storefrontComplete;
+  let pruneResult = { relinked: 0, removed: 0 };
+  if (catalogFullyFetched) {
+    const freshExternalIds = new Set(syncedProducts.map((product) => product.external_id));
+    pruneResult = await pruneStaleUpzeroProducts(storeId, freshExternalIds);
   }
 
   const imagesFound = syncedProducts.filter((product) => Boolean(product.image_url)).length;
@@ -1731,6 +1841,9 @@ export async function upzeroSyncProductsHandler(
         last_product_sync_variants_with_attributes: variantsWithAttributes,
         last_product_sync_variants_with_images: variantsWithImages,
         last_product_sync_variants: variantsSaveResult.total,
+        last_product_sync_catalog_fully_fetched: catalogFullyFetched,
+        last_product_sync_pruned: pruneResult.removed,
+        last_product_sync_relinked_videos: pruneResult.relinked,
       } as Prisma.InputJsonValue,
     },
   });
@@ -1747,5 +1860,8 @@ export async function upzeroSyncProductsHandler(
     variants_with_attributes: variantsWithAttributes,
     variants_with_images: variantsWithImages,
     variants: variantsSaveResult.total,
+    catalog_fully_fetched: catalogFullyFetched,
+    pruned: pruneResult.removed,
+    relinked_videos: pruneResult.relinked,
   });
 }
