@@ -349,6 +349,100 @@ describe("POST /api/integrations/upzero/sync-products (e2e)", () => {
     expect(keptVariant.stock_qty).toBe(3);
   });
 
+  it("does not invent a 'ref' prefix for a bare numeric product id, and adds the discovered storefront-id path prefix on a later sync", async () => {
+    const { owner, store } = await createStore();
+    const integration = await seedIntegration(store.id);
+    const token = app.jwt.sign({ sub: owner.id, role: "agent" });
+
+    function bareNumericPayload() {
+      return {
+        items: [
+          {
+            product: {
+              id: 27082,
+              code: null,
+              name: "VT Linho Gerlane",
+              slug: null,
+              card_data: { cover_image_url: "/img.jpg", price_cents: 40999 },
+            },
+            variants: [],
+          },
+        ],
+      };
+    }
+
+    fetchMock.mockImplementation(async (input: unknown) => {
+      const url = String(input);
+      if (url.includes("/v1/product-images") || url.includes("/v1/product/data/")) {
+        return jsonResponse({ error: "not_found" }, 404);
+      }
+      if (url.includes("/v1/products")) return jsonResponse(bareNumericPayload());
+      return jsonResponse({}, 404);
+    });
+
+    await request(app.server)
+      .post("/api/integrations/upzero/sync-products")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ store_id: store.id });
+
+    const productAfterFirstSync = await prisma.product.findUniqueOrThrow({
+      where: {
+        store_id_platform_external_id: {
+          store_id: store.id,
+          platform: "upzero",
+          external_id: "27082",
+        },
+      },
+    });
+    // No "ref" invented for a bare numeric id, and no storefront-id prefix
+    // yet — nothing to discover it from on a store's very first sync.
+    expect(productAfterFirstSync.product_url).toBe(
+      "https://loja.example.com/produtos/27082-vt-linho-gerlane",
+    );
+
+    // On the next sync, discovery fetches that just-synced product's own
+    // page and finds the storefront's numeric id embedded in it.
+    fetchMock.mockImplementation(async (input: unknown) => {
+      const url = String(input);
+      if (url === "https://loja.example.com/produtos/27082-vt-linho-gerlane") {
+        return new Response(
+          '<script id="__NEXT_DATA__">{"props":{"store":{"id":40}}}</script>',
+          { status: 200 },
+        );
+      }
+      if (url.includes("/v1/product-images") || url.includes("/v1/product/data/")) {
+        return jsonResponse({ error: "not_found" }, 404);
+      }
+      if (url.includes("/v1/products")) return jsonResponse(bareNumericPayload());
+      return jsonResponse({}, 404);
+    });
+
+    const resync = await request(app.server)
+      .post("/api/integrations/upzero/sync-products")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ store_id: store.id });
+
+    expect(resync.status).toBe(200);
+
+    const productAfterResync = await prisma.product.findUniqueOrThrow({
+      where: {
+        store_id_platform_external_id: {
+          store_id: store.id,
+          platform: "upzero",
+          external_id: "27082",
+        },
+      },
+    });
+    expect(productAfterResync.product_url).toBe(
+      "https://loja.example.com/40/produtos/27082-vt-linho-gerlane",
+    );
+
+    const updatedIntegration = await prisma.integration.findUniqueOrThrow({
+      where: { id: integration.id },
+    });
+    expect(updatedIntegration.settings).toMatchObject({ storefront_store_id: 40 });
+  });
+
   it("prunes a product Upzero stopped returning, re-linking any video to its same-named replacement first", async () => {
     const { owner, store } = await createStore();
     await seedIntegration(store.id);

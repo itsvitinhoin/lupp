@@ -1666,20 +1666,22 @@ export async function upzeroSyncProductsHandler(
   // Best-effort: some Upzero storefront templates (verified live —
   // vitrine-plus.upzero.com.br, shared across multiple tenant stores)
   // require the numeric storefront id as the URL's first path segment, or
-  // product links 404/mismatch. Resolve it once here (from any existing
-  // synced product's page, falling back to the bare storefront root) so
-  // this run's freshly built product_url values can include it; failures
-  // are silently ignored; a future sync will retry.
-  if (!settings.storefront_store_id && settings.storefront_url) {
+  // product links 404/mismatch. Only attempted once a previously-synced
+  // product's real page exists to discover it from (a brand new store's
+  // very first sync has nothing yet — skip rather than guess off the bare,
+  // ambiguous multi-tenant storefront root); failures are silently
+  // ignored, a future sync retries.
+  if (!settings.storefront_store_id) {
     try {
       const existingProductWithUrl = await prisma.product.findFirst({
         where: { store_id: storeId, platform: "upzero", NOT: { product_url: null } },
         select: { product_url: true },
       });
-      const discoveryUrl = existingProductWithUrl?.product_url || settings.storefront_url;
-      const discovered = await discoverUpzeroCartContext(discoveryUrl);
-      if (discovered.storefront_store_id) {
-        settings.storefront_store_id = discovered.storefront_store_id;
+      if (existingProductWithUrl?.product_url) {
+        const discovered = await discoverUpzeroCartContext(existingProductWithUrl.product_url);
+        if (discovered.storefront_store_id) {
+          settings.storefront_store_id = discovered.storefront_store_id;
+        }
       }
     } catch {
       // Non-fatal — product URLs just won't get the storefront-id prefix
