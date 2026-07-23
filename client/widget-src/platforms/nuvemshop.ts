@@ -61,6 +61,22 @@ type NuvemshopCartBridgeFn = (items: NuvemshopCartItem[]) => unknown;
     );
   }
 
+  // Only NubeSDK mode ever installs the bridge (its widget frame relays
+  // cart:add through the SDK) — classic-mode stores (the DOM loader chain,
+  // still how most stores are set up) never will, so polling for it there
+  // only ever burns the full wait before falling back on every single
+  // add-to-cart. nuvemshop-script.js uses this same presence check for the
+  // analogous "is NubeSDK mode active on this page" question.
+  function nubesdkWidgetFrameActive(): boolean {
+    try {
+      return Boolean(
+        document.querySelector('iframe[src*="nuvemshop-widget-frame.html"]'),
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
   function waitForNuvemshopCartBridge(
     deadline: number,
   ): Promise<NuvemshopCartBridgeFn> {
@@ -158,7 +174,22 @@ type NuvemshopCartBridgeFn = (items: NuvemshopCartItem[]) => unknown;
       return Promise.reject(new Error("empty_cart_items"));
     }
 
-    return waitForNuvemshopCartBridge(Date.now() + 6000)
+    // Already available (the common NubeSDK-mode case, once its widget
+    // frame has finished its first render) — use it immediately, no wait.
+    var readyBridge = getNuvemshopCartBridge();
+    var bridgeReady: Promise<NuvemshopCartBridgeFn> = readyBridge
+      ? Promise.resolve(readyBridge)
+      : nubesdkWidgetFrameActive()
+        // The frame exists but hasn't installed the relay yet — genuinely
+        // still initializing (renders within ~1s per its own loader), so a
+        // short grace period is worth it here, unlike the classic-mode case.
+        ? waitForNuvemshopCartBridge(Date.now() + 2000)
+        // No NubeSDK frame at all: this store is in classic mode, which
+        // never installs this bridge — go straight to the native fallback
+        // instead of polling for something that will never appear.
+        : Promise.reject(new Error("nuvemshop_cart_bridge_not_ready"));
+
+    return bridgeReady
       .then(function (bridge: NuvemshopCartBridgeFn) {
         return Promise.resolve(bridge(validItems)).then(function (result: unknown) {
           notifyNuvemshopCartUpdated(validItems);
