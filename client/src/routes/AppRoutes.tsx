@@ -14,7 +14,6 @@ const Onboarding = React.lazy(() => import("@/pages/onboarding"));
 const Dashboard = React.lazy(() => import("@/pages/dashboard"));
 const VideosList = React.lazy(() => import("@/pages/videos/index"));
 const VideosNew = React.lazy(() => import("@/pages/videos/new"));
-const FeedConfig = React.lazy(() => import("@/pages/feed"));
 const Widgets = React.lazy(() => import("@/pages/widgets"));
 const CustomPages = React.lazy(() => import("@/pages/custom-pages"));
 const Products = React.lazy(() => import("@/pages/products"));
@@ -28,6 +27,7 @@ const AdminConsole = React.lazy(() => import("@/pages/admin"));
 const AdminStore = React.lazy(() => import("@/pages/admin/store"));
 const AdminAsaas = React.lazy(() => import("@/pages/admin/asaas"));
 const AdminUsers = React.lazy(() => import("@/pages/admin/users"));
+const AdminBunny = React.lazy(() => import("@/pages/admin/bunny"));
 const PreviewFeed = React.lazy(() => import("@/pages/preview/feed"));
 const PreviewProduct = React.lazy(() => import("@/pages/preview/product"));
 const TestStore = React.lazy(() => import("@/pages/test-store"));
@@ -101,10 +101,9 @@ export function AppRoutes() {
             <VideosNew />
           </ProtectedRoute>
         </Route>
+        {/* Feed Vertical is now a card inside /app/widgets, not its own page. */}
         <Route path="/app/feed">
-          <ProtectedRoute>
-            <FeedConfig />
-          </ProtectedRoute>
+          <Redirect to="/app/widgets" replace />
         </Route>
         <Route path="/app/widgets">
           <ProtectedRoute>
@@ -160,6 +159,9 @@ export function AppRoutes() {
         </Route>
         <Route path="/admin/users">
           <AdminUsers />
+        </Route>
+        <Route path="/admin/bunny">
+          <AdminBunny />
         </Route>
         <Route path="/admin/:storeId">
           <AdminStore />

@@ -3,15 +3,16 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { ListItem } from "@/components/shared/ListItem";
 import { SectionCard } from "@/components/shared/SectionCard";
 import type { AdminStoreDetail } from "@/types/admin-console";
-import { FeedManager } from "@/pages/feed";
 import { WidgetsManager } from "@/pages/widgets";
 import { formatDate, statusTone } from "../shared";
 import { RunAdminAction } from "./shared";
 
-// The rich editors (WidgetsManager/FeedManager) manage their own data
-// fetching and mutations directly against /api/widgets — the same
-// components /app/widgets and /app/feed use for a store's own logged-in
-// user, just given the admin's arbitrary store instead of useCurrentStore().
+// WidgetsManager is the same component /app/widgets uses for a store's own
+// logged-in user — its card flow already covers the floating launcher, the
+// vertical feed and the horizontal feed carousel in one place, so an admin
+// gets the identical rich editor for an arbitrary store, not a separate
+// reimplementation that could drift from it. It manages its own data
+// fetching/mutations directly against /api/widgets.
 // isActing/onAction stay in the signature for the other cards on this tab
 // (domains/custom pages are read-only today, kept for a future action).
 export function WidgetsTab({
@@ -24,16 +25,10 @@ export function WidgetsTab({
   return (
     <div className="space-y-6">
       <SectionCard
-        title="Widget flutuante e Feed Horizontal"
+        title="Widget, Feed Vertical e Feed Horizontal"
         description="Mesmo editor de /app/widgets, aplicado a esta loja."
       >
         <WidgetsManager store={detail.store} />
-      </SectionCard>
-      <SectionCard
-        title="Feed vertical"
-        description="Mesmo editor de /app/feed, aplicado a esta loja."
-      >
-        <FeedManager store={detail.store} />
       </SectionCard>
       <div className="grid gap-6 xl:grid-cols-2">
         <DomainsCard detail={detail} />

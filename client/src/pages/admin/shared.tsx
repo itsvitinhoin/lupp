@@ -29,6 +29,7 @@ const ADMIN_NAV_ITEMS = [
   { href: "/admin", label: "Home" },
   { href: "/admin/users", label: "Usuários" },
   { href: "/admin/asaas", label: "Asaas" },
+  { href: "/admin/bunny", label: "Bunny" },
 ] as const;
 
 function AdminNav() {

@@ -244,6 +244,42 @@ export interface AdminStoreProduct {
   updated_at: string;
 }
 
+export interface AdminBunnyVideo {
+  guid: string;
+  title: string | null;
+  dateUploaded: string | null;
+  length: number | null;
+  status: number | null;
+  storageSize: number | null;
+  views: number | null;
+  width: number | null;
+  height: number | null;
+  thumbnailUrl: string | null;
+  db: {
+    id: string;
+    title: string;
+    status: string;
+    processing_status: string;
+    store: { id: string; name: string; slug: string } | null;
+    products: { id: string; name: string }[];
+  } | null;
+}
+
+export interface AdminBunnyVideosPage {
+  currentPage: number;
+  itemsPerPage: number;
+  totalItems: number;
+  items: AdminBunnyVideo[];
+}
+
+export interface AdminBunnySummary {
+  library_id: string;
+  cdn_hostname: string;
+  bunny_video_count: number | null;
+  local_video_count: number;
+  local_storage_bytes: string;
+}
+
 export interface AdminStoreVideo {
   _count: { comments: number; likes: number; video_products: number };
   allow_comments: boolean;

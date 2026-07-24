@@ -2,6 +2,14 @@ import { FastifyTypedInstance } from "@/@types/fastify-type-instance";
 import { verifyJwt } from "@/middlewares/verify-jwt";
 import { verifyUserRole } from "@/middlewares/verify-user-role";
 import { adminConsoleActionHandler, AdminConsoleActionSchema } from "./actions";
+import {
+  adminConsoleBunnyDeleteVideoHandler,
+  AdminConsoleBunnyDeleteVideoSchema,
+  adminConsoleBunnySummaryHandler,
+  AdminConsoleBunnySummarySchema,
+  adminConsoleBunnyVideosHandler,
+  AdminConsoleBunnyVideosSchema,
+} from "./bunny";
 import { adminConsoleSnapshotHandler, AdminConsoleSnapshotSchema } from "./snapshot";
 import {
   adminConsoleStoreDetailHandler,
@@ -61,6 +69,21 @@ export async function AdminConsoleRoutes(app: FastifyTypedInstance) {
     "/api/admin-console/users",
     { schema: AdminConsoleUsersSchema.schema, preHandler },
     adminConsoleUsersHandler,
+  );
+  app.get(
+    "/api/admin-console/bunny/videos",
+    { schema: AdminConsoleBunnyVideosSchema.schema, preHandler },
+    adminConsoleBunnyVideosHandler,
+  );
+  app.get(
+    "/api/admin-console/bunny/summary",
+    { schema: AdminConsoleBunnySummarySchema.schema, preHandler },
+    adminConsoleBunnySummaryHandler,
+  );
+  app.delete(
+    "/api/admin-console/bunny/videos/:guid",
+    { schema: AdminConsoleBunnyDeleteVideoSchema.schema, preHandler },
+    adminConsoleBunnyDeleteVideoHandler,
   );
   app.post(
     "/api/admin-console",

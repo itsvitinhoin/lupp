@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { ExternalLink, MessageCircle, Video, Zap } from "lucide-react";
 
-export type WidgetView = "overview" | "floating" | "horizontal-feed";
+export type WidgetView = "overview" | "floating" | "vertical-feed" | "horizontal-feed";
 
 export type WidgetOverviewCard = {
   id: WidgetView;
@@ -18,6 +18,13 @@ export const overviewCards: WidgetOverviewCard[] = [
     description:
       "Ajuste a chamada que aparece sobre a loja e abre o feed vertical da Lupp.",
     tone: "launcher",
+  },
+  {
+    id: "vertical-feed",
+    title: "Feed Vertical",
+    description:
+      "Vídeos em tela cheia com curtidas, comentários e compra direto pelo vídeo.",
+    tone: "interactions",
   },
   {
     id: "horizontal-feed",

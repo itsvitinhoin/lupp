@@ -1,5 +1,7 @@
-import { apiGet, apiPost } from "@/lib/api";
+import { apiDelete, apiGet, apiPost } from "@/lib/api";
 import type {
+  AdminBunnySummary,
+  AdminBunnyVideosPage,
   AdminConsoleAction,
   AdminConsoleSnapshot,
   AdminCursorPage,
@@ -188,5 +190,33 @@ export const adminConsoleService = {
       action,
       ...payload,
     });
+  },
+
+  async getBunnyVideos(
+    options: { page?: number; itemsPerPage?: number; search?: string } = {},
+  ) {
+    const params = new URLSearchParams();
+    if (options.page) params.set("page", String(options.page));
+    if (options.itemsPerPage) params.set("itemsPerPage", String(options.itemsPerPage));
+    if (options.search?.trim()) params.set("search", options.search.trim());
+    const data = await apiGet<AdminBunnyVideosPage>(
+      `/api/admin-console/bunny/videos?${params}`,
+    );
+    if (!data) throw new Error("Bunny não retornou dados.");
+    return data;
+  },
+
+  async getBunnySummary() {
+    const data = await apiGet<AdminBunnySummary>("/api/admin-console/bunny/summary");
+    if (!data) throw new Error("Bunny não retornou dados.");
+    return data;
+  },
+
+  async deleteBunnyVideo(guid: string) {
+    const data = await apiDelete<{ ok: boolean }>(
+      `/api/admin-console/bunny/videos/${encodeURIComponent(guid)}`,
+    );
+    if (!data) throw new Error("Bunny não retornou dados.");
+    return data;
   },
 };

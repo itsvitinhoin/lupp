@@ -1,5 +1,6 @@
 import React from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrentStore } from "@/hooks/useStore";
 import { widgetsService } from "@/services/widgets.service";
@@ -10,8 +11,10 @@ import {
   planAllowsHorizontalFeed,
 } from "@/lib/constants";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft } from "lucide-react";
 import { FloatingEditor } from "./widgets/FloatingEditor";
 import { HorizontalFeedEditor } from "./widgets/HorizontalFeedEditor";
+import { FeedManager } from "./feed";
 import {
   Overview,
   overviewCards,
@@ -208,6 +211,10 @@ export function WidgetsManager({ store }: { store: WidgetsManagerStore | null | 
       setView("floating");
       return;
     }
+    if (card.id === "vertical-feed") {
+      setView("vertical-feed");
+      return;
+    }
     if (card.id === "horizontal-feed") {
       setView("horizontal-feed");
       return;
@@ -244,6 +251,28 @@ export function WidgetsManager({ store }: { store: WidgetsManagerStore | null | 
           onSave={() => void handleSaveLauncherSettings()}
           setField={setField}
         />
+      ) : view === "vertical-feed" ? (
+        <div>
+          <div className="mb-6 flex items-center gap-4">
+            <Button
+              onClick={() => setView("overview")}
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 rounded-xl text-foreground/80 hover:bg-card"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h2 className="text-2xl font-bold leading-tight tracking-tight text-foreground">
+                Feed Vertical
+              </h2>
+              <p className="mt-1 text-sm font-medium text-muted-foreground">
+                Vídeos em tela cheia com curtidas, comentários e compra direto pelo vídeo.
+              </p>
+            </div>
+          </div>
+          <FeedManager store={store} />
+        </div>
       ) : (
         <HorizontalFeedEditor
           activeWidgetCount={activeWidgetCount}

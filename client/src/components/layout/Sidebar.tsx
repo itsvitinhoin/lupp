@@ -7,7 +7,6 @@ import {
   MessageSquare,
   Package,
   Settings,
-  Smartphone,
   Blocks,
   Link as LinkIcon,
   ListOrdered,
@@ -19,7 +18,6 @@ import { useCurrentStore } from "@/hooks/useStore";
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/app" },
   { icon: Film, label: "Vídeos", href: "/app/videos" },
-  { icon: Smartphone, label: "Feed Vertical", href: "/app/feed" },
   { icon: Blocks, label: "Widgets", href: "/app/widgets" },
   { icon: Package, label: "Produtos", href: "/app/products" },
   { icon: MessageSquare, label: "Comentários", href: "/app/comments" },

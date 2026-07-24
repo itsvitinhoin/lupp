@@ -16,6 +16,27 @@ export type BunnyVideo = {
   length?: number;
   status?: number;
   storageSize?: number;
+  title?: string;
+  dateUploaded?: string;
+  views?: number;
+  width?: number;
+  height?: number;
+  thumbnailFileName?: string;
+  averageWatchTime?: number;
+  totalWatchTime?: number;
+};
+
+export type BunnyVideoListPage = {
+  currentPage?: number;
+  itemsPerPage?: number;
+  items?: BunnyVideo[];
+  totalItems?: number;
+};
+
+export type BunnyLibraryInfo = {
+  videoCount?: number;
+  liveStreamCount?: number;
+  collectionCount?: number;
 };
 
 export function getBunnyStreamConfig() {
@@ -97,6 +118,48 @@ export async function bunnyStreamFetch({
       ...(contentType ? { "Content-Type": contentType } : {}),
     },
     method,
+  });
+}
+
+export async function listBunnyVideos({
+  apiKey,
+  libraryId,
+  page,
+  itemsPerPage,
+  search,
+}: {
+  apiKey: string;
+  libraryId: string;
+  page: number;
+  itemsPerPage: number;
+  search?: string;
+}): Promise<BunnyVideoListPage> {
+  const query = new URLSearchParams({
+    page: String(page),
+    itemsPerPage: String(itemsPerPage),
+    orderBy: "date",
+  });
+  if (search) query.set("search", search);
+  return bunnyRequest<BunnyVideoListPage>({
+    apiKey,
+    libraryId,
+    method: "GET",
+    path: `/videos?${query.toString()}`,
+  });
+}
+
+export async function getBunnyLibraryInfo({
+  apiKey,
+  libraryId,
+}: {
+  apiKey: string;
+  libraryId: string;
+}): Promise<BunnyLibraryInfo> {
+  return bunnyRequest<BunnyLibraryInfo>({
+    apiKey,
+    libraryId,
+    method: "GET",
+    path: "",
   });
 }
 

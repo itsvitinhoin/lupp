@@ -24,6 +24,16 @@ export function formatDateTime(value?: string | null) {
   }).format(new Date(value));
 }
 
+/** Bytes -> "1.2 GB" style label, base-1024, 0 decimals under 10 of a unit. */
+export function formatBytes(value: number | string | bigint | null | undefined) {
+  const bytes = Number(value ?? 0);
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const scaled = bytes / 1024 ** exponent;
+  return `${scaled.toFixed(scaled < 10 ? 1 : 0)} ${units[exponent]}`;
+}
+
 /** Up to two uppercase initials for avatar placeholders ("Loja Um" → "LU"). */
 export function initials(name: string) {
   return (

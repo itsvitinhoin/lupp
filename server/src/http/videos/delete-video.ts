@@ -3,15 +3,7 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "@/lib/prisma";
 import { findStoreMembership } from "@/lib/store-membership";
 import { edgeErrorSchemas } from "@/schemas/http-errors";
-import {
-  bunnyStreamFetch,
-  getBunnyStreamConfig,
-  readBunnyError,
-} from "@/lib/bunny";
-import {
-  bunnyStoragePathFromPublicUrl,
-  deleteFromBunnyStorage,
-} from "@/lib/bunny-storage";
+import { deleteVideoAndBunnyAsset } from "@/lib/video-deletion";
 
 // Ported from supabase/functions/bunny-delete-video. Field checks stay in the
 // handler so the machine-readable error codes the SPA switches on are kept.
@@ -54,61 +46,12 @@ export async function deleteVideoHandler(
 
   const video = await prisma.video.findFirst({
     where: { id: videoId, store_id: storeId },
-    select: { id: true, provider: true, provider_video_id: true, thumbnail_url: true },
+    select: { id: true, store_id: true, provider: true, provider_video_id: true, thumbnail_url: true },
   });
   if (!video) return reply.status(404).send({ error: "video_not_found" });
 
-  const providerVideoId = (video.provider_video_id ?? "").trim();
-  if (video.provider === "bunny" && providerVideoId) {
-    // Bunny Stream config is only required for bunny-hosted assets — legacy
-    // rows (provider supabase etc.) must stay deletable without it.
-    const { libraryId, apiKey } = getBunnyStreamConfig();
-    if (!libraryId || !apiKey) {
-      return reply.status(500).send({ error: "missing_bunny_stream_config" });
-    }
-    const response = await bunnyStreamFetch({
-      apiKey,
-      libraryId,
-      method: "DELETE",
-      path: `/videos/${providerVideoId}`,
-    });
-    // A video already gone at Bunny (404) must not block the local delete.
-    if (!response.ok && response.status !== 404) {
-      return reply.status(502).send({ error: await readBunnyError(response) });
-    }
-  }
-
-  // Best-effort thumbnail cleanup — only for CDN-hosted (Bunny Storage)
-  // thumbnails; legacy Supabase URLs resolve to "" and are skipped.
-  const thumbnailPath = bunnyStoragePathFromPublicUrl(video.thumbnail_url);
-  if (thumbnailPath) {
-    try {
-      await deleteFromBunnyStorage(thumbnailPath);
-    } catch (error) {
-      request.log.warn({ err: error }, "thumbnail cleanup failed");
-    }
-  }
-
-  await prisma.videoProduct.deleteMany({ where: { video_id: videoId } });
-
-  try {
-    await prisma.video.deleteMany({ where: { id: videoId, store_id: storeId } });
-  } catch {
-    // Original fallback: when the hard delete fails, archive the row instead.
-    try {
-      await prisma.video.updateMany({
-        where: { id: videoId, store_id: storeId },
-        data: { processing_status: "archived", status: "deleted" },
-      });
-    } catch (updateError) {
-      return reply.status(500).send({
-        error:
-          updateError instanceof Error
-            ? updateError.message
-            : "video_delete_failed",
-      });
-    }
-  }
+  const result = await deleteVideoAndBunnyAsset(video);
+  if (!result.ok) return reply.status(result.status).send({ error: result.error });
 
   return reply.status(200).send({ ok: true });
 }
