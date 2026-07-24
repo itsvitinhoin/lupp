@@ -184,6 +184,79 @@ describe("admin console Bunny video management (e2e)", () => {
     ).resolves.toBeNull();
   });
 
+  it("filters videos by store_id and product_id using the local DB (Bunny has no such filter)", async () => {
+    env.BUNNY_STREAM_LIBRARY_ID = "686560";
+    env.BUNNY_STREAM_API_KEY = "stream-key";
+    env.BUNNY_STREAM_CDN_HOSTNAME = "vz-test.b-cdn.net";
+
+    const { store: storeA } = await createStore();
+    const { store: storeB } = await createStore();
+    const productA = await prisma.product.create({
+      data: { store_id: storeA.id, name: "Produto A", platform: "upzero" },
+    });
+    await createVideo({
+      storeId: storeA.id,
+      provider_video_id: "guid-a",
+      productIds: [productA.id],
+    });
+    await createVideo({ storeId: storeB.id, provider_video_id: "guid-b" });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse({
+          guid: "guid-a",
+          title: "Video A",
+          length: 10,
+          status: 4,
+          storageSize: 100,
+          views: 1,
+          width: 1080,
+          height: 1920,
+          thumbnailFileName: "thumb.jpg",
+        }),
+      ),
+    );
+
+    const admin = await createUser({ role: "admin" });
+    const token = app.jwt.sign({ sub: admin.id, role: "admin" });
+
+    const byStore = await request(app.server)
+      .get("/api/admin-console/bunny/videos")
+      .query({ store_id: storeA.id })
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(byStore.status).toBe(200);
+    expect(byStore.body.totalItems).toBe(1);
+    expect(byStore.body.items).toHaveLength(1);
+    expect(byStore.body.items[0].guid).toBe("guid-a");
+    expect(byStore.body.items[0].db).toMatchObject({ store: { id: storeA.id } });
+
+    const byProduct = await request(app.server)
+      .get("/api/admin-console/bunny/videos")
+      .query({ product_id: productA.id })
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(byProduct.status).toBe(200);
+    expect(byProduct.body.totalItems).toBe(1);
+    expect(byProduct.body.items[0].guid).toBe("guid-a");
+  });
+
+  it("lists every store for the Bunny filter dropdown", async () => {
+    const { store } = await createStore();
+    const admin = await createUser({ role: "admin" });
+    const token = app.jwt.sign({ sub: admin.id, role: "admin" });
+
+    const response = await request(app.server)
+      .get("/api/admin-console/bunny/stores")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(
+      response.body.items.some((item: { id: string }) => item.id === store.id),
+    ).toBe(true);
+  });
+
   it("deletes an orphaned Bunny video with no local row without touching the database", async () => {
     env.BUNNY_STREAM_LIBRARY_ID = "686560";
     env.BUNNY_STREAM_API_KEY = "stream-key";

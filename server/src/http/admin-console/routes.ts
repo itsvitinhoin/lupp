@@ -5,6 +5,8 @@ import { adminConsoleActionHandler, AdminConsoleActionSchema } from "./actions";
 import {
   adminConsoleBunnyDeleteVideoHandler,
   AdminConsoleBunnyDeleteVideoSchema,
+  adminConsoleBunnyStoresHandler,
+  AdminConsoleBunnyStoresSchema,
   adminConsoleBunnySummaryHandler,
   AdminConsoleBunnySummarySchema,
   adminConsoleBunnyVideosHandler,
@@ -79,6 +81,11 @@ export async function AdminConsoleRoutes(app: FastifyTypedInstance) {
     "/api/admin-console/bunny/summary",
     { schema: AdminConsoleBunnySummarySchema.schema, preHandler },
     adminConsoleBunnySummaryHandler,
+  );
+  app.get(
+    "/api/admin-console/bunny/stores",
+    { schema: AdminConsoleBunnyStoresSchema.schema, preHandler },
+    adminConsoleBunnyStoresHandler,
   );
   app.delete(
     "/api/admin-console/bunny/videos/:guid",

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ColorPickerField } from "@/components/shared/ColorPickerField";
 import { PhonePreview } from "@/components/shared/PhonePreview";
+import { AdvancedSwitch } from "./widgets/AdvancedSwitch";
 import { Copy, ExternalLink, Heart, MessageCircle, Send, ShoppingBag } from "lucide-react";
 import { mockVideos } from "@/data/mock";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +20,7 @@ import { cn, formatBRL } from "@/lib/utils";
 import { primaryProductOfVideo } from "@/lib/video-products";
 
 type FeedOptions = {
+  accentColor: string;
   addToCartInline: boolean;
   autoplayMuted: boolean;
   closeButtonColor: string;
@@ -41,6 +43,7 @@ type FeedOptions = {
 };
 
 const defaultFeedOptions: FeedOptions = {
+  accentColor: "",
   addToCartInline: true,
   autoplayMuted: true,
   closeButtonColor: "#ffffff",
@@ -89,6 +92,7 @@ function money(value?: number | string | null) {
 type FeedManagerStore = {
   id: string;
   slug?: string | null;
+  button_color?: string | null;
 };
 
 /**
@@ -127,6 +131,10 @@ export function FeedManager({ store }: { store: FeedManagerStore | null | undefi
     const display = asSettings(settings.display);
     const feed = asSettings(settings.feed_options);
     setOptions({
+      // Empty string means "inherit the store's own button_color" — same
+      // sentinel convention as the carousel's accent_color.
+      accentColor:
+        typeof feed.accent_color === "string" ? feed.accent_color : "",
       addToCartInline: asBoolean(
         feed.add_to_cart_inline,
         defaultFeedOptions.addToCartInline,
@@ -210,6 +218,7 @@ export function FeedManager({ store }: { store: FeedManagerStore | null | undefi
             feed_enabled: options.enabled,
           },
           feed_options: {
+            accent_color: options.accentColor,
             add_to_cart_inline: options.addToCartInline,
             autoplay_muted: options.autoplayMuted,
             close_button_color: options.closeButtonColor,
@@ -292,7 +301,7 @@ export function FeedManager({ store }: { store: FeedManagerStore | null | undefi
 
           <Card className="border-border bg-card text-foreground shadow-sm">
             <CardHeader>
-              <CardTitle className="text-foreground">Aparência</CardTitle>
+              <CardTitle className="text-foreground">Elementos visíveis</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <ToggleRow
@@ -340,7 +349,7 @@ export function FeedManager({ store }: { store: FeedManagerStore | null | undefi
 
           <Card className="border-border bg-card text-foreground shadow-sm">
             <CardHeader>
-              <CardTitle className="text-foreground">Comportamento</CardTitle>
+              <CardTitle className="text-foreground">Reprodução</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <ToggleRow
@@ -363,6 +372,14 @@ export function FeedManager({ store }: { store: FeedManagerStore | null | undefi
                 label="Pausar vídeo ao sair da tela"
                 onChange={(value) => setOption("pauseWhenHidden", value)}
               />
+            </CardContent>
+          </Card>
+
+          <Card className="border-border bg-card text-foreground shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-foreground">Carrinho e saída</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <ToggleRow
                 checked={options.addToCartInline}
                 label="Add to cart sem sair do feed"
@@ -385,14 +402,31 @@ export function FeedManager({ store }: { store: FeedManagerStore | null | undefi
 
           <Card className="border-border bg-card text-foreground shadow-sm">
             <CardHeader>
-              <CardTitle className="text-foreground">
-                Aparência do overlay
-              </CardTitle>
+              <CardTitle className="text-foreground">Aparência</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <AdvancedSwitch
+                checked={Boolean(options.accentColor)}
+                description="Cor de destaque usada nos botões e curtidas do feed. Quando desativado, usa a mesma cor de destaque (button_color) configurada para a loja."
+                label="Cor de destaque própria"
+                onChange={(value) =>
+                  setOption(
+                    "accentColor",
+                    value ? store?.button_color || "#fe2c55" : "",
+                  )
+                }
+              />
+              {options.accentColor ? (
+                <ColorPickerField
+                  id="feed-accent-color"
+                  label="Cor de destaque do feed"
+                  value={options.accentColor}
+                  onChange={(value) => setOption("accentColor", value)}
+                />
+              ) : null}
               <ColorPickerField
                 id="feed-overlay-backdrop-color"
-                label="Cor de fundo"
+                label="Cor de fundo do overlay"
                 value={options.overlayBackdropColor}
                 onChange={(value) => setOption("overlayBackdropColor", value)}
               />

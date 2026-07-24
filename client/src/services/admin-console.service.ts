@@ -6,6 +6,7 @@ import type {
   AdminConsoleSnapshot,
   AdminCursorPage,
   AdminPlatformUser,
+  AdminPlatformUserStoreRef,
   AsaasAccountOverview,
   AsaasAccountSubscription,
   AsaasCustomer,
@@ -24,7 +25,7 @@ import type {
   AdminStoreVideo,
 } from "@/types/admin-console";
 
-type CursorListOptions = { cursor?: string | null; search?: string };
+type CursorListOptions = { cursor?: string | null; limit?: number; search?: string };
 
 async function fetchAsaasList<TItem>(
   resource: "payments" | "customers" | "subscriptions" | "invoices",
@@ -48,6 +49,7 @@ async function fetchStoreList<TItem>(
 ) {
   const params = new URLSearchParams();
   if (options.cursor) params.set("cursor", options.cursor);
+  if (options.limit) params.set("limit", String(options.limit));
   if (options.search?.trim()) params.set("search", options.search.trim());
   const data = await apiGet<AdminCursorPage<TItem>>(
     `/api/admin-console/stores/${encodeURIComponent(storeId)}/${resource}?${params}`,
@@ -193,12 +195,20 @@ export const adminConsoleService = {
   },
 
   async getBunnyVideos(
-    options: { page?: number; itemsPerPage?: number; search?: string } = {},
+    options: {
+      page?: number;
+      itemsPerPage?: number;
+      search?: string;
+      storeId?: string;
+      productId?: string;
+    } = {},
   ) {
     const params = new URLSearchParams();
     if (options.page) params.set("page", String(options.page));
     if (options.itemsPerPage) params.set("itemsPerPage", String(options.itemsPerPage));
     if (options.search?.trim()) params.set("search", options.search.trim());
+    if (options.storeId) params.set("store_id", options.storeId);
+    if (options.productId) params.set("product_id", options.productId);
     const data = await apiGet<AdminBunnyVideosPage>(
       `/api/admin-console/bunny/videos?${params}`,
     );
@@ -210,6 +220,14 @@ export const adminConsoleService = {
     const data = await apiGet<AdminBunnySummary>("/api/admin-console/bunny/summary");
     if (!data) throw new Error("Bunny não retornou dados.");
     return data;
+  },
+
+  async getBunnyStores() {
+    const data = await apiGet<{ items: AdminPlatformUserStoreRef[] }>(
+      "/api/admin-console/bunny/stores",
+    );
+    if (!data) throw new Error("Bunny não retornou dados.");
+    return data.items;
   },
 
   async deleteBunnyVideo(guid: string) {

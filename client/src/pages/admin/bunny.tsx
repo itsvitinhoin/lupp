@@ -4,6 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ListItem } from "@/components/shared/ListItem";
 import { StatCard } from "@/components/shared/StatCard";
@@ -72,11 +79,18 @@ function BunnyConsole({
   const queryClient = useQueryClient();
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState("");
+  const [storeFilter, setStoreFilter] = React.useState("all");
+  const [productFilter, setProductFilter] = React.useState("all");
   const debouncedSearch = useDebouncedValue(search, 350);
 
   React.useEffect(() => {
     setPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, storeFilter, productFilter]);
+
+  const handleStoreFilterChange = (value: string) => {
+    setStoreFilter(value);
+    setProductFilter("all");
+  };
 
   const summaryQuery = useQuery({
     queryKey: ["admin-console", "bunny", "summary"],
@@ -84,13 +98,38 @@ function BunnyConsole({
     retry: false,
   });
 
+  const storesQuery = useQuery({
+    queryKey: ["admin-console", "bunny", "stores"],
+    queryFn: () => adminConsoleService.getBunnyStores(),
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const productsQuery = useQuery({
+    queryKey: ["admin-console", "bunny", "products", storeFilter],
+    queryFn: () =>
+      adminConsoleService.getStoreProducts(storeFilter, { limit: 100 }),
+    enabled: storeFilter !== "all",
+    retry: false,
+  });
+
   const videosQuery = useQuery({
-    queryKey: ["admin-console", "bunny", "videos", page, debouncedSearch],
+    queryKey: [
+      "admin-console",
+      "bunny",
+      "videos",
+      page,
+      debouncedSearch,
+      storeFilter,
+      productFilter,
+    ],
     queryFn: () =>
       adminConsoleService.getBunnyVideos({
         page,
         itemsPerPage: ITEMS_PER_PAGE,
         search: debouncedSearch,
+        storeId: storeFilter === "all" ? undefined : storeFilter,
+        productId: productFilter === "all" ? undefined : productFilter,
       }),
     retry: false,
   });
@@ -187,14 +226,46 @@ function BunnyConsole({
         <Card className="border-border bg-card text-foreground shadow-sm">
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-foreground">Vídeos</CardTitle>
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                className="pl-9"
-                placeholder="Buscar por título..."
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={storeFilter} onValueChange={handleStoreFilterChange}>
+                <SelectTrigger className="h-9 w-48 bg-card text-sm font-bold">
+                  <SelectValue placeholder="Todas as lojas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as lojas</SelectItem>
+                  {(storesQuery.data ?? []).map((store) => (
+                    <SelectItem key={store.id} value={store.id}>
+                      {store.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={productFilter}
+                onValueChange={setProductFilter}
+                disabled={storeFilter === "all"}
+              >
+                <SelectTrigger className="h-9 w-48 bg-card text-sm font-bold">
+                  <SelectValue placeholder="Todos os produtos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os produtos</SelectItem>
+                  {(productsQuery.data?.items ?? []).map((product) => (
+                    <SelectItem key={product.id} value={product.id}>
+                      {product.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="pl-9"
+                  placeholder="Buscar por título..."
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </div>
             </div>
           </CardHeader>
           <CardContent className="gap-3">
